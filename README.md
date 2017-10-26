@@ -1,2 +1,5 @@
-# aws-instance-scheduler
-Provides AWS Signing implementation of Apache Interface.
+AWS Instance Scheduler
+
+## License
+
+This library is licensed under the Amazon Software License.
