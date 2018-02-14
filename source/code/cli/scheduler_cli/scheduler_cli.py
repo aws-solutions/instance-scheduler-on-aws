@@ -110,7 +110,7 @@ def handle_command(args, command):
         lambda_resource = cloudformation_client.describe_stack_resource(
             StackName=args.stack, LogicalResourceId="Main").get("StackResourceDetail", None)
 
-        lambda_client = boto3.client("lambda")
+        lambda_client = _service_client("lambda", region=args.region)
 
         event = {
             "source": EVENT_SOURCE,
