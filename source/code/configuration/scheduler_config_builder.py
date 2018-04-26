@@ -370,6 +370,12 @@ class SchedulerConfigBuilder:
                      ATTR_SCHEDULE_LAMBDA_ACCOUNT]:
             if attr in config.__dict__ and config.__dict__[attr] is not None:
                 result[attr] = config.__dict__[attr]
+                
+        if "_start_tags" in config.__dict__ and config.__dict__["_start_tags"] is not None:
+            result["started_tags"] = config.__dict__["_start_tags"]
+            
+        if "_stop_tags" in config.__dict__ and config.__dict__["_stop_tags"] is not None:
+            result["stopped_tags"] = config.__dict__["_stop_tags"]
 
         for attr in [ATTR_REGIONS,
                      ATTR_CROSS_ACCOUNT_ROLES,
