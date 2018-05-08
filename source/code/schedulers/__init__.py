@@ -28,6 +28,7 @@ INST_TAGS = "tags"
 INST_MAINTENANCE_WINDOW = "maintenance_window"
 INST_ENGINE_TYPE = "engine_type"
 INST_DB_ARN = "db_inst_arn"
+INST_ASG = "asg_name"
 
 PARAM_ACCOUNT = "account"
 PARAM_CONTEXT = "context"
