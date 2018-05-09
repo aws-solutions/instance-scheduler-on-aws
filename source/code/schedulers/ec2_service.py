@@ -31,7 +31,7 @@ ERR_STOPPING_INSTANCES = "Error stopping instances {}, ({})"
 INF_FETCHED_INSTANCES = "Number of fetched ec2 instances is {}, number of instances in a schedulable state is {}"
 INF_FETCHING_INSTANCES = "Fetching ec2 instances for account {} in region {}"
 INF_SETTING_SIZE = "Setting size for ec2 instance {} to {}"
-INF_FETCHING_ASG_INSTANCES = "Fetching schedulable ec2 instances belonging to an asg for account {} in region {}"
+INF_FETCHING_ASG_INSTANCES = "Fetching schedulable ec2 instances belonging to an autoscaling group for account {} in region {}"
 INF_FETCHED_ASG_INSTANCES = "Number of fetched schedulable ec2 instances that belong to an autoscaling group: {}"
 INF_STANDBY_MODE = "{} standby mode for the instances: {} in autoscaling group: {}"
 
@@ -40,11 +40,13 @@ WARN_STOPPED_INSTANCES_TAGGING = "Error deleting or creating tags for stopped in
 WARNING_INSTANCE_NOT_STARTING = "Ec2 instance {} is not started"
 WARNING_INSTANCE_NOT_STOPPING = "Ec2 instance {} is not stopped"
 WARN_STANDBY_GROUP = "Action {} standby failed for the instance group {} in autoscaling group {}. Will retry individually."
-WARN_STANDBY_FAILED = "Failed setting the standby mode ({}) for instances {}. No action will be take on it ({})"
-WARN_STANDBY_FAILED_EXIT = "Failed to exit standby mode for instances {}. Scheduled action will still be taken."
+WARN_STANDBY_FAILED_ENTER = "Instances {} failed to enter standby mode, they will not be stopped."
+WARN_STANDBY_FAILED_EXIT = "Instances {} were started but failed to exit standby mode."
 
 DEBUG_SKIPPED_INSTANCE = "Skipping ec2 instance {} because it it not in a schedulable state ({})"
 DEBUG_SELECTED_INSTANCE = "Selected ec2 instance {} in state ({})"
+DEBUG_INSTANCE_STANDBY_EXIT = "Instance {} failed to exit standby mode. ({})"
+DEBUG_INSTANCE_STANDBY_ENTER = "Instance {} failed to enter standby mode. ({})"
 
 
 class Ec2Service:
@@ -212,63 +214,75 @@ class Ec2Service:
         except Exception as ex:
             self._logger.error("Error resizing instance {}, ({})", ",".join(instance.id), str(ex))
 
-    def asg_instance_standby(self, instances, mode):
+    def group_asg_instances(self, instances):
         # prepare instances that are a part of an asg, sort, and group for batch processing
         asg_instances = [instance for instance in instances if instance.asg_name]
         asg_instances.sort(key=lambda asg_instance: asg_instance.asg_name)
         grouped_instances = itertools.groupby(asg_instances, lambda asg_instance: asg_instance.asg_name)
-        # for each ASG name, set the instances standby mode
+        return grouped_instances
+
+    def exit_standby(self, instances):
         standby_instances = []
         failed_instances = []
-        for asg_name, instances in grouped_instances:
+        for asg_name, instances in self.group_asg_instances(instances):
             batches = self.instance_batches(instances, STANDBY_BATCH_SIZE)
             for asg_instance_batch in batches:
                 asg_instance_ids = [i.id for i in list(asg_instance_batch)]
-                if mode == 'enter':
-                    self._logger.info(INF_STANDBY_MODE, 'Entering', asg_instance_ids, asg_name)
-                    asg_client = get_client_with_retries("autoscaling", ["enter_standby"], context=self._context,
-                                                         session=self._session, region=self._region)
-                    try:
-                        resp = asg_client.enter_standby_with_retries(InstanceIds=asg_instance_ids,
-                                                                     AutoScalingGroupName=asg_name,
-                                                                     ShouldDecrementDesiredCapacity=True)
-                        for activity in resp['Activities']:
-                            standby_instances.extend(
-                                re.search(r"^Moving EC2 instance to Standby: (i-.*)$", activity['Description']).group(
-                                    1))
-                    except Exception as ex:
-                        if len(asg_instance_ids) > 1:
-                            # group failed, send the generator the retries
-                            self._logger.warning(WARN_STANDBY_GROUP, mode, asg_instance_ids, asg_name)
-                            batches.send(asg_instance_batch)
-                        else:  # working on individual instance
-                            not_inservice = re.search(r"The instance (i-.*) is not in InService.",
-                                                      str(ex))
-                            if not_inservice:
-                                self._logger.warning('Instance {} is already not InService', not_inservice.group(1))
-                                standby_instances.extend(not_inservice.group(1).split(","))
-                            else:
-                                # here the batch failed to complete the requested action, add them to the failed list
-                                failed_instances.append(asg_instance_ids)
-                elif mode == 'exit':
-                    self._logger.info(INF_STANDBY_MODE, 'Exiting', asg_instance_ids, asg_name)
-                    asg_client = get_client_with_retries("autoscaling", ["exit_standby"], context=self._context,
-                                                         session=self._session, region=self._region)
-                    try:
-                        resp = asg_client.exit_standby_with_retries(InstanceIds=asg_instance_ids,
-                                                                 AutoScalingGroupName=asg_name)
-                        for activity in resp['Activities']:
-                            standby_instances.extend(re.search(r"^Moving EC2 instance out of Standby: (i-.*)$",
-                                                               activity['Description']).group(1))
-                    except Exception as ex:
-                        if len(asg_instance_ids) > 1:
-                            # group failed, send the generator the retries
-                            self._logger.warning(WARN_STANDBY_GROUP, mode, asg_instance_ids, asg_name)
-                            batches.send(asg_instance_batch)
-                        else:
-                            self._logger.warning(WARN_STANDBY_FAILED_EXIT, asg_instance_ids)
 
-        self._logger.info("Instances with standby mode '{}': {}. Failed: {}", mode, standby_instances, failed_instances)
+                self._logger.info(INF_STANDBY_MODE, 'Exiting', asg_instance_ids, asg_name)
+                asg_client = get_client_with_retries("autoscaling", ["exit_standby"], context=self._context,
+                                                     session=self._session, region=self._region)
+                try:
+                    resp = asg_client.exit_standby_with_retries(InstanceIds=asg_instance_ids,
+                                                                AutoScalingGroupName=asg_name)
+                    for activity in resp['Activities']:
+                        standby_instances.extend([re.search(r"^Moving EC2 instance out of Standby: (i-.*)$",
+                                                            activity['Description']).group(1)])
+                except Exception as ex:
+                    if len(asg_instance_ids) > 1:
+                        # group failed, send the generator the retries
+                        self._logger.warning(WARN_STANDBY_GROUP, 'exit', asg_instance_ids, asg_name)
+                        batches.send(asg_instance_batch)
+                    else:
+                        self._logger.debug(DEBUG_INSTANCE_STANDBY_EXIT, asg_instance_ids, str(ex))
+                        failed_instances.extend(asg_instance_ids)
+        return standby_instances, failed_instances
+
+    def enter_standby(self, instances):
+        standby_instances = []
+        failed_instances = []
+
+        for asg_name, instances in self.group_asg_instances(instances):
+            batches = self.instance_batches(instances, STANDBY_BATCH_SIZE)
+            for asg_instance_batch in batches:
+                asg_instance_ids = [i.id for i in list(asg_instance_batch)]
+
+                self._logger.info(INF_STANDBY_MODE, 'Entering', asg_instance_ids, asg_name)
+                asg_client = get_client_with_retries("autoscaling", ["enter_standby"], context=self._context,
+                                                     session=self._session, region=self._region)
+                try:
+                    resp = asg_client.enter_standby_with_retries(InstanceIds=asg_instance_ids,
+                                                                 AutoScalingGroupName=asg_name,
+                                                                 ShouldDecrementDesiredCapacity=True)
+                    for activity in resp['Activities']:
+                        standby_instances.extend([
+                            re.search(r"^Moving EC2 instance to Standby: (i-.*)$", activity['Description']).group(
+                                1)])
+                except Exception as ex:
+                    if len(asg_instance_ids) > 1:
+                        # group failed, send the generator the retries
+                        self._logger.warning(WARN_STANDBY_GROUP, 'enter', asg_instance_ids, asg_name)
+                        batches.send(asg_instance_batch)
+                    else:  # working on individual instance
+                        not_inservice = re.search(r"The instance (i-.*) is not in InService.",
+                                                  str(ex))
+                        if not_inservice:
+                            self._logger.warning('Instance {} is already not InService', not_inservice.group(1))
+                            standby_instances.extend(not_inservice.group(1).split(","))
+                        else:
+                            self._logger.debug(DEBUG_INSTANCE_STANDBY_ENTER, asg_instance_ids, str(ex))
+                            failed_instances.extend(asg_instance_ids)
+        return standby_instances, failed_instances
 
     # noinspection PyMethodMayBeStatic
     def stop_instances(self, **kwargs):
@@ -280,8 +294,11 @@ class Ec2Service:
 
         stopped_instances = kwargs[schedulers.PARAM_STOPPED_INSTANCES]
 
-        # handle asg instances
-        self.asg_instance_standby(stopped_instances, 'enter')
+        # handle asg instances, do not stop those that fail
+        standby_instances, failed_exit_standby = self.enter_standby(stopped_instances)
+        if failed_exit_standby:
+            self._logger.warning(WARN_STANDBY_FAILED_ENTER, failed_exit_standby)
+            stopped_instances = [instance for instance in stopped_instances if instance.id not in failed_exit_standby]
 
         stop_tags = kwargs[schedulers.PARAM_CONFIG].stopped_tags
         start_tags_keys = [{"Key": t["Key"]} for t in kwargs[schedulers.PARAM_CONFIG].started_tags]
@@ -324,9 +341,6 @@ class Ec2Service:
 
         started_instances = kwargs[schedulers.PARAM_STARTED_INSTANCES]
 
-        # exit standby mode for instances that need to be started
-        self.asg_instance_standby(started_instances, 'exit')
-
         start_tags = kwargs[schedulers.PARAM_CONFIG].started_tags
         stop_tags_keys = [{"Key": t["Key"]} for t in kwargs[schedulers.PARAM_CONFIG].stopped_tags]
         client = get_client_with_retries("ec2", ["start_instances", "create_tags", "delete_tags"],
@@ -357,3 +371,10 @@ class Ec2Service:
                         client.create_tags_with_retries(Resources=instances_starting, Tags=start_tags)
                 except Exception as ex:
                     self._logger.warning(WARN_STARTED_INSTANCES_TAGGING, ','.join(instances_starting), str(ex))
+
+                # exit standby mode for instances that need to be started
+                standby_instances, failed_exit_standby = self.exit_standby([instance for instance in instance_batch if instance.id in instances_starting])
+                started_failed_exit_standby = [instance for instance in instances_starting if
+                                     instance in failed_exit_standby]
+                if started_failed_exit_standby:
+                    self._logger.warning(WARN_STANDBY_FAILED_EXIT, started_failed_exit_standby)

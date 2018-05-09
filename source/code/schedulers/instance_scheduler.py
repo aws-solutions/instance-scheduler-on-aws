@@ -471,7 +471,7 @@ class InstanceScheduler:
                 if instance.is_running:
                     # instance needs to be stopped
                     self._logger.debug(DEBUG_STOPPED_REGION_INSTANCES, instance.instance_str, instance.region)
-                    # append instance to list of instances to start
+                    # append instance to list of instances to stop
                     self._scheduler_stop_list.append(instance)
                     # stopped instance with desired state of running but in retained state mode
                     # (manually stopped in running period and already running at start)
@@ -519,5 +519,5 @@ class InstanceScheduler:
                 schedulers.PARAM_STACK: self._stack_name,
                 schedulers.PARAM_CONFIG: self._scheduler_configuration
             }):
-                # set state based on start of stop action
+                # set state based on returned state from stop action
                 self._instance_states.set_instance_state(inst_id, state)
