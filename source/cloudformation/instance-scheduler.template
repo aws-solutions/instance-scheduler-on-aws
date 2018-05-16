@@ -783,6 +783,14 @@
                     }, {
                         "Effect": "Allow",
                         "Action": [
+                            "autoscaling:DescribeAutoScalingInstances",
+                            "autoscaling:ExitStandby",
+                            "autoscaling:EnterStandby"
+                        ],
+                        "Resource": "*"
+                    }, {
+                        "Effect": "Allow",
+                        "Action": [
                             "rds:AddTagsToResource",
                             "rds:DeleteDBSnapshot",
                             "rds:DescribeDBInstances",

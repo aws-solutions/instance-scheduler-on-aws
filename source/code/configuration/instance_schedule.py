@@ -40,6 +40,7 @@ class InstanceSchedule:
     STATE_STOPPED = "stopped"
     STATE_RUNNING = "running"
     STATE_RETAIN_RUNNING = "retain-running"
+    STATE_STANDBY = "standby"
 
     def __init__(self, name, periods=None, timezone=None, override_status=None, description=None, use_metrics=None,
                  stop_new_instances=None, schedule_dt=None, use_maintenance_window=False, enforced=False, retain_running=False):

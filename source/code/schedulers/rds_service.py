@@ -55,6 +55,7 @@ class RdsService:
     def __init__(self):
         self.service_name = "rds"
         self.allow_resize = False
+        self.supports_standby = False
         self._instance_tags = None
 
         self._context = None
@@ -262,7 +263,9 @@ class RdsService:
                 instance["PreferredMaintenanceWindow"]),
             schedulers.INST_TAGS: tags,
             schedulers.INST_NAME: tags.get("Name", ""),
-            schedulers.INST_SCHEDULE: tags.get(self._tagname, None)
+            schedulers.INST_SCHEDULE: tags.get(self._tagname, None),
+            schedulers.INST_ASG: None,
+            schedulers.INST_ASG_LIFECYCLE_STATE: None
         }
         return instance_data
 
