@@ -87,9 +87,14 @@ class InstanceScheduler:
         self._logger = None
         self._context = None
 
-        # valid regions for service
+        # ==================================
+        # valid regions for AWS Commercical
         self._valid_regions = boto3.Session().get_available_regions(service.service_name)
 
+        # valid region for GovCloud
+        # self._valid_regions = "us-gov-west-1"
+        # ==================================
+        
         self._usage_metrics = {"Started": {}, "Stopped": {}, "Resized": {}}
 
     @property
