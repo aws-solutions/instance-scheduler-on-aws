@@ -34,7 +34,7 @@ CMD_HELP_VERSION = "Show version"
 
 HELP_ENDDATE = "End time of the period in format yyyymmdd, default is today"
 HELP_NAME_SCHEDULE = "Name of the schedule"
-HELP_PERIOD_BEGINTIME = "Begin time of the period in hotmat hh:mm"
+HELP_PERIOD_BEGINTIME = "Begin time of the period in format hh:mm"
 HELP_PERIOD_DESCRIPTION = "Description for the period"
 HELP_PERIOD_ENDTIME = "End time of the period in format hh:mm"
 HELP_PERIOD_MONTH_DAYS = "Calendar monthdays of the period"
