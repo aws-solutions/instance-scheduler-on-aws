@@ -28,8 +28,8 @@ s3http='https:\/\/s3-eu-west-1.amazonaws.com\/$(bucket)'
 pydirs= configuration configuration/setbuilders requesthandlers schedulers util boto_retry
 py=$(foreach dir, $(pydirs), $(wildcard $(dir)/*.py))
 
-cli_dirs = ./cli ./cli/scheduler_cli
-pycli=$(foreach dir, $(cli_dirs), $(wildcard $(dir)/*.py))
+cli_dirs = cli cli/scheduler_cli
+pycli=$(foreach d, $(cli_dirs), $(wildcard $(d)/*.py))
 
 
 # ops automator templates
@@ -42,7 +42,7 @@ zip = $(deployment)/instance-scheduler-$(version).zip
 zip_cli = $(deployment)/scheduler-cli-$(version).zip
 pwd=`pwd`
 
-build: lambda cfn cli
+build: lambda scheduler-cli  cfn
 
 ######################################################################################################################
 # lambda code                                                                                                        #
@@ -68,7 +68,7 @@ lambda:$(py) main.py version.txt
 # cli                                                                                                                #
 ######################################################################################################################
 
-cli:$(pycli) version.txt
+scheduler-cli:$(pycli) version.txt
 
 	# delete old deployments
 	find $(deployment) -maxdepth 1 -type f -name 'scheduler-cli-*.zip' -delete
@@ -126,11 +126,6 @@ deploy: lambda cfn cli
 	aws s3 cp $(deployment)/scheduler-cli-latest.zip $(s3bucket) --acl public-read
 
 	python update-build-number.py version.txt
-
-
-	#next few lines during developement only
-	sleep 15
-	aws cloudformation update-stack --stack-name InstanceScheduler --template-url https://s3-eu-west-1.amazonaws.com/instance-scheduler-deploy/instance-scheduler-latest.template --capabilities CAPABILITY_IAM --parameters "`aws cloudformation describe-stacks --stack-name InstanceScheduler --query Stacks[0].Parameters[]`"
 
 
 

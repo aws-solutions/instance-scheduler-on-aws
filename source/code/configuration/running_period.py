@@ -125,14 +125,14 @@ class RunningPeriod:
                 return desired_state
             elif self.begintime is None:
                 # just the end time, stopped if later than that time
-                desired_state = InstanceSchedule.STATE_STOPPED if t > self.endtime else InstanceSchedule.STATE_ANY
+                desired_state = InstanceSchedule.STATE_STOPPED if t >= self.endtime else InstanceSchedule.STATE_ANY
                 self._log_debug(DEBUG_CHECK_DT_STOP_TIME,
                                 check_running_state_str(desired_state), ts,
                                "before" if desired_state == InstanceSchedule.STATE_ANY else "after",
                                 time_str(self.endtime), desired_state)
                 return desired_state
 
-            elif self.endtime is None:
+            elif self.begintime is not None and self.endtime is None:
                 # just the start time, running if later that that time
                 desired_state = InstanceSchedule.STATE_RUNNING if t >= self.begintime else InstanceSchedule.STATE_ANY
                 self._log_debug(DEBUG_CHECK_DT_START_TIME,

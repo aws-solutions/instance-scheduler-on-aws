@@ -64,7 +64,7 @@ MSG_OVERWRITE_OVERRIDE_MUTALLY_EXCLUSIVE = "{} and {} are mytualy exclusive opti
 MSG_SCHEDULE_IS_NOT_DEFINED = "Period \"{}\" used in schedule \"{}\" is not defined"
 MSG_TAGNAME_MISSING_IN_CONFIGURATION = "tagname is missing in configuration"
 MSG_INVALID_SCHEDULE_TIMEZONE = "\"{}\" is in schedule config \"{}\" is not a valid timezone, check pytz.all_timezone for " \
-                                 "valid zones"
+                                "valid zones"
 
 
 class SchedulerConfigBuilder:
@@ -371,6 +371,11 @@ class SchedulerConfigBuilder:
             if attr in config.__dict__ and config.__dict__[attr] is not None:
                 result[attr] = config.__dict__[attr]
 
+        for attr in [ATTR_STARTED_TAGS,
+                     ATTR_STOPPED_TAGS]:
+            if attr in config.__dict__ and config.__dict__[attr] is not None:
+                result[attr] = ",".join(["{}={}".format(t["Key"], t["Value"]) for t in config.__dict__[attr]])
+
         for attr in [ATTR_REGIONS,
                      ATTR_CROSS_ACCOUNT_ROLES,
                      ATTR_SCHEDULED_SERVICES]:
@@ -389,6 +394,7 @@ class SchedulerConfigBuilder:
                          ATTR_STOP_NEW_INSTANCES,
                          ATTR_USE_METRICS,
                          ATTR_ENFORCED,
+                         ATTR_USE_MAINTENANCE_WINDOW,
                          ATTR_RETAIN_RUNNING]:
                 if attr in schedule.__dict__ and schedule.__dict__[attr] is not None:
                     result[ATTR_SCHEDULES][schedule_name][attr] = schedule.__dict__[attr]

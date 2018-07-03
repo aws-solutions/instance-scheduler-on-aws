@@ -64,8 +64,8 @@ class SchedulerConfig:
         self.schedule_lambda_account = schedule_lambda_account
         self.scheduled_services = scheduled_services
         self._service_settings = None
-        self._start_tags = started_tags
-        self._stop_tags = stopped_tags
+        self.started_tags = [] if started_tags in ["" or None] else self.tag_list(self.build_tags_from_template(started_tags))
+        self.stopped_tags = [] if stopped_tags in ["" or None] else self.tag_list(self.build_tags_from_template(stopped_tags))
 
     def get_schedule(self, name):
         """
@@ -74,28 +74,6 @@ class SchedulerConfig:
         :return: Schedule, None f it does not exist
         """
         return self.schedules[name] if name in self.schedules else None
-
-    @property
-    def started_tags(self):
-        """
-        Return tags to set to started instances
-        :return:  tags for started instances
-        """
-        if self._start_tags in ["" or None]:
-            return []
-        else:
-            return self.tag_list(self.build_tags_from_template(self._start_tags))
-
-    @property
-    def stopped_tags(self):
-        """
-              Return tags to set to stopped instances
-              :return:  tags for stopped instances
-              """
-        if self._stop_tags in ["" or None]:
-            return []
-        else:
-            return self.tag_list(self.build_tags_from_template(self._stop_tags))
 
     @classmethod
     def build_tags_from_template(cls, tags_str, tag_variables=None):
@@ -143,8 +121,8 @@ class SchedulerConfig:
                                         str(self.trace),
                                         str(self.use_metrics),
                                         ", ".join(self.regions),
-                                        self._start_tags,
-                                        self._stop_tags,
+                                        str(self.started_tags),
+                                        str(self.stopped_tags),
                                         str(self.schedule_lambda_account),
                                         ", ".join(self.cross_account_roles))
 

@@ -12,6 +12,9 @@
 ######################################################################################################################
 
 import schedulers
+import re
+import copy
+
 from boto_retry import get_client_with_retries
 
 from configuration.instance_schedule import InstanceSchedule
@@ -19,15 +22,18 @@ from configuration.running_period import RunningPeriod
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
 from configuration.setbuilders.weekday_setbuilder import WeekdaySetBuilder
 
+RESTRICTED_RDS_TAG_VALUE_SET_CHARACTERS = r"[^a-zA-Z0-9\s_\.:+/=\\@-]"
+
 RDS_DB_ARN = "arn:aws:rds:{}:{}:db:{}"
 
 ERR_STARTING_INSTANCE = "Error starting rds instance {} ({})"
 ERR_STOPPING_INSTANCE = "Error stopping rds instance {}, action : {} ({})"
 
+INF_ADD_TAGS = "Adding {} tags {} to instance {}"
 INF_DELETE_SNAPSHOT = "Deleted previous snapshot {}"
 INF_FETCHED = "Number of fetched rds  instances is {}, number of instances in a schedulable state is {}"
 INF_FETCHING_INSTANCES = "Fetching rds instances for account {} in region {}"
-
+INF_REMOVE_KEYS = "Removing {} key(s) {} from instance {}"
 INF_STOPPED_INSTANCE = "Stopped rds instance \"{}\" and creating snapshot \"{}\""
 
 DEBUG_MULTI_AZ = "Can not schedule Multi-AZ or Mirrored database rds instance \"{}\""
@@ -41,6 +47,9 @@ DEBUG_NO_SCHEDULE_TAG = "Instance {} has no schedule tag named {}"
 
 WARN_TAGGING_STARTED = "Error setting start or stop tags to started instance {}, ({})"
 WARN_TAGGING_STOPPED = "Error setting start or stop tags to stopped instance {}, ({})"
+WARN_RDS_TAG_VALUE = "Tag value \"{}\" for tag \"{}\" changed to \"{}\" because it did contain characters that are not allowed " \
+                     "in RDS tag values. The value can only contain only the set of Unicode letters, digits, " \
+                     "white-space, '_', '.', '/', '=', '+', '-'"
 
 MAINTENANCE_SCHEDULE_NAME = "Preferred Maintenance Window Schedule"
 MAINTENANCE_PERIOD_NAME = "Preferred Maintenance Window Period"
@@ -171,7 +180,7 @@ class RdsService:
 
         return schedule
 
-    def get_schedulable_instances(self, **kwargs):
+    def get_schedulable_instances(self, kwargs):
 
         def is_schedulable(rds_inst):
 
@@ -266,11 +275,22 @@ class RdsService:
         }
         return instance_data
 
-    def resize_instance(self, **kwargs):
+    def resize_instance(self, kwargs):
         pass
 
+    def _validate_rds_tag_values(self, tags):
+        result = copy.deepcopy(tags)
+        for t in result:
+            original_value = t.get("Value", "")
+            value = re.sub(RESTRICTED_RDS_TAG_VALUE_SET_CHARACTERS, " ", original_value)
+            value = value.replace("\n", " ")
+            if value != original_value:
+                self._logger.warning(WARN_RDS_TAG_VALUE, original_value, t, value)
+                t["Value"] = value
+        return result
+
     # noinspection PyMethodMayBeStatic
-    def stop_instances(self, **kwargs):
+    def stop_instances(self, kwargs):
 
         def does_snapshot_exist(name):
 
@@ -294,7 +314,7 @@ class RdsService:
 
         client = get_client_with_retries("rds", methods, context=self._context, session=self._session, region=self._region)
 
-        stop_tags = self._config.stopped_tags
+        stop_tags = self._validate_rds_tag_values(self._config.stopped_tags)
         start_tags_keys = [t["Key"] for t in self._config.started_tags]
 
         stopped_instances = kwargs["stopped_instances"]
@@ -317,21 +337,24 @@ class RdsService:
                 client.stop_db_instance_with_retries(DBInstanceIdentifier=inst.id, DBSnapshotIdentifier=snapshot_name)
                 self._logger.info(INF_STOPPED_INSTANCE, inst.id, snapshot_name)
 
+                try:
+                    if start_tags_keys is not None and len(start_tags_keys):
+                        self._logger.info(INF_REMOVE_KEYS, "start",
+                                          ",".join(["\"{}\"".format(k) for k in start_tags_keys]), arn)
+                        client.remove_tags_from_resource_with_retries(ResourceName=arn, TagKeys=start_tags_keys)
+                    if stop_tags is not None and len(stop_tags) > 0:
+                        self._logger.info(INF_ADD_TAGS, "stop", str(stop_tags), arn)
+                        client.add_tags_to_resource_with_retries(ResourceName=arn, Tags=stop_tags)
+                except Exception as ex:
+                    self._logger.warning(WARN_TAGGING_STOPPED, inst.id, str(ex))
+
                 yield inst.id, InstanceSchedule.STATE_STOPPED
             except Exception as ex:
                 self._logger.error(ERR_STOPPING_INSTANCE, inst.instance_str, action, str(ex))
                 return
 
-            try:
-                if start_tags_keys is not None and len(start_tags_keys):
-                    client.remove_tags_from_resource_with_retries(ResourceName=arn, TagKeys=start_tags_keys)
-                if stop_tags is not None and len(stop_tags) > 0:
-                    client.add_tags_to_resource_with_retries(ResourceName=arn, Tags=stop_tags)
-            except Exception as ex:
-                self._logger.warning(WARN_TAGGING_STOPPED, inst.id, str(ex))
-
     # noinspection PyMethodMayBeStatic
-    def start_instances(self, **kwargs):
+    def start_instances(self, kwargs):
         self._init_scheduler(kwargs)
 
         methods = ["start_db_instance",
@@ -340,7 +363,7 @@ class RdsService:
 
         client = get_client_with_retries("rds", methods, context=self._context, session=self._session, region=self._region)
 
-        start_tags = kwargs[schedulers.PARAM_CONFIG].started_tags
+        start_tags = self._validate_rds_tag_values(kwargs[schedulers.PARAM_CONFIG].started_tags)
         stop_tags_keys = [t["Key"] for t in self._config.stopped_tags]
 
         started_instances = kwargs["started_instances"]
@@ -348,15 +371,19 @@ class RdsService:
             arn = RDS_DB_ARN.format(inst.region, inst.account, inst.id)
             try:
                 client.start_db_instance_with_retries(DBInstanceIdentifier=inst.id)
+
+                try:
+                    if stop_tags_keys is not None and len(stop_tags_keys):
+                        self._logger.info(INF_REMOVE_KEYS, "stop",
+                                          ",".join(["\"{}\"".format(k) for k in stop_tags_keys]), arn)
+                        client.remove_tags_from_resource_with_retries(ResourceName=arn, TagKeys=stop_tags_keys)
+                    if start_tags is not None and len(start_tags) > 0:
+                        self._logger.info(INF_ADD_TAGS, "start", str(start_tags), arn)
+                        client.add_tags_to_resource_with_retries(ResourceName=arn, Tags=start_tags)
+                except Exception as ex:
+                    self._logger.warning(WARN_TAGGING_STARTED, inst.id, str(ex))
+
                 yield inst.id, InstanceSchedule.STATE_RUNNING
             except Exception as ex:
                 self._logger.error(ERR_STARTING_INSTANCE, inst.instance_str, str(ex))
                 return
-
-            try:
-                if stop_tags_keys is not None and len(stop_tags_keys):
-                    client.remove_tags_from_resource_with_retries(ResourceName=arn, TagKeys=stop_tags_keys)
-                if start_tags is not None and len(start_tags) > 0:
-                    client.add_tags_to_resource_with_retries(ResourceName=arn, Tags=start_tags)
-            except Exception as ex:
-                self._logger.warning(WARN_TAGGING_STARTED, inst.id, str(ex))

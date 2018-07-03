@@ -16,8 +16,6 @@ echo "mkdir -p dist"
 mkdir -p dist
 
 mv instance-scheduler-latest.template dist/instance-scheduler.template
-mv instance-scheduler-remote-latest.template dist/instance-scheduler-remote.template
-mv instance-schedule-forward-events-latest.template dist/instance-schedule-forward-events.template
 mv scheduler-cli-latest.zip dist/scheduler-cli.zip
 mv instance-scheduler-`cat ../source/code/version.txt`.zip dist
 rm instance-scheduler-`cat ../source/code/version.txt`.template

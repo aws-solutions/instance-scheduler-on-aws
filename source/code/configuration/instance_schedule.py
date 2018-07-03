@@ -109,7 +109,7 @@ class InstanceSchedule:
         s += "\n".join(attributes)
         return s
 
-    def get_desired_state(self, instance, logger=None, dt=None):
+    def get_desired_state(self, instance, logger=None, dt=None, check_adjacent_periods =True):
         """
         Test if an instance should be running at a specific moment in this schedule
         :param instance: the instance to test
@@ -202,12 +202,7 @@ class InstanceSchedule:
         self._log_debug(DEBUG_USED_TIME_FOR_SCHEDULE, localized_time.strftime("%c"))
 
         # get the desired state for every period in the schedule
-        periods_with_desired_states = [
-            {
-                "period": p["period"], "instancetype": p.get("instancetype", None),
-                "state": p["period"].get_desired_state(self._logger, localized_time)
-            }
-            for p in self.periods]
+        periods_with_desired_states = self.get_periods_with_desired_states(localized_time)
 
         # get periods from the schema that have a running state
         periods_with_running_state = filter(lambda period: period["state"] == InstanceSchedule.STATE_RUNNING,
@@ -220,7 +215,29 @@ class InstanceSchedule:
         if any(period_with_any_state):
             return handle_any_state()
 
+        if len(periods_with_desired_states) > 1 and check_adjacent_periods:
+            self._log_debug("Checking for adjacent running periods at current time")
+            self._log_debug("Checking states for previous minute")
+            last_minute_running_periods = [p for p in self.get_periods_with_desired_states(localized_time - timedelta(minutes=1)) if p["state"] == InstanceSchedule.STATE_RUNNING]
+            self._log_debug("Running period(s) for previous minute {}", ",".join([p["period"].name for p in last_minute_running_periods]))
+            if len(last_minute_running_periods) > 0:
+                self._log_debug("Checking states for next minute")
+                next_minute_running_periods = [p for p in self.get_periods_with_desired_states(localized_time + timedelta(minutes=1)) if p["state"] == InstanceSchedule.STATE_RUNNING]
+                self._log_debug("Running period(s) for next minute {}", ",".join([p["period"].name for p in next_minute_running_periods]))
+                if len(next_minute_running_periods):
+                    self._log_debug("Adjacent periods found, keep instance in running state")
+                    return handle_running_state(instance, last_minute_running_periods)
+
         return handle_stopped_state()
+
+    def get_periods_with_desired_states(self, time):
+        periods_with_desired_states = [
+            {
+                "period": p["period"], "instancetype": p.get("instancetype", None),
+                "state": p["period"].get_desired_state(self._logger, time)
+            }
+            for p in self.periods]
+        return periods_with_desired_states
 
     def get_usage(self, start_dt, stop_dt=None, instance=None, logger=None):
         """
@@ -280,7 +297,7 @@ class InstanceSchedule:
             instance_type = None
             inst = instance or as_namedtuple("Instance", {"instance_str": "instance", "allow_resize": False})
             for tm in sorted(list(timeline)):
-                desired_state, instance_type, period = self.get_desired_state(inst, self._logger, tm)
+                desired_state, instance_type, period = self.get_desired_state(inst, self._logger, tm, False)
 
                 if current_state != desired_state:
                     if desired_state == InstanceSchedule.STATE_RUNNING:
@@ -289,6 +306,9 @@ class InstanceSchedule:
                         starting_period = period
                     elif desired_state == InstanceSchedule.STATE_STOPPED:
                         stopped = tm
+                        desired_state_with_adj_check, _, __ = self.get_desired_state(inst, self._logger, tm, True)
+                        if desired_state_with_adj_check == InstanceSchedule.STATE_RUNNING:
+                            stopped += timedelta(minutes=1)
                         if current_state == InstanceSchedule.STATE_RUNNING:
                             current_state = InstanceSchedule.STATE_STOPPED
                             running_periods[starting_period] = (make_period(started, stopped, instance_type))

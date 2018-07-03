@@ -169,7 +169,7 @@ class InstanceScheduler:
     def _scheduled_instances_in_region(self, account, region):
 
         # use service strategy to get a list of instances that can be scheduled for that service
-        for instance in self._service.get_schedulable_instances(**{
+        for instance in self._service.get_schedulable_instances({
             schedulers.PARAM_SESSION: account.session,
             schedulers.PARAM_ACCOUNT: account.name,
             schedulers.PARAM_ROLE: account.role,
@@ -406,7 +406,7 @@ class InstanceScheduler:
             try:
 
                 # adjust instance type before starting using the resize_instance method in the service_strategy
-                self._service.resize_instance(**{
+                self._service.resize_instance({
                     schedulers.PARAM_SESSION: account.session,
                     schedulers.PARAM_ACCOUNT: account.name,
                     schedulers.PARAM_ROLE: account.role,
@@ -489,7 +489,7 @@ class InstanceScheduler:
             self._logger.info(INF_STARTING_INSTANCES, ", ".join([i.instance_str for i in self._scheduler_start_list]),
                               region)
 
-            for inst_id, state in self._service.start_instances(**{
+            for inst_id, state in self._service.start_instances({
                 schedulers.PARAM_SESSION: account.session,
                 schedulers.PARAM_ACCOUNT: account.name,
                 schedulers.PARAM_ROLE: account.role,
@@ -507,7 +507,7 @@ class InstanceScheduler:
         if len(self._scheduler_stop_list) > 0:
             self._logger.info(INF_STOPPED_INSTANCES, ", ".join([i.instance_str for i in self._scheduler_stop_list]),
                               region)
-            for inst_id, state in self._service.stop_instances(**{
+            for inst_id, state in self._service.stop_instances({
                 schedulers.PARAM_SESSION: account.session,
                 schedulers.PARAM_ACCOUNT: account.name,
                 schedulers.PARAM_ROLE: account.role,

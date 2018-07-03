@@ -14,11 +14,13 @@
 import jmespath
 
 import schedulers
+import time
 from boto_retry import get_client_with_retries
 from configuration.instance_schedule import InstanceSchedule
 
 # instances are started in batches, larger bathes are more efficient but smaller batches allow more instances
 # to start if we run into resource limits
+
 START_BATCH_SIZE = 5
 STOP_BATCH_SIZE = 50
 
@@ -28,6 +30,8 @@ ERR_STOPPING_INSTANCES = "Error stopping instances {}, ({})"
 INF_FETCHED_INSTANCES = "Number of fetched ec2 instances is {}, number of instances in a schedulable state is {}"
 INF_FETCHING_INSTANCES = "Fetching ec2 instances for account {} in region {}"
 INF_SETTING_SIZE = "Setting size for ec2 instance {} to {}"
+INF_ADD_KEYS = "Adding {} key(s) {} to instance(s) {}"
+INFO_REMOVING_KEYS = "Removing {} key(s) {} from instance(s) {}"
 
 WARN_STARTED_INSTANCES_TAGGING = "Error deleting or creating tags for started instances {} ({})"
 WARN_STOPPED_INSTANCES_TAGGING = "Error deleting or creating tags for stopped instances {} ({})"
@@ -77,7 +81,7 @@ class Ec2Service:
             yield instance_buffer
 
     # get instances and handle paging
-    def get_schedulable_instances(self, **kwargs):
+    def get_schedulable_instances(self, kwargs):
         session = kwargs[schedulers.PARAM_SESSION]
         context = kwargs[schedulers.PARAM_CONTEXT]
         region = kwargs[schedulers.PARAM_REGION]
@@ -149,7 +153,7 @@ class Ec2Service:
         return instance_data
 
     # noinspection PyMethodMayBeStatic
-    def resize_instance(self, **kwargs):
+    def resize_instance(self, kwargs):
 
         self._init_scheduler(kwargs)
         instance = kwargs[schedulers.PARAM_INSTANCE]
@@ -166,7 +170,13 @@ class Ec2Service:
             self._logger.error("Error resizing instance {}, ({})", ",".join(instance.id), str(ex))
 
     # noinspection PyMethodMayBeStatic
-    def stop_instances(self, **kwargs):
+    def get_instance_status(self, client, instance_ids):
+        status_resp = client.describe_instances_with_retries(InstanceIds=instance_ids)
+        jmes = "Reservations[*].Instances[*].{InstanceId:InstanceId, State:State}[]"
+        return jmespath.search(jmes, status_resp)
+
+    # noinspection PyMethodMayBeStatic
+    def stop_instances(self, kwargs):
 
         def is_in_stopping_state(state):
             return (state & 0xFF) in Ec2Service.EC2_STOPPING_STATES
@@ -177,70 +187,108 @@ class Ec2Service:
         stop_tags = kwargs[schedulers.PARAM_CONFIG].stopped_tags
         start_tags_keys = [{"Key": t["Key"]} for t in kwargs[schedulers.PARAM_CONFIG].started_tags]
 
-        methods = ["stop_instances", "create_tags", "delete_tags"]
+        methods = ["stop_instances", "create_tags", "delete_tags", "describe_instances"]
         client = get_client_with_retries("ec2", methods=methods, context=self._context, session=self._session, region=self._region)
 
         for instance_batch in self.instance_batches(stopped_instances, STOP_BATCH_SIZE):
 
-            instances_stopping = []
             instance_ids = [i.id for i in list(instance_batch)]
 
             try:
                 stop_resp = client.stop_instances_with_retries(InstanceIds=instance_ids)
-                for stopped_instance in stop_resp["StoppingInstances"]:
-                    if is_in_stopping_state(stopped_instance["CurrentState"]["Code"]):
-                        instances_stopping.append(stopped_instance["InstanceId"])
-                        yield stopped_instance["InstanceId"], InstanceSchedule.STATE_STOPPED
-                    else:
-                        self._logger.warning(WARNING_INSTANCE_NOT_STOPPING, stopped_instance["InstanceId"])
+                instances_stopping = [i["InstanceId"] for i in stop_resp.get("StoppingInstances", []) if
+                                      is_in_stopping_state(i.get("CurrentState", {}).get("Code", ""))]
+
+                get_status_count = 0
+                if len(instances_stopping) < len(instance_ids):
+                    time.sleep(5)
+
+                    instances_stopping = [i["InstanceId"] for i in self.get_instance_status(client, instance_ids) if
+                                          is_in_stopping_state(i.get("State", {}).get("Code", ""))]
+
+                    if len(instances_stopping) == len(instance_ids):
+                        break
+
+                    get_status_count += 1
+                    if get_status_count > 3:
+                        for i in instance_ids:
+                            if i not in instances_stopping:
+                                self._logger.warning(WARNING_INSTANCE_NOT_STOPPING, i)
+                        break
+
+                if len(instances_stopping) > 0:
+                    try:
+                        if start_tags_keys is not None and len(start_tags_keys):
+                            self._logger.info(INFO_REMOVING_KEYS, "start",
+                                              ",".join(["\"{}\"".format(k["Key"]) for k in start_tags_keys]),
+                                              ",".join(instances_stopping))
+                            client.delete_tags_with_retries(Resources=instances_stopping, Tags=start_tags_keys)
+                        if stop_tags is not None and len(stop_tags) > 0:
+                            self._logger.info(INF_ADD_KEYS, "stop", str(stop_tags), ",".join(instances_stopping))
+                            client.create_tags_with_retries(Resources=instances_stopping, Tags=stop_tags)
+                    except Exception as ex:
+                        self._logger.warning(WARN_STOPPED_INSTANCES_TAGGING, ','.join(instances_stopping), str(ex))
+
+                for i in instances_stopping:
+                    yield i, InstanceSchedule.STATE_STOPPED
+
             except Exception as ex:
                 self._logger.error(ERR_STOPPING_INSTANCES, ",".join(instance_ids), str(ex))
 
-            if len(instances_stopping) > 0:
-                try:
-                    if start_tags_keys is not None and len(start_tags_keys):
-                        client.delete_tags_with_retries(Resources=instances_stopping, Tags=start_tags_keys)
-                    if stop_tags is not None and len(stop_tags) > 0:
-                        client.create_tags_with_retries(Resources=instances_stopping, Tags=stop_tags)
-                except Exception as ex:
-                    self._logger.warning(WARN_STOPPED_INSTANCES_TAGGING, ','.join(instances_stopping), str(ex))
-
     # noinspection PyMethodMayBeStatic
-    def start_instances(self, **kwargs):
+    def start_instances(self, kwargs):
 
         def is_in_starting_state(state):
             return (state & 0xFF) in Ec2Service.EC2_STARTING_STATES
 
         self._init_scheduler(kwargs)
 
-        started_instances = kwargs[schedulers.PARAM_STARTED_INSTANCES]
+        instances_to_start = kwargs[schedulers.PARAM_STARTED_INSTANCES]
         start_tags = kwargs[schedulers.PARAM_CONFIG].started_tags
         stop_tags_keys = [{"Key": t["Key"]} for t in kwargs[schedulers.PARAM_CONFIG].stopped_tags]
-        client = get_client_with_retries("ec2", ["start_instances", "create_tags", "delete_tags"],
+        client = get_client_with_retries("ec2", ["start_instances", "describe_instances", "create_tags", "delete_tags"],
                                          context=self._context, session=self._session, region=self._region)
 
-        for instance_batch in self.instance_batches(started_instances, START_BATCH_SIZE):
-
-            instances_starting = []
+        for instance_batch in self.instance_batches(instances_to_start, START_BATCH_SIZE):
 
             instance_ids = [i.id for i in list(instance_batch)]
             try:
                 start_resp = client.start_instances_with_retries(InstanceIds=instance_ids)
+                instances_starting = [i["InstanceId"] for i in start_resp.get("StartingInstances", []) if
+                                      is_in_starting_state(i.get("CurrentState", {}).get("Code", ""))]
 
-                for started_instance in start_resp["StartingInstances"]:
-                    if is_in_starting_state(started_instance["CurrentState"]["Code"]):
-                        instances_starting.append(started_instance["InstanceId"])
-                        yield started_instance["InstanceId"], InstanceSchedule.STATE_RUNNING
-                    else:
-                        self._logger.warning(WARNING_INSTANCE_NOT_STARTING, started_instance["InstanceId"])
+                get_status_count = 0
+                if len(instances_starting) < len(instance_ids):
+                    time.sleep(5)
+
+                    instances_starting = [i["InstanceId"] for i in self.get_instance_status(client, instance_ids) if
+                                          is_in_starting_state(i.get("State", {}).get("Code", ""))]
+
+                    if len(instances_starting) == len(instance_ids):
+                        break
+
+                    get_status_count += 1
+                    if get_status_count > 3:
+                        for i in instance_ids:
+                            if i not in instances_starting:
+                                self._logger.warning(WARNING_INSTANCE_NOT_STARTING, i)
+                        break
+
+                if len(instances_starting) > 0:
+                    try:
+                        if stop_tags_keys is not None and len(stop_tags_keys) > 0:
+                            self._logger.info(INFO_REMOVING_KEYS, "stop",
+                                              ",".join(["\"{}\"".format(k["Key"]) for k in stop_tags_keys]),
+                                              ",".join(instances_starting))
+                            client.delete_tags_with_retries(Resources=instances_starting, Tags=stop_tags_keys)
+                        if start_tags is not None and len(start_tags) > 0:
+                            self._logger.info(INF_ADD_KEYS, "start", str(start_tags), ",".join(instances_starting))
+                            client.create_tags_with_retries(Resources=instances_starting, Tags=start_tags)
+                    except Exception as ex:
+                        self._logger.warning(WARN_STARTED_INSTANCES_TAGGING, ','.join(instances_starting), str(ex))
+
+                for i in instances_starting:
+                    yield i, InstanceSchedule.STATE_RUNNING
+
             except Exception as ex:
                 self._logger.error(ERR_STARTING_INSTANCES, ",".join(instance_ids), str(ex))
-
-            if len(instances_starting) > 0:
-                try:
-                    if stop_tags_keys is not None and len(stop_tags_keys):
-                        client.delete_tags_with_retries(Resources=instances_starting, Tags=stop_tags_keys)
-                    if start_tags is not None and len(start_tags) > 0:
-                        client.create_tags_with_retries(Resources=instances_starting, Tags=start_tags)
-                except Exception as ex:
-                    self._logger.warning(WARN_STARTED_INSTANCES_TAGGING, ','.join(instances_starting), str(ex))

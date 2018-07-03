@@ -38,6 +38,7 @@ HELP_PERIOD_BEGINTIME = "Begin time of the period in hotmat hh:mm"
 HELP_PERIOD_DESCRIPTION = "Description for the period"
 HELP_PERIOD_ENDTIME = "End time of the period in format hh:mm"
 HELP_PERIOD_MONTH_DAYS = "Calendar monthdays of the period"
+HELP_PERIOD_MONTHS = "Months of the period"
 HELP_PERIOD_NAME = "Name of the period"
 HELP_PERIOD_WEEKDAYS = "Weekdays of the period"
 HELP_QUERY = "JMESPath query to transform or filter the result"
@@ -70,6 +71,7 @@ PARAM_ENFORCED = "--enforced"
 PARAM_RETAINED_RUNNING = "--retain-running"
 PARAM_METRICS = "--metrics"
 PARAM_MONTHDAYS = "--monthdays"
+PARAM_MONTHS = "--months"
 PARAM_OVERRIDE = "--override-status"
 PARAM_PERIODS = "--periods"
 PARAM_STARTDATE = "--startdate"
@@ -110,7 +112,7 @@ def handle_command(args, command):
         lambda_resource = cloudformation_client.describe_stack_resource(
             StackName=args.stack, LogicalResourceId="Main").get("StackResourceDetail", None)
 
-        lambda_client = boto3.client("lambda")
+        lambda_client = _service_client("lambda", region=args.region)
 
         event = {
             "source": EVENT_SOURCE,
@@ -163,6 +165,7 @@ def build_parser():
         period_parser.add_argument(PARAM_DESCRIPTION, help=HELP_PERIOD_DESCRIPTION)
         period_parser.add_argument(PARAM_ENDTIME, help=HELP_PERIOD_ENDTIME)
         period_parser.add_argument(PARAM_MONTHDAYS, help=HELP_PERIOD_MONTH_DAYS)
+        period_parser.add_argument(PARAM_MONTHS,help=HELP_PERIOD_MONTHS)
         period_parser.add_argument(PARAM_NAME, required=True, help=HELP_PERIOD_NAME)
         period_parser.add_argument(PARAM_WEEKDAYS, help=HELP_PERIOD_WEEKDAYS)
 
@@ -254,6 +257,4 @@ def build_parser():
 def main():
     parser = build_parser()
     p = parser.parse_args(sys.argv[1:])
-    sys.exit( p.func(p, p.command))
-
-
+    sys.exit(p.func(p, p.command))

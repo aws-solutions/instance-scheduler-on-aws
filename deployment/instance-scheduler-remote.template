@@ -1,0 +1,112 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "ECS and RDS scheduler cross account role, version 2.2.2.0",
+    "Parameters": {
+        "InstanceSchedulerAccount": {
+            "Type": "String",
+            "AllowedPattern": "(^[0-9]{12}$)",
+            "ConstraintDescription": "Account number is a 12 digit number",
+            "Description": "Account number of Instance Scheduler account to give access to manage EC2 and RDS  Instances in this account."
+        }
+    },
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [{
+                "Label": {
+                    "default": "Account"
+                },
+                "Parameters": [
+                    "InstanceSchedulerAccount"
+                ]
+            }],
+            "ParameterLabels": {
+                "InstanceSchedulerAccount": {
+                    "default": "Primary account"
+                }
+            }
+        }
+    },
+    "Resources": {
+        "EC2SchedulerCrossAccountRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": {
+                                "Fn::Join": [
+                                    "", [
+                                        "arn:aws:iam::", {
+                                            "Ref": "InstanceSchedulerAccount"
+                                        },
+                                        ":root"
+                                    ]
+                                ]
+                            },
+                            "Service": "lambda.amazonaws.com"
+                        },
+                        "Action": [
+                            "sts:AssumeRole"
+                        ]
+                    }]
+                },
+                "Path": "/",
+                "Policies": [{
+                    "PolicyName": "EC2InstanceSchedulerRemote",
+                    "PolicyDocument": {
+                        "Version": "2012-10-17",
+                        "Statement": [{
+                            "Effect": "Allow",
+                            "Action": [
+                                "ec2:DescribeInstances",
+                                "ec2:StartInstances",
+                                "ec2:StopInstances",
+                                "ec2:ModifyInstanceAttribute",
+                                "ec2:CreateTags",
+                                "ec2:DeleteTags"
+                            ],
+                            "Resource": [
+                                "*"
+                            ]
+                        }, {
+                            "Effect": "Allow",
+                            "Action": [
+                                "rds:DescribeDBInstances",
+                                "rds:DescribeDBSnapshots",
+                                "rds:StartDBInstance",
+                                "rds:StopDBInstance",
+                                "rds:AddTagsToResource",
+                                "rds:RemoveTagsFromResource",
+                                "rds:DeleteDBSnapshot"
+                            ],
+                            "Resource": [
+                                "*"
+                            ]
+                        }, {
+                            "Effect": "Allow",
+                            "Action": [
+                                "tag:GetResources"
+                            ],
+                            "Resource": [
+                                "*"
+                            ]
+                        }]
+                    }
+                }]
+            }
+        }
+    },
+    "Outputs": {
+        "CrossAccountRole": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2SchedulerCrossAccountRole",
+                    "Arn"
+                ]
+            },
+            "Description": "Arn for cross account role for Instance scheduler, add this arn to the list of crossaccount roles (CrossAccountRoles) parameter of the Instance Scheduler template."
+        }
+    }
+}

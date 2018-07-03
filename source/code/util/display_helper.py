@@ -35,7 +35,7 @@ class DisplayHelper:
         :param t: time
         :return: time as a string
         """
-        return "{:0>2d}:{:0>2d}".format(t.hour, t.minute)
+        return "{:0>2d}:{:0>2d}:{:0>2d}".format(t.hour, t.minute, t.second)
 
     @staticmethod
     def set_as_str(the_set, display_names=None, offset=0):
