@@ -94,7 +94,34 @@
                             ]
                         }]
                     }
-                }]
+                },
+                {
+                    "Effect": "Allow",
+                     "Action": [
+                         "kms:CreateGrant"
+                     ],
+                     "Resource": [
+                         {
+                             "Fn::Join": [
+                                 ":",
+                                     [
+                                         "arn:aws:kms",
+                                         {
+                                             "Ref": "AWS::Region"
+                                         },
+                                         {
+                                             "Ref": "AWS::AccountId"
+                                         },
+                                         "key/*"
+                                    ]
+                              ]
+                         } ],
+                     "Condition": {
+                         "Bool": {
+                             "kms:GrantIsForAWSResource": true
+                         }
+                     }
+                 }]
             }
         }
     },
