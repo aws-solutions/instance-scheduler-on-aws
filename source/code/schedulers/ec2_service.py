@@ -175,6 +175,37 @@ class Ec2Service:
         jmes = "Reservations[*].Instances[*].{InstanceId:InstanceId, State:State}[]"
         return jmespath.search(jmes, status_resp)
 
+    def get_asg(self, client, instance_ids):
+        asg = client.describe_auto_scaling_instances_with_retries(InstanceIds=instance_ids)
+        jmes = "AutoScalingInstances[*].AutoScalingGroupName"
+        return jmespath.search(jmes, response)
+
+    def suspend_asg(self, instance_ids):
+        client = get_client_with_retries("autoscaling",
+                                        ["describe_auto_scaling_instances","suspend_processes"],
+                                        context=self._context, session=self._session, region=self._region)
+        try:
+            asg_names = self.get_asg(client, instances_ids)
+            return client.suspend_processes_with_retries(
+                AutoScalingGroupName=asg_names,
+                ScalingProcesses=['Launch','Terminate',]
+            )
+        except Exception as ex:
+            self._logger.error("Error suspend asg scaling {}, ({})", ",".join(instance.id), str(ex))
+
+    def resume_asg(self, instance_ids):
+        client = get_client_with_retries("autoscaling",
+                                        ["describe_auto_scaling_instances","resume_processes"],
+                                        context=self._context, session=self._session, region=self._region)
+        try:
+            asg_names = self.get_asg(client, instances_ids)
+            return client.resume_processes_with_retries(
+                AutoScalingGroupName=ASGName,
+                ScalingProcesses=['Launch','Terminate',]
+            )
+        except Exception as ex:
+            self._logger.error("Error resume asg scaling {}, ({})", ",".join(instance.id), str(ex))
+
     # noinspection PyMethodMayBeStatic
     def stop_instances(self, kwargs):
 
@@ -195,6 +226,8 @@ class Ec2Service:
             instance_ids = [i.id for i in list(instance_batch)]
 
             try:
+                self.suspend_asg(instance_ids)
+
                 stop_resp = client.stop_instances_with_retries(InstanceIds=instance_ids)
                 instances_stopping = [i["InstanceId"] for i in stop_resp.get("StoppingInstances", []) if
                                       is_in_stopping_state(i.get("CurrentState", {}).get("Code", ""))]
@@ -289,6 +322,8 @@ class Ec2Service:
 
                 for i in instances_starting:
                     yield i, InstanceSchedule.STATE_RUNNING
+
+                self.resume_asg(instance_ids)
 
             except Exception as ex:
                 self._logger.error(ERR_STARTING_INSTANCES, ",".join(instance_ids), str(ex))
