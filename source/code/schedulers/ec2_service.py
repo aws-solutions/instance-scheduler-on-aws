@@ -44,7 +44,7 @@ DEBUG_SELECTED_INSTANCE = "Selected ec2 instance {} in state ({})"
 
 class Ec2Service:
     """
-    Implements service start/stop/resize functions for ECS service
+    Implements service start/stop/resize functions for EC2 service
     """
     EC2_STATE_PENDING = 0
     EC2_STATE_RUNNING = 16

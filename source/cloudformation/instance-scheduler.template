@@ -1419,7 +1419,7 @@
                     "Ref": "MemorySize"
                 },
                 "Timeout": 300,
-                "Description": "ECS and RDS instance scheduler, version %version%"
+                "Description": "EC2 and RDS instance scheduler, version %version%"
             },
             "DependsOn": [
                 "SchedulerPolicy",

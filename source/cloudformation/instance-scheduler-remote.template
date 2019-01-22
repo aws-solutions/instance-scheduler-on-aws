@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "ECS and RDS scheduler cross account role, version %version%",
+    "Description": "EC2 and RDS scheduler cross account role, version %version%",
     "Parameters": {
         "InstanceSchedulerAccount": {
             "Type": "String",
