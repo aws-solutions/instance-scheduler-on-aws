@@ -40,6 +40,7 @@ PROP_INSTANCE_TYPE = "InstanceType"
 PROP_METRICS = "Metrics"
 PROP_MONTH_DAYS = "MonthDays"
 PROP_MONTHS = "Months"
+PROP_NAME = "Name"
 PROP_OVERRIDE_STATUS = "OverrideStatus"
 PROP_OVERWRITE = "Overwrite"
 PROP_PERIODS = "Periods"
@@ -53,6 +54,7 @@ VALID_SCHEDULE_PROPERTIES = [
     PROP_DESCRIPTION,
     PROP_ENFORCED,
     PROP_METRICS,
+    PROP_NAME,
     PROP_OVERRIDE_STATUS,
     PROP_OVERWRITE,
     PROP_PERIODS,
@@ -112,7 +114,7 @@ class ScheduleResourceHandler(CustomResource):
 
     @property
     def _schedule_resource_name(self):
-        return "{}-{}".format(self.stack_name, self.logical_resource_id)
+        return self.resource_properties.get(PROP_NAME, "{}-{}".format(self.stack_name, self.logical_resource_id))
 
     def _create_period(self, period):
 
