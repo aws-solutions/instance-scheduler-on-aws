@@ -302,7 +302,7 @@ class RdsService:
                 if type(e).__name__ == "DBSnapshotNotFoundFault":
                     return False
                 else:
-                    raise ex
+                    raise e
 
         self._init_scheduler(kwargs)
 
