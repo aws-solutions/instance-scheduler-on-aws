@@ -11,6 +11,9 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
+# version number
+version=`cat version.txt`
+
 # bucket name to deploy to
 ifndef bucket
 bucket=instance-scheduler-deploy
@@ -18,7 +21,7 @@ endif
 
 # prefix of deployed artifacts in bucket
 ifndef prefix
-prefix = instance-scheduler/latest/
+prefix = instance-scheduler/$(version)/
 endif
 
 s3bucket=s3://$(bucket)/
@@ -34,8 +37,6 @@ pycli=$(foreach d, $(cli_dirs), $(wildcard $(d)/*.py))
 
 # ops automator templates
 templates=$(wildcard ../cloudformation/*.template)
-
-version=`cat version.txt`
 
 deployment=../../deployment
 zip = $(deployment)/instance-scheduler-$(version).zip
@@ -55,13 +56,14 @@ lambda:$(py) main.py version.txt
 
 	mkdir -p $(deployment)
 	zip  $(zip) version.txt
-	mv main.py main.py.org
-	sed s/%version%/$(version)/g main.py.org > main.py
-	zip  $(zip) main.py
-	rm main.py
-	mv main.py.org main.py
+	mv version.py version.py.org
+	sed s/%version%/$(version)/g version.py.org > version.py
+	zip  $(zip) main.py version.py
+	rm version.py
+	mv version.py.org version.py
 	zip -r $(zip)  $(py)  version.txt
 	zip -r -q $(zip) pytz
+	zip -r $(zip) models
 
 
 ######################################################################################################################
@@ -114,7 +116,7 @@ cfn:version.txt $(templates)
 # Deploy to S3                                                                                                       #
 ######################################################################################################################
 
-deploy: lambda cfn cli
+deploy: lambda cfn scheduler-cli
 	aws s3 cp $(deployment)/instance-scheduler-latest.template $(s3bucket)$(prefix)  --acl public-read
 	aws s3 cp $(deployment)/instance-scheduler-latest.template $(s3bucket)  --acl public-read
 

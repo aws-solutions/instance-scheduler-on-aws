@@ -11,10 +11,11 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 import json
-import jmespath
-import configuration
-
 from datetime import datetime
+
+import jmespath
+
+import configuration
 from configuration.config_admin import ConfigAdmin
 from util import safe_json
 from util.logger import Logger
@@ -42,6 +43,10 @@ class AdminCliRequestHandler(object):
         self.additional_parameters = {
             "delete-period": {"exception_if_not_exists": True},
             "delete-schedule": {"exception_if_not_exists": True}
+        }
+
+        self.transform_parameters = {
+            "metrics": "use-metrics"
         }
 
         self.commands = {
@@ -78,6 +83,10 @@ class AdminCliRequestHandler(object):
     @property
     def parameters(self):
         params = self._event.get("parameters", {})
+        for p in params:
+            if p in self.transform_parameters:
+                params[self.transform_parameters[p]] = params[p]
+                del params[p]
         extra = self.additional_parameters.get(self.action, {})
         params.update(extra)
         return {p.replace("-", "_"): params[p] for p in params}

@@ -144,6 +144,22 @@ class SchedulerSetupHandler(CustomResource):
         return result
 
     @property
+    def schedule_clusters(self):
+        """
+        Returns global trace flag
+        :return: trace flag
+        """
+        return self.resource_properties.get(configuration.SCHEDULE_CLUSTERS, "False")
+
+    @property
+    def create_rds_snapshot(self):
+        """
+        Returns global trace flag
+        :return: trace flag
+        """
+        return self.resource_properties.get(configuration.CREATE_RDS_SNAPSHOT, "True")
+
+    @property
     def schedule_lambda_account(self):
         """
         Returns flag for processing lambda account switch
@@ -168,6 +184,8 @@ class SchedulerSetupHandler(CustomResource):
             admin = ConfigAdmin(logger=self._logger, context=self.context)
             settings = admin.update_config(default_timezone=self.default_timezone,
                                            scheduled_services=self.scheduled_services,
+                                           schedule_clusters=self.schedule_clusters,
+                                           create_rds_snapshot = self.create_rds_snapshot,
                                            tagname=self.tagname,
                                            regions=self.regions,
                                            cross_account_roles=self.cross_account_roles,
@@ -187,7 +205,7 @@ class SchedulerSetupHandler(CustomResource):
 
     def set_lambda_logs_retention_period(self):
         """
-        Aligns retention period for default Lambda logstreams with settings 
+        Aligns retention period for default Lambda log streams with settings
         :return: 
         """
 

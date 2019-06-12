@@ -106,14 +106,14 @@ class WeekdaySetBuilder(SetBuilder):
                 return None
 
             # gets the first occurrence of that weekday in the month
-            day_for_number_weekday = self._get_day_for_first_occurence_month(weekday)
+            day_for_number_weekday = self._get_day_for_first_occurrence_month(weekday)
 
-            # return if the nth occurrence was on the day specified in the constructor of the builder
-            return [weekday] if self._day == day_for_number_weekday + ((number - 1) * 7) else []
+            monthday = day_for_number_weekday + ((number - 1) * 7)
+            return [weekday] if self._day == monthday else []
 
         return None
 
-    def _get_day_for_first_occurence_month(self, weekday):
+    def _get_day_for_first_occurrence_month(self, weekday):
         # calculated the first occurrence of a weekday in a month
         day = 1
         if weekday != self._first_weekday_in_month:
@@ -137,7 +137,7 @@ class WeekdaySetBuilder(SetBuilder):
         if last_weekday_str.endswith(WeekdaySetBuilder.LAST_DAY_WILDCARD):
             weekday = fn(last_weekday_str[:-1])
             if weekday is not None:
-                day_for_number_weekday = self._get_day_for_first_occurence_month(weekday)
+                day_for_number_weekday = self._get_day_for_first_occurrence_month(weekday)
                 while day_for_number_weekday + 7 <= self._days_in_month:
                     day_for_number_weekday += 7
                 return [weekday] if day_for_number_weekday == self._day else []

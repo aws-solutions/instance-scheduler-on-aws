@@ -19,6 +19,7 @@ from botocore.vendored import requests
 
 import util
 from util import safe_json
+from version import VERSION
 
 INF_METRICS_DATA = "Sending anonymous metrics data: {}"
 INF_METRICS_DATA_SENT = "Metrics data send, status code is {}, message is {}"
@@ -57,9 +58,10 @@ def send_metrics_data(metrics, logger):
         "UUID": str(uuid.uuid4()),
         "Data": metrics,
         "Solution": solution_id,
+        "Version" : VERSION
     }
 
-    data_json = safe_json(data_dict)
+    data_json = safe_json(data_dict, indent=3)
     logger.info(INF_METRICS_DATA, data_json)
 
     headers = {

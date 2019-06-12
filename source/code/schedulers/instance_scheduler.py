@@ -21,7 +21,6 @@ import boto3
 import configuration
 import pytz
 import schedulers
-
 from boto_retry import get_client_with_retries
 from configuration.instance_schedule import InstanceSchedule
 from instance_states import InstanceStates
@@ -38,7 +37,7 @@ INF_DESIRED_TYPE = ", desired type is {}"
 INF_PROCESSING_ACCOUNT = "Running {} scheduler for account {}{} in region(s) {}"
 INF_STARTING_INSTANCES = "Starting instances {} in region {}"
 INF_STOPPED_INSTANCES = "Stopping instances {} in region {}"
-INF_MAINTENANCE_WINDOW = "Maintenance window used as running period found for instance"
+INF_MAINTENANCE_WINDOW = "Maintenance window \"{}\" used as running period found for instance {}"
 
 INF_DO_NOT_STOP_RETAINED_INSTANCE = "Instance {} was already running at start of period and schedule uses retain option, desired " \
                                     "state set to {} but instance will not be stopped if it is still running."
@@ -174,8 +173,7 @@ class InstanceScheduler:
             schedulers.PARAM_ACCOUNT: account.name,
             schedulers.PARAM_ROLE: account.role,
             schedulers.PARAM_REGION: region,
-            schedulers.PARAM_TRACE: self._configuration.trace,
-            schedulers.PARAM_TAG_NAME: self._configuration.tag_name,
+            schedulers.PARAM_CONFIG: self._configuration,
             schedulers.PARAM_LOGGER: self._logger,
             schedulers.PARAM_CONTEXT: self._context
         }):
@@ -236,7 +234,7 @@ class InstanceScheduler:
 
             # test if the instance has a maintenance window in which it must be running
             if instance.maintenance_window is not None and schedule.use_maintenance_window is True:
-                self._logger.info(INF_MAINTENANCE_WINDOW)
+                self._logger.info(INF_MAINTENANCE_WINDOW, instance.maintenance_window.name, instance.id)
 
                 # get the desired start for the maintenance window at current UTC time
                 inst_state, inst_type, running_period = instance.maintenance_window.get_desired_state(
@@ -357,12 +355,22 @@ class InstanceScheduler:
         return result
 
     def _send_usage_metrics(self):
+        usage_data = []
         for s in self._usage_metrics.keys():
             if len(self._usage_metrics[s]) == 0:
                 del self._usage_metrics[s]
         if len(self._usage_metrics) > 0:
-            self._usage_metrics["Service"] = self._service.service_name
-            send_metrics_data(self._usage_metrics, logger=self._logger)
+            for action in self._usage_metrics:
+                for instance_type in self._usage_metrics.get(action, {}):
+                    usage_data.append({
+                        "Service" : self._service.service_name,
+                        "Action" : action,
+                        "InstanceType" : instance_type,
+                        "Instances" : self._usage_metrics[action][instance_type],
+
+                    })
+
+            send_metrics_data(usage_data, logger=self._logger)
 
     def _collect_usage_metrics(self):
 
@@ -467,11 +475,13 @@ class InstanceScheduler:
 
                             # desired state is running but saved state already saves as retain running
 
-            elif desired_state == InstanceSchedule.STATE_STOPPED:
+            elif desired_state in [InstanceSchedule.STATE_STOPPED, InstanceSchedule.STATE_STOPPED_FOR_RESIZE]:
                 if instance.is_running:
                     # instance needs to be stopped
                     self._logger.debug(DEBUG_STOPPED_REGION_INSTANCES, instance.instance_str, instance.region)
                     # append instance to list of instances to start
+                    if desired_state == InstanceSchedule.STATE_STOPPED_FOR_RESIZE:
+                        instance = instance._replace(resized = True)
                     self._scheduler_stop_list.append(instance)
                     # stopped instance with desired state of running but in retained state mode
                     # (manually stopped in running period and already running at start)

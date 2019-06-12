@@ -202,3 +202,4 @@ class InstanceStates:
                 elif i in self._instances_to_purge:
                     # the instance was not returned by describe instances at last cleanup but it is this time
                     self._instances_to_purge.remove(i)
+

@@ -11,6 +11,4 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
-from scheduler_cli import main
-
-main()
+VERSION = "%version%"

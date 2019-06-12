@@ -11,7 +11,6 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
-
 import argparse
 import json
 import sys
@@ -25,8 +24,8 @@ HELP_CMD_CREATE_PERIOD = "Creates a period"
 HELP_CMD_CREATE_SCHEDULE = "Creates a schedule"
 HELP_CMD_DELETE_SCHEDULE = "Deletes a schedule"
 HELP_CMD_DELETE_PERIOD = "Deletes a period"
-HELP_CMD_DESCRIBE_PERIODS = "Describess configured periods"
-HELP_CMD_DESCRIBE_SCHEDULES = "Described configured schedules"
+HELP_CMD_DESCRIBE_PERIODS = "Describes configured periods"
+HELP_CMD_DESCRIBE_SCHEDULES = "Describes configured schedules"
 HELP_CMD_SCHEDULE_DESCRIBE_USAGE = "Calculates periods and billing hours in which instances are running"
 HELP_CMD_UPDATE_PERIOD = "Updates a period"
 HELP_CMD_UPDATE_SCHEDULE = "Updates a schedule"
@@ -34,7 +33,7 @@ CMD_HELP_VERSION = "Show version"
 
 HELP_ENDDATE = "End time of the period in format yyyymmdd, default is today"
 HELP_NAME_SCHEDULE = "Name of the schedule"
-HELP_PERIOD_BEGINTIME = "Begin time of the period in hotmat hh:mm"
+HELP_PERIOD_BEGINTIME = "Begin time of the period in format hh:mm"
 HELP_PERIOD_DESCRIPTION = "Description for the period"
 HELP_PERIOD_ENDTIME = "End time of the period in format hh:mm"
 HELP_PERIOD_MONTH_DAYS = "Calendar monthdays of the period"
@@ -43,19 +42,22 @@ HELP_PERIOD_NAME = "Name of the period"
 HELP_PERIOD_WEEKDAYS = "Weekdays of the period"
 HELP_QUERY = "JMESPath query to transform or filter the result"
 HELP_REGION = "Region in which the Instance Scheduler stack is deployed"
-HELP_SCHEDULE_CLOUDWATCH_METRICS = "Enable/disable CloudWatch metrics for this schedule"
+HELP_SCHEDULE_CLOUDWATCH_METRICS = "Enable CloudWatch metrics for this schedule"
 HELP_SCHEDULE_DESCRIPTION = "Description for the schedule."
 HELP_SCHEDULE_ENFORCED = "Enforce schedule state for instance."
-HELP_SCHEDULE_RETAIN_RUNNING = "keep instances running at end of period if they were already running at start of period"
+HELP_SCHEDULE_HIBERNATE = "Hibernate EC2 instances if possible when stopped."
+HELP_SCHEDULE_RETAIN_RUNNING = "Keep instances running at end of period if they were already running at start of period"
 HELP_SCHEDULE_NAME = "Name of the schedule"
+HELP_SCHEDULE_SSM_MAINTENANCE_WINDOW = "Name of SSM window in which EC2 instances are started"
 
 HELP_PARAM_TIMEZONE = "Timezone for schedule"
 HELP_SCHEDULE_OVERRIDE_STATUS = "Override status to keep instances in specified state."
 HELP_SCHEDULE_PERIODS = "List of the names of the periods in the schedule. Each period can specify an instance type by " \
                         "appending @<type> to the name of the period."
-HELP_SCHEDULE_STOP_NEW = "Stop new instances if outside of a running period"
+HELP_SCHEDULE_KEEP_NEW = "Do not stop new instances if outside of a running period until end of next period"
 HELP_SCHEDULE_USE_MAIN = "Use prefered maintenace windows of RDS instances as a running period."
 HELP_STACK = "Name of the Instance Scheduler stack"
+HELP_PROFILE_NAME = " The name of a profile to use. If not given, then the default profile is used."
 HELP_STARTDATE = "Start time of the period in format yyyymmdd, default is today"
 HELP_SUB_COMMANDS = "Commands help"
 HELP_VALID_COMMANDS = "Valid subcommands"
@@ -68,22 +70,25 @@ PARAM_DESCRIPTION = "--description"
 PARAM_ENDDATE = "--enddate"
 PARAM_ENDTIME = "--endtime"
 PARAM_ENFORCED = "--enforced"
+PARAM_HIBERNATE = "--hibernate"
 PARAM_RETAINED_RUNNING = "--retain-running"
-PARAM_METRICS = "--metrics"
+PARAM_METRICS = "--use-metrics"
 PARAM_MONTHDAYS = "--monthdays"
 PARAM_MONTHS = "--months"
 PARAM_OVERRIDE = "--override-status"
 PARAM_PERIODS = "--periods"
 PARAM_STARTDATE = "--startdate"
-PARAM_STOP_NEW = "--stop-new-instances"
+PARAM_KEEP_NEW = "--do-not-stop-new-instances"
 PARAM_USE_MAIN = "--use-maintenance-window"
 PARAM_WEEKDAYS = "--weekdays"
 PARAM_TIMEZONE = "--timezone"
+PARAM_SSM_MAINTENCE_WINDOW = "--ssm-maintenance-window"
 
 PARAM_STACK = "--stack"
 PARAM_REGION = "--region"
 PARAM_QUERY = "--query"
-COMMON_PARAMS = [s[2:] for s in [PARAM_QUERY, PARAM_REGION, PARAM_STACK, ]] + ["command"]
+PARAM_PROFILE_NAME = "--profile-name"
+COMMON_PARAMS = [s[2:].replace("-", "_") for s in [PARAM_QUERY, PARAM_REGION, PARAM_STACK, PARAM_PROFILE_NAME]] + ["command"]
 
 CMD_CREATE_PERIOD = "create-period"
 CMD_CREATE_SCHEDULE = "create-schedule"
@@ -99,20 +104,22 @@ CMD_VERSION = "--version"
 PARAM_NAME = "--name"
 
 
-def _service_client(service, region=None):
+def _service_client(service, region=None, profile_name=None):
+    session = boto3.Session() if profile_name is None else boto3.Session(profile_name=profile_name)
     args = {"service_name": service}
     if region is not None:
         args["region_name"] = region
-    return boto3.client(**args)
+
+    return session.client(**args)
 
 
 def handle_command(args, command):
     try:
-        cloudformation_client = _service_client("cloudformation", region=args.region)
+        cloudformation_client = _service_client("cloudformation", region=args.region, profile_name=args.profile_name)
         lambda_resource = cloudformation_client.describe_stack_resource(
             StackName=args.stack, LogicalResourceId="Main").get("StackResourceDetail", None)
 
-        lambda_client = _service_client("lambda", region=args.region)
+        lambda_client = _service_client("lambda", region=args.region, profile_name=args.profile_name)
 
         event = {
             "source": EVENT_SOURCE,
@@ -156,30 +163,65 @@ def handle_command(args, command):
 
 def build_parser():
     def add_common_arguments(parser):
-        parser.add_argument(PARAM_QUERY, help=HELP_QUERY)
-        parser.add_argument(PARAM_REGION, help=HELP_REGION)
+        parser.add_argument(PARAM_QUERY, PARAM_QUERY[1:3], help=HELP_QUERY)
+        parser.add_argument(PARAM_REGION, PARAM_REGION[1:3], help=HELP_REGION)
         parser.add_argument(PARAM_STACK, PARAM_STACK[1:3], required=True, help=HELP_STACK)
+        parser.add_argument(PARAM_PROFILE_NAME, PARAM_PROFILE_NAME[1:3], required=False, help=HELP_PROFILE_NAME)
 
     def add_period_arguments(period_parser):
         period_parser.add_argument(PARAM_BEGINTIME, help=HELP_PERIOD_BEGINTIME)
         period_parser.add_argument(PARAM_DESCRIPTION, help=HELP_PERIOD_DESCRIPTION)
         period_parser.add_argument(PARAM_ENDTIME, help=HELP_PERIOD_ENDTIME)
         period_parser.add_argument(PARAM_MONTHDAYS, help=HELP_PERIOD_MONTH_DAYS)
-        period_parser.add_argument(PARAM_MONTHS,help=HELP_PERIOD_MONTHS)
+        period_parser.add_argument(PARAM_MONTHS, help=HELP_PERIOD_MONTHS)
         period_parser.add_argument(PARAM_NAME, required=True, help=HELP_PERIOD_NAME)
         period_parser.add_argument(PARAM_WEEKDAYS, help=HELP_PERIOD_WEEKDAYS)
 
     def add_schedule_arguments(schedule_parser):
         schedule_parser.add_argument(PARAM_DESCRIPTION, help=HELP_SCHEDULE_DESCRIPTION)
-        schedule_parser.add_argument(PARAM_ENFORCED, type=bool, default=False, help=HELP_SCHEDULE_ENFORCED)
-        schedule_parser.add_argument(PARAM_RETAINED_RUNNING, type=bool, default=False, help=HELP_SCHEDULE_RETAIN_RUNNING)
         schedule_parser.add_argument(PARAM_TIMEZONE, help=HELP_PARAM_TIMEZONE)
-        schedule_parser.add_argument(PARAM_METRICS, type=bool, help=HELP_SCHEDULE_CLOUDWATCH_METRICS)
         schedule_parser.add_argument(PARAM_NAME, required=True, help=HELP_SCHEDULE_NAME)
         schedule_parser.add_argument(PARAM_OVERRIDE, choices=VALUES_OVERRIDE_STATUS, help=HELP_SCHEDULE_OVERRIDE_STATUS)
         schedule_parser.add_argument(PARAM_PERIODS, type=str, help=HELP_SCHEDULE_PERIODS)
-        schedule_parser.add_argument(PARAM_STOP_NEW, type=bool, default=True, help=HELP_SCHEDULE_STOP_NEW)
-        schedule_parser.add_argument(PARAM_USE_MAIN, type=bool, help=HELP_SCHEDULE_USE_MAIN)
+
+        schedule_parser.add_argument(PARAM_KEEP_NEW,
+                                     dest='stop_new_instances',
+                                     action='store_false',
+                                     help=HELP_SCHEDULE_KEEP_NEW)
+
+        schedule_parser.add_argument(PARAM_USE_MAIN,
+                                     default=False,
+                                     dest='use_maintenance_window',
+                                     action='store_true',
+                                     help=HELP_SCHEDULE_USE_MAIN)
+
+        schedule_parser.add_argument(PARAM_SSM_MAINTENCE_WINDOW,
+                                     help=HELP_SCHEDULE_SSM_MAINTENANCE_WINDOW,
+                                     type=str)
+
+        schedule_parser.add_argument(PARAM_RETAINED_RUNNING,
+                                     default=False,
+                                     dest='retain_running',
+                                     action='store_true',
+                                     help=HELP_SCHEDULE_RETAIN_RUNNING)
+
+        schedule_parser.add_argument(PARAM_ENFORCED,
+                                     default=False,
+                                     dest='enforced',
+                                     action='store_true',
+                                     help=HELP_SCHEDULE_ENFORCED)
+
+        schedule_parser.add_argument(PARAM_HIBERNATE,
+                                     default=False,
+                                     dest='hibernate',
+                                     action='store_true',
+                                     help=HELP_SCHEDULE_HIBERNATE)
+
+        schedule_parser.add_argument(PARAM_METRICS,
+                                     default=False,
+                                     dest='use-metrics',
+                                     action='store_true',
+                                     help=HELP_SCHEDULE_CLOUDWATCH_METRICS)
 
     def build_describe_schedules_parser():
         sub_parser = subparsers.add_parser(CMD_DESCRIBE_SCHEDULES, help=HELP_CMD_DESCRIBE_SCHEDULES)

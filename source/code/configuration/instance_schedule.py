@@ -16,9 +16,6 @@ from datetime import datetime, timedelta
 
 import configuration
 import pytz
-from util.named_tuple_builder import as_namedtuple
-
-ERR_STOP_MUST_BE_LATER_OR_EQUAL_TO_START = "stop_date must be equal or later than start_date"
 
 DEBUG_ACTIVE_PERIOD_IN_SCHEDULE = "Active period{} in schedule \"{}\": {}"
 DEBUG_NO_RUNNING_PERIODS = "No running periods at this time found in schedule \"{}\" for this time, desired state is {}"
@@ -38,11 +35,23 @@ class InstanceSchedule:
     STATE_UNKNOWN = "unknown"
     STATE_ANY = "any"
     STATE_STOPPED = "stopped"
+    STATE_STOPPED_FOR_RESIZE = "stopped_for_resize"
     STATE_RUNNING = "running"
     STATE_RETAIN_RUNNING = "retain-running"
 
-    def __init__(self, name, periods=None, timezone=None, override_status=None, description=None, use_metrics=None,
-                 stop_new_instances=None, schedule_dt=None, use_maintenance_window=False, enforced=False, retain_running=False):
+    def __init__(self, name,
+                 periods=None,
+                 timezone=None,
+                 override_status=None,
+                 description=None,
+                 use_metrics=None,
+                 stop_new_instances=None,
+                 schedule_dt=None,
+                 use_maintenance_window=False,
+                 ssm_maintenance_window=None,
+                 enforced=False,
+                 hibernate=False,
+                 retain_running=False):
         """
         Initializes a schedule instance
         :param name: Name of a schedule
@@ -55,7 +64,9 @@ class InstanceSchedule:
         :param schedule_dt: datetime to use for scheduling
         :param use_maintenance_window: Set to True to use the maintenance window as an additional schedule in
         which instances are running
-        :param: enforce start/stop state of the schema on instances
+        :param ssm_maintenance_window: name of ssm mainatenance window in which to start ec2 instances
+        :param enforced: start/stop state of the schema on instances
+        :param: hibernate: hibernate instances when stopping
         """
         self.name = name
         self.periods = periods
@@ -64,8 +75,10 @@ class InstanceSchedule:
         self.description = description
         self.stop_new_instances = stop_new_instances
         self.use_maintenance_window = use_maintenance_window
+        self.ssm_maintenance_window = ssm_maintenance_window
         self.use_metrics = use_metrics
         self.enforced = enforced
+        self.hibernate = hibernate
         self.retain_running = retain_running
         self.schedule_dt = schedule_dt if schedule_dt is not None else datetime.now(pytz.timezone(self.timezone))
         self._logger = None
@@ -90,9 +103,13 @@ class InstanceSchedule:
         if self.stop_new_instances is not None:
             attributes.append("new instanced are {}stopped".format("" if self.stop_new_instances else "not "))
         if self.use_maintenance_window is not None:
-            attributes.append("maintenance windows are {}used to start instances".format("" if self.stop_new_instances else "not "))
+            attributes.append("maintenance windows are {}used to start instances".format("" if self.use_maintenance_window else "not "))
+        if self.ssm_maintenance_window is not None and self.use_maintenance_window:
+            attributes.append("SSM maintenance window is {}used to start EC2 instances".format(self.ssm_maintenance_window))
         if self.enforced is not None:
             attributes.append("schedule state is {}enforced to start or stop instances".format("" if self.enforced else "not "))
+        if self.hibernate is not None:
+            attributes.append("stopped ec2 instances are is {}hibernated when stopped".format("" if self.hibernate else "not "))
         if self.retain_running is not None:
             attributes.append(
                 "instances are {}stopped if at the and of a period if they were already running at the start of the period".format(
@@ -109,12 +126,13 @@ class InstanceSchedule:
         s += "\n".join(attributes)
         return s
 
-    def get_desired_state(self, instance, logger=None, dt=None, check_adjacent_periods =True):
+    def get_desired_state(self, instance, logger=None, dt=None, check_adjacent_periods=True):
         """
         Test if an instance should be running at a specific moment in this schedule
         :param instance: the instance to test
         :param logger: logger for logging output of scheduling logic
         :param dt: date time to use for scheduling, use Non for using the time specified in the constructor of the schedule
+        :param check_adjacent_periods: check for adjacent periods in a schedule
         :return: desired state, instance type and name of the active period of the schedule if the state is running
         """
 
@@ -167,7 +185,7 @@ class InstanceSchedule:
             # check if the instance type matches the desired type, if not set the status to stopped if the instance is currently
             # and the instance will be started with the desired type at the next invocation
             if requires_adjust_instance_size(desired_type, inst):
-                desired_state = InstanceSchedule.STATE_STOPPED
+                desired_state = InstanceSchedule.STATE_STOPPED_FOR_RESIZE
                 self._log_debug(DEBUG_SET_DESIRED_INSTANCE_TYPE, inst.instancetype, desired_type, desired_state)
             return desired_state, desired_type, current_running_period["period"].name
 
@@ -218,12 +236,17 @@ class InstanceSchedule:
         if len(periods_with_desired_states) > 1 and check_adjacent_periods:
             self._log_debug("Checking for adjacent running periods at current time")
             self._log_debug("Checking states for previous minute")
-            last_minute_running_periods = [p for p in self.get_periods_with_desired_states(localized_time - timedelta(minutes=1)) if p["state"] == InstanceSchedule.STATE_RUNNING]
-            self._log_debug("Running period(s) for previous minute {}", ",".join([p["period"].name for p in last_minute_running_periods]))
+            last_minute_running_periods = [p for p in self.get_periods_with_desired_states(localized_time - timedelta(minutes=1)) if
+                                           p["state"] == InstanceSchedule.STATE_RUNNING]
+            self._log_debug("Running period(s) for previous minute {}",
+                            ",".join([p["period"].name for p in last_minute_running_periods]))
             if len(last_minute_running_periods) > 0:
                 self._log_debug("Checking states for next minute")
-                next_minute_running_periods = [p for p in self.get_periods_with_desired_states(localized_time + timedelta(minutes=1)) if p["state"] == InstanceSchedule.STATE_RUNNING]
-                self._log_debug("Running period(s) for next minute {}", ",".join([p["period"].name for p in next_minute_running_periods]))
+                next_minute_running_periods = [p for p in
+                                               self.get_periods_with_desired_states(localized_time + timedelta(minutes=1)) if
+                                               p["state"] == InstanceSchedule.STATE_RUNNING]
+                self._log_debug("Running period(s) for next minute {}",
+                                ",".join([p["period"].name for p in next_minute_running_periods]))
                 if len(next_minute_running_periods):
                     self._log_debug("Adjacent periods found, keep instance in running state")
                     return handle_running_state(instance, last_minute_running_periods)
@@ -238,91 +261,3 @@ class InstanceSchedule:
             }
             for p in self.periods]
         return periods_with_desired_states
-
-    def get_usage(self, start_dt, stop_dt=None, instance=None, logger=None):
-        """
-           Get running periods for a schedule in a period
-           :param instance: instance id
-           :param start_dt: start date of the period, None is today
-           :param stop_dt: end date of the period, None is today
-           :param logger: logger for output of scheduling logic
-           :return: dictionary containing the periods in the specified in which instances are running as well as the % saving 
-           in running hours
-           """
-        result = {}
-
-        def running_seconds(startdt, stopdt):
-            return max(int((stopdt - startdt).total_seconds()), 60)
-
-        def running_hours(startdt, stopdt):
-            return int(((stopdt - startdt).total_seconds() - 1) / 3600) + 1
-
-        def make_period(started_dt, stopped_dt, inst_type):
-            running_period = ({
-                "begin": started_dt,
-                "end": stopped_dt,
-                "billing_hours": running_hours(started_dt, stopped_dt),
-                "billing_seconds": running_seconds(started_dt, stopped_dt)
-            })
-            if inst_type is not None:
-                running_period["instancetype"] = inst_type
-            return running_period
-
-        self._logger = logger
-
-        stop = stop_dt or start_dt
-        if start_dt > stop:
-            raise ValueError(ERR_STOP_MUST_BE_LATER_OR_EQUAL_TO_START)
-
-        dt = start_dt if isinstance(start_dt, datetime) else datetime(start_dt.year, start_dt.month, start_dt.day)
-        while dt <= stop:
-
-            timeline = {dt.replace(hour=0, minute=0)}
-            for p in self.periods:
-                begintime = p["period"].begintime
-                endtime = p["period"].endtime
-                if begintime is None and endtime is None:
-                    timeline.add(dt.replace(hour=0, minute=0))
-                    timeline.add(dt.replace(hour=23, minute=59))
-                else:
-                    if begintime:
-                        timeline.add(dt.replace(hour=begintime.hour, minute=begintime.minute))
-                    if endtime:
-                        timeline.add(dt.replace(hour=endtime.hour, minute=endtime.minute))
-
-            running_periods = {}
-            started = None
-            starting_period = None
-            current_state = None
-            instance_type = None
-            inst = instance or as_namedtuple("Instance", {"instance_str": "instance", "allow_resize": False})
-            for tm in sorted(list(timeline)):
-                desired_state, instance_type, period = self.get_desired_state(inst, self._logger, tm, False)
-
-                if current_state != desired_state:
-                    if desired_state == InstanceSchedule.STATE_RUNNING:
-                        started = tm
-                        current_state = InstanceSchedule.STATE_RUNNING
-                        starting_period = period
-                    elif desired_state == InstanceSchedule.STATE_STOPPED:
-                        stopped = tm
-                        desired_state_with_adj_check, _, __ = self.get_desired_state(inst, self._logger, tm, True)
-                        if desired_state_with_adj_check == InstanceSchedule.STATE_RUNNING:
-                            stopped += timedelta(minutes=1)
-                        if current_state == InstanceSchedule.STATE_RUNNING:
-                            current_state = InstanceSchedule.STATE_STOPPED
-                            running_periods[starting_period] = (make_period(started, stopped, instance_type))
-
-            if current_state == InstanceSchedule.STATE_RUNNING:
-                stopped = dt.replace(hour=23, minute=59) + timedelta(minutes=1)
-                running_periods[starting_period] = (make_period(started, stopped, instance_type))
-
-            result[str(dt.date())] = {
-                "running_periods": running_periods,
-                "billing_seconds": sum([running_periods[ps]["billing_seconds"] for ps in running_periods]),
-                "billing_hours": sum([running_periods[ph]["billing_hours"] for ph in running_periods])
-            }
-
-            dt += timedelta(days=1)
-
-        return {"schedule": self.name, "usage": result}

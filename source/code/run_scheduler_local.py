@@ -16,6 +16,7 @@ import sys
 
 import boto3
 
+import configuration
 from main import lambda_handler
 
 
@@ -30,6 +31,7 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 2:
         print("Enter the name of the stack")
+        # noinspection PyCompatibility
         stack = raw_input("Enter name of the Scheduler Stack: ")
     else:
         stack = sys.argv[1]
@@ -53,7 +55,7 @@ if __name__ == "__main__":
     event = {
         "source": "aws.events",
         "detail-type": "Scheduled Event",
-        "resources": ["{}-SchedulerRule".format(os.getenv("STACK_NAME"))]
+        "resources": ["arn/{}".format(os.getenv(configuration.ENV_SCHEDULER_RULE))]
     }
 
     lambda_handler(event, None)

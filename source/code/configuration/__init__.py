@@ -22,8 +22,10 @@ ENV_STATE = "STATE_TABLE"
 ENV_ACCOUNT = "ACCOUNT"
 ENV_STACK = "STACK_NAME"
 ENV_TAG_NAME = "TAG_NAME"
+ENV_SCHEDULE_FREQUENCY = "SCHEDULER_FREQUENCY"
 ENV_TRACE = "TRACE"
 ENV_USER_AGENT = "USER_AGENT"
+ENV_SCHEDULER_RULE = "SCHEDULER_RULE"
 
 # name of months
 MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
@@ -79,10 +81,16 @@ PERIOD = "period"
 SCHEDULES = "schedules"
 # name of scheduled services
 SCHEDULED_SERVICES = "scheduled_services"
+# schedule RDS Multi-AZ ans Autora Clusters
+SCHEDULE_CLUSTERS = "schedule_clusters"
+# create snapshot before stopping RDS Instances
+CREATE_RDS_SNAPSHOT = "create_rds_snapshot"
 # stop new instances
 STOP_NEW_INSTANCES = "stop_new_instances"
 # use maintenance windows
 USE_MAINTENANCE_WINDOW = "use_maintenance_window"
+# ssm maiantenance windows to use for EC2
+SSM_MAINTENANCE_WINDOW = "ssm_maintenance_window"
 # name of timezone setting for a schedule
 TIMEZONE = "timezone"
 # name of the tagname setting
@@ -95,6 +103,8 @@ CROSS_ACCOUNT_ROLES = "cross_account_roles"
 SCHEDULE_LAMBDA_ACCOUNT = "schedule_lambda_account"
 # enforce schedule state
 ENFORCED = "enforced"
+# use hibernation for stopped instances
+HIBERNATE = "hibernate"
 # retain running instances at end of period if they were already running at beginning of period
 RETAINED_RUNNING = "retain_running"
 # started and stopped tags, these are set to started and stoped instances

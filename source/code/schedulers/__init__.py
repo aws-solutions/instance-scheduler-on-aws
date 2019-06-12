@@ -14,6 +14,8 @@ from schedulers.ec2_service import Ec2Service
 from schedulers.rds_service import RdsService
 
 INST_ALLOW_RESIZE = "allow_resize"
+INST_RESIZED = "resized"
+INST_ARN = "arn"
 INST_CURRENT_STATE = "current_state"
 INST_ID = "id"
 INST_INSTANCE_TYPE = "instancetype"
@@ -22,12 +24,14 @@ INST_IS_TERMINATED = "is_terminated"
 INST_MULTI_AZ = "multi_az"
 INST_NAME = "name"
 INST_SCHEDULE = "schedule_name"
+INST_HIBERNATE = "hibernate"
 INST_STATE = "state"
 INST_STATE_NAME = "state_name"
 INST_TAGS = "tags"
 INST_MAINTENANCE_WINDOW = "maintenance_window"
 INST_ENGINE_TYPE = "engine_type"
 INST_DB_ARN = "db_inst_arn"
+INST_DB_IS_CLUSTER = "is_cluster"
 
 PARAM_ACCOUNT = "account"
 PARAM_CONTEXT = "context"
@@ -43,6 +47,7 @@ PARAM_TAG_NAME = "tagname"
 PARAM_TRACE = "trace"
 PARAM_STACK = "stack_name"
 PARAM_CONFIG = "configuration"
+PARAM_CLUSTERS = "clusters"
 
 
 # Services handled by the scheduler, the class that handles the logic for scheduling instances for each know service

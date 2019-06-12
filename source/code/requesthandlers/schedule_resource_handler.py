@@ -12,12 +12,11 @@
 ######################################################################################################################
 from datetime import datetime
 
+import configuration
 from configuration.config_admin import ConfigAdmin
 from util import safe_json
 from util.custom_resource import CustomResource
 from util.logger import Logger
-
-import configuration
 
 INF_DELETE_SCHEDULE = "Deleted schedule {}"
 INF_DELETED_PERIOD = "Deleted period {}"
@@ -36,29 +35,37 @@ PROP_BEGIN_TIME = "BeginTime"
 PROP_DESCRIPTION = "Description"
 PROP_END_TIME = "EndTime"
 PROP_ENFORCED = "Enforced"
+PROP_HIBERNATE = "Hibernate"
+PROP_RETAIN_RUNNING = "RetainRunning"
 PROP_INSTANCE_TYPE = "InstanceType"
 PROP_METRICS = "Metrics"
 PROP_MONTH_DAYS = "MonthDays"
 PROP_MONTHS = "Months"
+PROP_NAME = "Name"
 PROP_OVERRIDE_STATUS = "OverrideStatus"
 PROP_OVERWRITE = "Overwrite"
 PROP_PERIODS = "Periods"
 PROP_STACK_NAME = "SchedulerStack"
+PROP_NO_STACK_PREFIX = "NoStackPrefix"
 PROP_STOP_NEW = "StopNewInstances"
 PROP_TIMEZONE = "Timezone"
-PROP_USE_MAINTENANCE_WINDOW = "UseMaintenaceWindow"
+PROP_USE_MAINTENANCE_WINDOW = "UseMaintenanceWindow"
+PROP_SSM_MAINTENANCE_WINDOW = "SsmMaintenanceWindow"
 PROP_WEEKDAYS = "WeekDays"
 
 VALID_SCHEDULE_PROPERTIES = [
     PROP_DESCRIPTION,
     PROP_ENFORCED,
+    PROP_RETAIN_RUNNING,
     PROP_METRICS,
+    PROP_NAME,
     PROP_OVERRIDE_STATUS,
     PROP_OVERWRITE,
     PROP_PERIODS,
     PROP_STOP_NEW,
     PROP_TIMEZONE,
     PROP_USE_MAINTENANCE_WINDOW,
+    PROP_NO_STACK_PREFIX,
     "ServiceToken",
     "Timeout"]
 
@@ -112,7 +119,12 @@ class ScheduleResourceHandler(CustomResource):
 
     @property
     def _schedule_resource_name(self):
-        return "{}-{}".format(self.stack_name, self.logical_resource_id)
+        name = self.resource_properties.get(PROP_NAME,None)
+        if name is None:
+            name = self.logical_resource_id
+        if str(self.resource_properties.get(PROP_NO_STACK_PREFIX, "False")).lower() == "true":
+            return name
+        return "{}-{}".format(self.stack_name, name)
 
     def _create_period(self, period):
 
@@ -171,6 +183,11 @@ class ScheduleResourceHandler(CustomResource):
         ps = self.resource_properties
 
         for pr in ps:
+
+            # fix for typo in older release, fix parameter if old version with typo is used for compatibility
+            if pr == "UseMaintenaceWindow":
+                pr = PROP_USE_MAINTENANCE_WINDOW
+
             if pr not in VALID_SCHEDULE_PROPERTIES:
                 raise ValueError(ERR_INVALID_SCHEDULE_PROPERTY.format(pr, ", ".join(VALID_SCHEDULE_PROPERTIES)))
 
@@ -180,9 +197,13 @@ class ScheduleResourceHandler(CustomResource):
         self._set_if_specified(ps, PROP_USE_MAINTENANCE_WINDOW, create_schedule_args,
                                dest_name=configuration.USE_MAINTENANCE_WINDOW)
         self._set_if_specified(ps, PROP_ENFORCED, create_schedule_args, dest_name=configuration.ENFORCED, default=False)
+        self._set_if_specified(ps, PROP_HIBERNATE, create_schedule_args, dest_name=configuration.HIBERNATE, default=False)
+        self._set_if_specified(ps, PROP_RETAIN_RUNNING, create_schedule_args, dest_name=configuration.RETAINED_RUNNING,
+                               default=False)
         self._set_if_specified(ps, PROP_STOP_NEW, create_schedule_args, dest_name=configuration.STOP_NEW_INSTANCES, default=True)
         self._set_if_specified(ps, PROP_TIMEZONE, create_schedule_args, dest_name=configuration.TIMEZONE, default="UTC")
         self._set_if_specified(ps, PROP_DESCRIPTION, create_schedule_args, dest_name=configuration.DESCRIPTION)
+        self._set_if_specified(ps, PROP_SSM_MAINTENANCE_WINDOW, create_schedule_args, dest_name=configuration.SSM_MAINTENANCE_WINDOW)
 
         create_schedule_args[configuration.SCHEDULE_CONFIG_STACK] = self.stack_id
 

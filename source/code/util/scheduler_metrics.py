@@ -11,8 +11,9 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
-import configuration
 import os
+
+import configuration
 from boto_retry import get_client_with_retries
 
 

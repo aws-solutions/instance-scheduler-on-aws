@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "ECS and RDS scheduler cross account role, version %version%",
+    "Description": "(SO0030) - Instance scheduler cross account role, version %version%",
     "Parameters": {
         "InstanceSchedulerAccount": {
             "Type": "String",
@@ -29,6 +29,16 @@
     "Resources": {
         "EC2SchedulerCrossAccountRole": {
             "Type": "AWS::IAM::Role",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W11",
+                            "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+                        }
+                    ]
+                }
+            },
             "Properties": {
                 "AssumeRolePolicyDocument": {
                     "Version": "2012-10-17",
@@ -53,48 +63,116 @@
                     }]
                 },
                 "Path": "/",
-                "Policies": [{
-                    "PolicyName": "EC2InstanceSchedulerRemote",
-                    "PolicyDocument": {
-                        "Version": "2012-10-17",
-                        "Statement": [{
-                            "Effect": "Allow",
-                            "Action": [
-                                "ec2:DescribeInstances",
-                                "ec2:StartInstances",
-                                "ec2:StopInstances",
-                                "ec2:ModifyInstanceAttribute",
-                                "ec2:CreateTags",
-                                "ec2:DeleteTags"
-                            ],
-                            "Resource": [
-                                "*"
+                "Policies": [
+                    {
+                        "PolicyName": "EC2InstanceSchedulerRemote",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "rds:DeleteDBSnapshot",
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            ":",
+                                            [
+                                                "arn:aws:rds:*",
+                                                {
+                                                    "Ref": "AWS::AccountId"
+                                                },
+                                                "snapshot:*"
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "rds:AddTagsToResource",
+                                        "rds:RemoveTagsFromResource",
+                                        "rds:DescribeDBSnapshots",
+                                        "rds:StartDBInstance",
+                                        "rds:StopDBInstance"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            ":",
+                                            [
+                                                "arn:aws:rds:*",
+                                                {
+                                                    "Ref": "AWS::AccountId"
+                                                },
+                                                "db:*"
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "rds:StartDBCluster",
+                                        "rds:StopDBCluster"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Join": [
+                                                ":",
+                                                [
+                                                    "arn:aws:rds:*",
+                                                    {
+                                                        "Ref": "AWS::AccountId"
+                                                    },
+                                                    "cluster:*"
+                                                ]
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:StartInstances",
+                                        "ec2:StopInstances",
+                                        "ec2:CreateTags",
+                                        "ec2:DeleteTags"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Join": [
+                                                ":",
+                                                [
+                                                    "arn:aws:ec2:*",
+                                                    {
+                                                        "Ref": "AWS::AccountId"
+                                                    },
+                                                    "instance/*"
+                                                ]
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "rds:DescribeDBClusters",
+                                        "rds:DescribeDBInstances",
+        
+                                        "ec2:DescribeInstances",
+                                        "ec2:DescribeRegions",
+                                        "ec2:ModifyInstanceAttribute",
+
+                                        "ssm:DescribeMaintenanceWindows",
+
+                                        "tag:GetResources"
+                                    ],
+                                    "Resource": [
+                                        "*"
+                                    ]
+                                }
                             ]
-                        }, {
-                            "Effect": "Allow",
-                            "Action": [
-                                "rds:DescribeDBInstances",
-                                "rds:DescribeDBSnapshots",
-                                "rds:StartDBInstance",
-                                "rds:StopDBInstance",
-                                "rds:AddTagsToResource",
-                                "rds:RemoveTagsFromResource",
-                                "rds:DeleteDBSnapshot"
-                            ],
-                            "Resource": [
-                                "*"
-                            ]
-                        }, {
-                            "Effect": "Allow",
-                            "Action": [
-                                "tag:GetResources"
-                            ],
-                            "Resource": [
-                                "*"
-                            ]
-                        }]
+                        }
                     }
-                }]
+                ]
             }
         }
     },

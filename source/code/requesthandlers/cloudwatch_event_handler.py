@@ -11,16 +11,17 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
-from boto_retry import get_client_with_retries
-from configuration.scheduler_config_builder import SchedulerConfigBuilder
+import json
+import os
 from copy import copy
 from datetime import datetime
+
+import configuration
+from boto_retry import get_client_with_retries
+from configuration.scheduler_config_builder import SchedulerConfigBuilder
 from schedulers import SCHEDULER_TYPES
 from schedulers.instance_scheduler import InstanceScheduler
 from util.logger import Logger
-import configuration
-import json
-import os
 
 ERR_INVALID_ARN = "{} is not a valid ARN"
 ERR_STARTING_LAMBDA = "Error executing {}, version {} with configuration {}"
@@ -148,7 +149,7 @@ class CloudWatchEventHandler:
         """
 
         return event.get("detail-type", "") == "Scheduled Event" and \
-               event.get("resources", ["/"])[0].split("/")[-1].startswith("{}-SchedulerRule".format(os.getenv(configuration.ENV_STACK)))
+               (os.getenv(configuration.ENV_SCHEDULER_RULE)== event.get("resources", ["/"])[0].split("/")[-1])
 
     def _configuration_level_partitions(self, level=TOP_LEVEL):
 
@@ -259,7 +260,7 @@ class CloudWatchEventHandler:
                         debug=self.configuration.trace) as logger:
                 result[service] = scheduler.run(state_table=self.state_table, scheduler_config=self.configuration,
                                                 lambda_account=self.lambda_account, logger=logger, context=self._context)
-        self._logger.info(INF_SCHEDULER_RESULT, result)
+        self._logger.info(INF_SCHEDULER_RESULT, json.dumps(result,indent=3))
         return result
 
     def _execute_as_lambda(self, conf):
@@ -278,7 +279,7 @@ class CloudWatchEventHandler:
             "dispatch_time": str(datetime.now())
         }))
 
-        if len(payload) > 100000:
+        if len(payload) > 200000:
             config["schedules"] = {}
             config["periods"] = {}
             payload = str.encode(json.dumps({

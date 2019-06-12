@@ -12,7 +12,6 @@
 ######################################################################################################################
 import copy
 import os
-
 from datetime import datetime
 
 import configuration
@@ -20,6 +19,8 @@ import configuration
 # class to hold the configuration for the instance scheduler
 INF_SCHEDULE_DISPLAY = "Configuration:\n" \
                        "Scheduled services = \"{}\"\n" \
+                       "Schedule clusters = \"{}\"\n" \
+                       "Create RDS instance snapshot = \"{}\"\n" \
                        "Tagname = \"{}\"\n" \
                        "Default timezone = \"{}\"\n" \
                        "Trace = \"{}\"\n" \
@@ -38,11 +39,24 @@ class SchedulerConfig:
     Implements scheduler configuration
     """
 
-    def __init__(self, scheduled_services, tag_name, regions, default_timezone, schedules, trace,
-                 use_metrics, cross_account_roles, schedule_lambda_account, started_tags=None, stopped_tags=None):
+    def __init__(self,
+                 scheduled_services,
+                 schedule_clusters,
+                 tag_name,
+                 regions,
+                 default_timezone,
+                 schedules,
+                 trace,
+                 use_metrics,
+                 cross_account_roles,
+                 schedule_lambda_account,
+                 create_rds_snapshot,
+                 started_tags=None,
+                 stopped_tags=None):
         """
         Initializes schedule configuration instance
         :param scheduled_services: services handled by the scheduler
+        :param schedule_clusters schedule RDS multi-AZ and Aurora clusters
         :param tag_name: name of the tag to define schedule for instances
         :param regions: regions to handle
         :param default_timezone: default timezone for schedules
@@ -51,6 +65,7 @@ class SchedulerConfig:
         :param use_metrics: global flag to enable metrics collection
         :param cross_account_roles: cross account roles for cross account scheduling
         :param schedule_lambda_account: set to true to schedule instances in account in which scheduler is installed
+        :param create_rds_snapshot create snapshot before stopping non-cluster rds instances
         :param started_tags: start tags in string format
         :param stopped_tags: stop tags in string format
         """
@@ -63,6 +78,8 @@ class SchedulerConfig:
         self.cross_account_roles = cross_account_roles
         self.schedule_lambda_account = schedule_lambda_account
         self.scheduled_services = scheduled_services
+        self.schedule_clusters = schedule_clusters
+        self.create_rds_snapshot = create_rds_snapshot
         self._service_settings = None
         self.started_tags = [] if started_tags in ["" or None] else self.tag_list(self.build_tags_from_template(started_tags))
         self.stopped_tags = [] if stopped_tags in ["" or None] else self.tag_list(self.build_tags_from_template(stopped_tags))
@@ -116,6 +133,8 @@ class SchedulerConfig:
 
     def __str__(self):
         s = INF_SCHEDULE_DISPLAY.format(", ".join(self.scheduled_services),
+                                        str(self.schedule_clusters),
+                                        str(self.create_rds_snapshot),
                                         self.tag_name,
                                         self.default_timezone,
                                         str(self.trace),

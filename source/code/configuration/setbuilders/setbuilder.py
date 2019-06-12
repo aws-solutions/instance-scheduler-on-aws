@@ -273,7 +273,8 @@ class SetBuilder:
                 if value is not None:
                     self._logging.debug("Parser : {}(\"{}\") returns {}".format(parser.__name__, set_str, value))
                     # add result from parser to result set
-                    set_items.update(set(value))
+                    if len(value) > 0:
+                        set_items.update(set(value))
                     # if the parser is "all-items" wildcard there is no need for further processing as all items are in the result
                     if parser == self._parse_all:
                         return set_items
