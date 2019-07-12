@@ -71,11 +71,7 @@
                             "Statement": [
                                 {
                                     "Effect": "Allow",
-                                    "Action": [
-                                        "rds:DeleteDBSnapshot",
-                                        "rds:DescribeDBSnapshots",
-                                        "rds:StopDBInstance"
-                                    ],                                        
+                                    "Action": "rds:DeleteDBSnapshot",
                                     "Resource": {
                                         "Fn::Join": [
                                             ":",
