@@ -345,12 +345,12 @@ class RdsService:
             snapshot_name = "{}-stopped-{}".format(self._stack_name, inst.id).replace(" ", "")
             args["DBSnapshotIdentifier"] = snapshot_name
 
-        try:
-            if does_snapshot_exist(snapshot_name):
-                client.delete_db_snapshot_with_retries(DBSnapshotIdentifier=snapshot_name)
-                self._logger.info(INF_DELETE_SNAPSHOT, snapshot_name)
-        except Exception as ex:
-            self._logger.error(ERR_DELETING_SNAPSHOT, snapshot_name)
+            try:
+                if does_snapshot_exist(snapshot_name):
+                    client.delete_db_snapshot_with_retries(DBSnapshotIdentifier=snapshot_name)
+                    self._logger.info(INF_DELETE_SNAPSHOT, snapshot_name)
+            except Exception as ex:
+                self._logger.error(ERR_DELETING_SNAPSHOT, snapshot_name)
     
         try:
             client.stop_db_instance_with_retries(**args)
