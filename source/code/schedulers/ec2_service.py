@@ -28,7 +28,7 @@ STANDBY_BATCH_SIZE = 20
 
 ERR_STARTING_INSTANCES = "Error starting instances {}, ({})"
 ERR_STOPPING_INSTANCES = "Error stopping instances {}, ({})"
-ERR_EXITING_STANDBY_INSTANCES = "Error exiting standby for instances {}, ({})"
+ERR_EXITING_STANDBY_INSTANCES = "Error exiting standby for instances {}, ({}): {}"
 
 INF_FETCHED_INSTANCES = "Number of fetched ec2 instances is {}, number of instances in a schedulable state is {}"
 INF_FETCHING_INSTANCES = "Fetching ec2 instances for account {} in region {}"
@@ -248,12 +248,12 @@ class Ec2Service:
                         self._logger.warning(WARN_STANDBY_GROUP, 'exit', asg_instance_ids, asg_name)
                         batches.send(asg_instance_batch)
                     else:
-                        not_instandby = re.search(r"The instance (i-.*) is not in Standby.",
-                                                  str(ex)).group(1)
-                        if not_instandby:
-                            standby_instances.append((not_instandby, InstanceSchedule.STATE_RUNNING))
+                        not_instandby_regex = re.search(r"The instance (i-.*) is not in Standby.",
+                                                  str(ex))
+                        if not_instandby_regex:
+                            standby_instances.append((not_instandby_regex.group(1), InstanceSchedule.STATE_RUNNING))
                         else:
-                            self._logger.debug(ERR_EXITING_STANDBY_INSTANCES, asg_instance_ids, str(ex))
+                            self._logger.debug(ERR_EXITING_STANDBY_INSTANCES, asg_instance_ids, asg_name, repr(ex))
         return standby_instances
 
     def enter_standby_instances(self, instances):
