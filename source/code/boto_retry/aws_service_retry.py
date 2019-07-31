@@ -32,7 +32,7 @@ class AwsApiServiceRetry:
         :param context: Lambda context that is used to calculate remaining execution time
         :param timeout: Timeout for method call. This time can not exceed the remaining time if a method is called
         within the context of a lambda function.
-        :param lambda_time_out_margin: If called within the context of a Lambda function this time should at least be 
+        :param lambda_time_out_margin: If called within the context of a Lambda function this time should at least be
         remaining before making a retry. This is to allow possible cleanup and logging actions in the remaining time
         """
         self.default_strategies = [self.api_throttled, self.service_not_available]
@@ -46,8 +46,8 @@ class AwsApiServiceRetry:
     def api_throttled(cls, ex):
         """
         Tests if the API call was throttled
-        :param ex: 
-        :return: 
+        :param ex:
+        :return:
         """
         return "throttling" in ex.message.lower()
 
@@ -55,8 +55,8 @@ class AwsApiServiceRetry:
     def service_not_available(cls, ex):
         """
         Tests if the service was temporary not available
-        :param ex: 
-        :return: 
+        :param ex:
+        :return:
         """
         if type(ex) == ClientError:
             return False

@@ -19,7 +19,7 @@ import configuration
 
 class ConfigDynamodbAdapter:
     """
-    Adapter to load configuration from a DynamoDB storage type. 
+    Adapter to load configuration from a DynamoDB storage type.
     """
     def __init__(self, tablename):
         self._tablename = tablename
@@ -29,7 +29,7 @@ class ConfigDynamodbAdapter:
     def config(self):
         """
         Returns and cached the configuration data
-        :return: 
+        :return:
         """
         if self._config is None:
             self._config = self._get_config()

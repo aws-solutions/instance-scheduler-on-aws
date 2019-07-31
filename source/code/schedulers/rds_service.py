@@ -351,7 +351,7 @@ class RdsService:
                 self._logger.info(INF_DELETE_SNAPSHOT, snapshot_name)
         except Exception as ex:
             self._logger.error(ERR_DELETING_SNAPSHOT, snapshot_name)
-    
+
         try:
             client.stop_db_instance_with_retries(**args)
             self._logger.info(INF_STOPPED_RESOURCE, "instance", inst.id)

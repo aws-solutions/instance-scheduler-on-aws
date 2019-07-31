@@ -116,16 +116,16 @@ class Logger:
         """
         Sets debug switch
         :param value: True to enable debugging, False to disable
-        :return: 
+        :return:
         """
         self._debug = value
 
     def publish_to_sns(self, level, msg):
         """
         Publish message to sns topic
-        :param msg: 
-        :param level: 
-        :return: 
+        :param msg:
+        :param level:
+        :return:
         """
         sns_arn = os.getenv(ENV_ISSUES_TOPIC_ARN, None)
         if sns_arn is not None:
@@ -137,7 +137,7 @@ class Logger:
         Logs informational message
         :param msg: Message format string
         :param args: Message parameters
-        :return: 
+        :return:
         """
         self._emit(LOG_LEVEL_INFO, msg, *args)
 
@@ -146,7 +146,7 @@ class Logger:
         Logs error message
         :param msg: Error message format string
         :param args: parameters
-        :return: 
+        :return:
         """
         s = self._emit(LOG_LEVEL_ERROR, msg, *args)
         self.publish_to_sns("Error", s)
@@ -156,7 +156,7 @@ class Logger:
         Logs warning message
         :param msg: Warning message format string
         :param args: parameters
-        :return: 
+        :return:
         """
         s = self._emit(LOG_LEVEL_WARNING, msg, *args)
         self.publish_to_sns("Warning", s)
@@ -166,7 +166,7 @@ class Logger:
         Conditionally logs debug message, does not log if debugging is disabled
         :param msg: Debug message format string
         :param args: parameters
-        :return: 
+        :return:
         """
         if self._debug:
             self._emit(LOG_LEVEL_DEBUG, msg, *args)
@@ -174,7 +174,7 @@ class Logger:
     def clear(self):
         """
         Clear all buffered error messages
-        :return: 
+        :return:
         """
         self._buffer = []
 
@@ -188,7 +188,7 @@ class Logger:
     def flush(self):
         """
         Writes all buffered messages to CloudWatch Stream
-        :return: 
+        :return:
         """
 
         def get_next_log_token():

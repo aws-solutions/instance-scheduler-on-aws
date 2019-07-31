@@ -206,7 +206,7 @@ class SchedulerSetupHandler(CustomResource):
     def set_lambda_logs_retention_period(self):
         """
         Aligns retention period for default Lambda log streams with settings
-        :return: 
+        :return:
         """
 
         if self.context is None:

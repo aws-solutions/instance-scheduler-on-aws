@@ -12,7 +12,7 @@ class DynamoDbServiceRetry(AwsApiServiceRetry):
         :param context: Lambda context that is used to calculate remaining execution time
         :param timeout: Timeout for method call. This time can not exceed the remaining time if a method is called
         within the context of a lambda function.
-        :param lambda_time_out_margin: If called within the context of a Lambda function this time should at least be 
+        :param lambda_time_out_margin: If called within the context of a Lambda function this time should at least be
         remaining before making a retry. This is to allow possible cleanup and logging actions in the remaining time
         """
         AwsApiServiceRetry.__init__(
@@ -30,7 +30,7 @@ class DynamoDbServiceRetry(AwsApiServiceRetry):
         """
         Adds retry logic on top of the retry logic already done by boto3 if max throughput is exceeded for a table or index
         :param ex: Exception to test
-        :return: 
+        :return:
         """
         return type(ex).__name__ == "ProvisionedThroughputExceededException"
 
