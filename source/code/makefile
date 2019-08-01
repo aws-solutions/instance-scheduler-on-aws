@@ -24,6 +24,19 @@ ifndef prefix
 prefix = instance-scheduler/$(version)/
 endif
 
+# acl of s3 artifacts
+ifndef acl
+acl = public-read
+endif
+
+ifndef acl_remote
+acl_remote = $(acl)
+endif
+
+ifndef s3_mirrors
+s3_mirrors = true
+endif
+
 s3bucket=s3://$(bucket)/
 
 s3http='https:\/\/s3-eu-west-1.amazonaws.com\/$(bucket)'
@@ -65,7 +78,6 @@ lambda:$(py) main.py version.txt
 	zip -r -q $(zip) pytz
 	zip -r $(zip) models
 
-
 ######################################################################################################################
 # cli                                                                                                                #
 ######################################################################################################################
@@ -91,9 +103,6 @@ scheduler-cli:$(pycli) version.txt
 	mv cli/setup.org cli/setup.py
 	cp $(zip_cli) $(deployment)/scheduler-cli-latest.zip
 
-
-
-
 ######################################################################################################################
 # cloudformation templates                                                                                           #
 ######################################################################################################################
@@ -105,11 +114,11 @@ cfn:version.txt $(templates)
 	find $(deployment) -maxdepth 1 -type f -name 'instance-scheduler-*.template' -delete
 
 	# build main template
-	python ./build-instance-scheduler-template.py ../cloudformation/instance-scheduler.template  $(version) $(bucket) $(prefix) > $(deployment)/instance-scheduler-$(version).template
+	python ./build-instance-scheduler-template.py ../cloudformation/instance-scheduler.template $(version) $(bucket) $(prefix) $(s3_mirrors)> $(deployment)/instance-scheduler-$(version).template
 	cp $(deployment)/instance-scheduler-$(version).template  $(deployment)/instance-scheduler-latest.template
 
 	# template for setting cross account role
-	sed s/%version%/$(version)/g ../cloudformation/instance-scheduler-remote.template > $(deployment)/instance-scheduler-remote-$(version).template
+	python ./build-instance-scheduler-template.py ../cloudformation/instance-scheduler-remote.template $(version) $(bucket) $(prefix) $(s3_mirrors)> $(deployment)/instance-scheduler-remote-$(version).template
 	cp  $(deployment)/instance-scheduler-remote-$(version).template $(deployment)/instance-scheduler-remote-latest.template
 
 ######################################################################################################################
@@ -117,23 +126,14 @@ cfn:version.txt $(templates)
 ######################################################################################################################
 
 deploy: lambda cfn scheduler-cli
-	aws s3 cp $(deployment)/instance-scheduler-latest.template $(s3bucket)$(prefix)  --acl public-read
-	aws s3 cp $(deployment)/instance-scheduler-latest.template $(s3bucket)  --acl public-read
+	aws s3 cp $(deployment)/instance-scheduler-$(version).template $(s3bucket)$(prefix) --acl $(acl)
+	aws s3 cp $(deployment)/instance-scheduler-latest.template $(s3bucket) --acl $(acl)
 
-	aws s3 cp $(deployment)/instance-scheduler-remote-latest.template $(s3bucket)$(prefix)  --acl public-read
-	aws s3 cp $(deployment)/instance-scheduler-remote-latest.template $(s3bucket)  --acl public-read
+	aws s3 cp $(deployment)/instance-scheduler-remote-$(version).template $(s3bucket)$(prefix) --acl $(acl_remote)
+	aws s3 cp $(deployment)/instance-scheduler-remote-latest.template $(s3bucket) --acl $(acl_remote)
 
-	aws s3 cp $(zip) $(s3bucket)$/$(prefix)  --acl public-read
-	aws s3 cp $(zip_cli) $(s3bucket)$(prefix) --acl public-read
-	aws s3 cp $(deployment)/scheduler-cli-latest.zip $(s3bucket) --acl public-read
+	aws s3 cp $(zip) $(s3bucket)$/$(prefix) --acl $(acl)
+	aws s3 cp $(zip_cli) $(s3bucket)$(prefix) --acl $(acl)
+	aws s3 cp $(deployment)/scheduler-cli-latest.zip $(s3bucket) --acl $(acl)
 
 	python update-build-number.py version.txt
-
-
-
-
-
-
-
-
-	

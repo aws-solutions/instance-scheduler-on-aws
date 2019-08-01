@@ -16,21 +16,20 @@ import sys
 
 from collections import OrderedDict
 
+from jinja2 import Template
 
-def get_versioned_template(template_filename, version, bucket, prefix):
-    with open(template_filename, "rt") as f:
-        template_text = "".join(f.readlines())
-        template_text = template_text.replace("%version%", version)
-        template_text = template_text.replace("%bucket%", bucket)
-        template_text = template_text.replace("%prefix%", prefix)
+def get_versioned_template(template_filename, **args):
+    with open(template_filename, "r") as f:
+        template = Template(f.read())
+        template_text = template.render(**args)
         return json.loads(template_text, object_pairs_hook=OrderedDict)
 
 
-def main(template_file, version, bucket, prefix):
-    template = get_versioned_template(template_file, version,bucket, prefix)
+def main(template_file, **args):
+    template = get_versioned_template(template_file, **args)
     print(json.dumps(template, indent=4))
 
 
-main(template_file=sys.argv[1], version=sys.argv[2], bucket=sys.argv[3], prefix=sys.argv[4])
+main(template_file=sys.argv[1], version=sys.argv[2], bucket=sys.argv[3], prefix=sys.argv[4], s3_mirrors=sys.argv[5] == "true")
 
 exit(0)

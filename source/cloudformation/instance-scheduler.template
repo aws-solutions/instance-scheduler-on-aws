@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "(SO0030) - Instance scheduler, version %version%",
+    "Description": "(SO0030) - Instance scheduler, version {{ version }}",
     "Parameters": {
         "SchedulingActive": {
             "Type": "String",
@@ -598,7 +598,7 @@
             "ParameterGroups": [
                 {
                     "Label": {
-                        "default": "Scheduler (version %version%)"
+                        "default": "Scheduler (version {{ version }})"
                     },
                     "Parameters": [
                         "TagName",
@@ -1160,18 +1160,22 @@
                     ]
                 },
                 "Code": {
+{% if s3_mirrors %}
                     "S3Bucket": {
                         "Fn::Join": [
                             "-",
                             [
-                                "%bucket%",
+                                "{{ bucket }}",
                                 {
                                     "Ref": "AWS::Region"
                                 }
                             ]
                         ]
                     },
-                    "S3Key": "%prefix%instance-scheduler-%version%.zip"
+{% else %}
+                    "S3Bucket": "{{ bucket }}",
+{% endif %}
+                    "S3Key": "{{ prefix }}instance-scheduler-{{ version }}.zip"
                 },
                 "Handler": "main.lambda_handler",
                 "Runtime": "python2.7",
@@ -1242,7 +1246,7 @@
                                     {
                                         "Ref": "AWS::StackName"
                                     },
-                                    "%version%"
+                                    "{{ version }}"
                                 ]
                             ]
                         },
@@ -1262,7 +1266,7 @@
                     "Ref": "MemorySize"
                 },
                 "Timeout": 300,
-                "Description": "EC2 and RDS instance scheduler, version %version%"
+                "Description": "EC2 and RDS instance scheduler, version {{ version }}"
             },
             "DependsOn": [
                 "SchedulerPolicy"
@@ -1311,7 +1315,7 @@
         "SchedulerRule": {
             "Type": "AWS::Events::Rule",
             "Properties": {
-                "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version %version%",
+                "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version {{ version }}",
                 "ScheduleExpression": {
                     "Fn::FindInMap": [
                         "Timeouts",
@@ -1456,7 +1460,7 @@
                 "stopped_tags": {
                     "Ref": "StoppedTags"
                 },
-                "stack_version": "%version%"
+                "stack_version": "{{ version }}"
             },
             "DependsOn": [
                 "SchedulerLogGroup"
