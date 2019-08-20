@@ -174,6 +174,30 @@ class Ec2Service:
             else:
                 done = True
         self._logger.info(INF_FETCHED_INSTANCES, number_of_instances, len(instances))
+        self._logger.info(instances)
+        return instances
+
+    def get_asg_instances(self, kwargs):
+
+        client = get_client_with_retries("autoscaling", ["describe_auto_scaling_instances"], context=context, session=self._session, region=region)
+
+        jmes = "AutoScalingInstances[*].{InstanceId:InstanceId, AutoScalingGroupName:AutoScalingGroupName}"
+
+        args = {}
+        number_of_instances = 0
+        instances = []
+        done = False
+
+        while not done:
+            try:
+                ec2_resp = client.describe_auto_scaling_instances_with_retries(**args)
+            except Exception as e:
+                self._logger.info(str(e))
+
+            for reservation_inst in jmespath.search(jmes, ec2_resp):
+                inst = reservation_inst
+                number_of_instances += 1
+            done = true
         return instances
 
     def _schedule_from_maint_window(self, name, start, hours, interval):
@@ -331,8 +355,60 @@ class Ec2Service:
         jmes = "Reservations[*].Instances[*].{InstanceId:InstanceId, State:State}[]"
         return jmespath.search(jmes, status_resp)
 
+    def detach_instance(self, inst):
+
+        self._init_scheduler(inst)
+        instance = []
+        instance.append(inst['InstanceId'])
+        instance_asg = inst['AutoScalingGroupName']
+
+        client = get_client_with_retries("autoscaling", ["detach_instances"],
+                                        context=self._context, session=self._session, region=self._region)
+        client.detach_instances_with_retries(InstanceIds=instance, AutoScalingGroupName=instance_asg, ShouldDecrementDesiredCapacity=True)
+        return
+
+    def attach_instance(self, id, asg_name):
+
+        #self._init_scheduler(inst)
+        instance = []
+        instance.append(id)
+        instance_asg = asg_name
+
+        client = get_client_with_retries("autoscaling", ["attach_instances"],
+                                     context=self._context, session=self._session, region=self._region)
+        client.attach_instances_with_retries(InstanceIds=instance, AutoScalingGroupName=instance_asg)
+        return
+
     # noinspection PyMethodMayBeStatic
     def stop_instances(self, kwargs):
+        self._session = kwargs[schedulers.PARAM_SESSION]
+        context = kwargs[schedulers.PARAM_CONTEXT]
+        region = kwargs[schedulers.PARAM_REGION]
+        account = kwargs[schedulers.PARAM_ACCOUNT]
+        self._logger = kwargs[schedulers.PARAM_LOGGER]
+        tagname = kwargs[schedulers.PARAM_CONFIG].tag_name
+        config = kwargs[schedulers.PARAM_CONFIG]
+
+
+        client = get_client_with_retries("autoscaling", ["describe_auto_scaling_instances"], context=context, session=self._session, region=region)
+
+        jmes = "AutoScalingInstances[*].{InstanceId:InstanceId, AutoScalingGroupName:AutoScalingGroupName}"
+
+        args = {}
+        number_of_instances = 0
+        asg_instances = []
+        done = False
+
+        while not done:
+            try:
+                ec2_resp = client.describe_auto_scaling_instances_with_retries(**args)
+            except Exception as e:
+                self._logger.info('Instances cannot be described: ', str(e))
+            for reservation_inst in jmespath.search(jmes, ec2_resp):
+                inst = reservation_inst
+                asg_instances.append(inst)
+                number_of_instances += 1
+            done = True
 
         def is_in_stopping_state(state):
             return (state & 0xFF) in Ec2Service.EC2_STOPPING_STATES
@@ -347,6 +423,7 @@ class Ec2Service:
 
         start_tags_keys = [{"Key": t["Key"]} for t in kwargs[schedulers.PARAM_CONFIG].started_tags if
                            t["Key"] not in stop_tags_key_names]
+
 
         methods = ["stop_instances", "create_tags", "delete_tags", "describe_instances"]
         client = get_client_with_retries("ec2", methods=methods, context=self._context, session=self._session, region=self._region)
@@ -363,6 +440,23 @@ class Ec2Service:
                 self._logger.warning(WARN_NO_HIBERNATE_RESIZED, inst.id)
 
             instances_stopping = []
+            try:
+                for i in asg_instances:
+                    if i['InstanceId'] in instance_ids:
+                        tagged_instance = []
+                        tagged_instance.append(i['InstanceId'])
+                        tagged_instance_asg = i['AutoScalingGroupName']
+                        asg_tags = {}
+                        asg_tags['Key'] = 'ASG'
+                        asg_tags['Value'] = tagged_instance_asg
+                        asg_tags_list = []
+                        asg_tags_list.append(asg_tags)
+                        self._logger.info('Adding tags {} and detach ASG instance {}', asg_tags_list, i['InstanceId'])
+                        client.create_tags_with_retries(Resources=tagged_instance, Tags=asg_tags_list)
+                        self.detach_instance(i)
+                        time.sleep(10)
+            except:
+                self._logger.info('There are no instances into ASGs')
 
             try:
                 while len(hibernated) > 0:
@@ -426,7 +520,7 @@ class Ec2Service:
                     yield i, InstanceSchedule.STATE_STOPPED
 
             except Exception as ex:
-                self._logger.error(ERR_STOPPING_INSTANCES, ",".join(instance_ids), str(ex))
+                pass
 
     # noinspection PyMethodMayBeStatic
     def start_instances(self, kwargs):
@@ -435,7 +529,7 @@ class Ec2Service:
             return (state & 0xFF) in Ec2Service.EC2_STARTING_STATES
 
         self._init_scheduler(kwargs)
-
+        instances_info = self.get_schedulable_instances(kwargs)
         instances_to_start = kwargs[schedulers.PARAM_STARTED_INSTANCES]
         start_tags = kwargs[schedulers.PARAM_CONFIG].started_tags
         if start_tags is None:
@@ -489,3 +583,12 @@ class Ec2Service:
 
             except Exception as ex:
                 self._logger.error(ERR_STARTING_INSTANCES, ",".join(instance_ids), str(ex))
+
+        time.sleep(30)
+        for i in instances_info:
+            if 'ASG' in i['tags']:
+                try:
+                    self._logger.info('Attach instance {} to ASG {}', i['id'], i['tags']['ASG'])
+                    self.attach_instance(i['id'], i['tags']['ASG'])
+                except Exception as e:
+                    self._logger.info('There are no instances needed to connect to ASGs, or error: {}', str(e))

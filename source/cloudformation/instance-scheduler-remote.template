@@ -156,11 +156,13 @@
                                     "Action": [
                                         "rds:DescribeDBClusters",
                                         "rds:DescribeDBInstances",
-        
+
                                         "ec2:DescribeInstances",
                                         "ec2:DescribeRegions",
                                         "ec2:ModifyInstanceAttribute",
-
+                                        "autoscaling-plans:*",
+                                        "autoscaling:*",
+                                        
                                         "ssm:DescribeMaintenanceWindows",
 
                                         "tag:GetResources"

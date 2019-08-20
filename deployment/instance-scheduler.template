@@ -795,7 +795,7 @@
                                                 "Ref": "AWS::AccountId"
                                             },
                                             "log-group",
-                                            { 
+                                            {
                                                 "Ref": "SchedulerLogGroup"
                                             },
                                             "*"
@@ -1028,9 +1028,11 @@
                                 "ssm:GetParameter",
                                 "ssm:GetParameters",
                                 "ssm:DescribeMaintenanceWindows",
+                                "autoscaling-plans:*",
+                                "autoscaling:*",
 
                                 "tag:GetResources",
-                                
+
                                 "sts:AssumeRole"
                             ],
                             "Resource": [
