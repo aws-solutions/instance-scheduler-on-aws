@@ -1195,7 +1195,7 @@
                         "STATE_TABLE": {
                             "Ref": "StateTable"
                         },
-                        "LOG_GROUP": {
+                        "ENV_LOG_GROUP": {
                             "Ref": "SchedulerLogGroup"
                         },
                         "ACCOUNT": {
