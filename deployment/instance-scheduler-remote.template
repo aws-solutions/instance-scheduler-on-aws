@@ -1,190 +1,129 @@
-{
-    "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "(SO0030) - Instance scheduler cross account role, version %version%",
-    "Parameters": {
-        "InstanceSchedulerAccount": {
-            "Type": "String",
-            "AllowedPattern": "(^[0-9]{12}$)",
-            "ConstraintDescription": "Account number is a 12 digit number",
-            "Description": "Account number of Instance Scheduler account to give access to manage EC2 and RDS  Instances in this account."
-        }
-    },
-    "Metadata": {
-        "AWS::CloudFormation::Interface": {
-            "ParameterGroups": [{
-                "Label": {
-                    "default": "Account"
-                },
-                "Parameters": [
-                    "InstanceSchedulerAccount"
-                ]
-            }],
-            "ParameterLabels": {
-                "InstanceSchedulerAccount": {
-                    "default": "Primary account"
-                }
-            }
-        }
-    },
-    "Resources": {
-        "EC2SchedulerCrossAccountRole": {
-            "Type": "AWS::IAM::Role",
-            "Metadata": {
-                "cfn_nag": {
-                    "rules_to_suppress": [
-                        {
-                            "id": "W11",
-                            "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
-                        }
-                    ]
-                }
-            },
-            "Properties": {
-                "AssumeRolePolicyDocument": {
-                    "Version": "2012-10-17",
-                    "Statement": [{
-                        "Effect": "Allow",
-                        "Principal": {
-                            "AWS": {
-                                "Fn::Join": [
-                                    "", [
-                                        "arn:aws:iam::", {
-                                            "Ref": "InstanceSchedulerAccount"
-                                        },
-                                        ":root"
-                                    ]
-                                ]
-                            },
-                            "Service": "lambda.amazonaws.com"
-                        },
-                        "Action": [
-                            "sts:AssumeRole"
-                        ]
-                    }]
-                },
-                "Path": "/",
-                "Policies": [
-                    {
-                        "PolicyName": "EC2InstanceSchedulerRemote",
-                        "PolicyDocument": {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Effect": "Allow",
-                                    "Action": "rds:DeleteDBSnapshot",
-                                    "Resource": {
-                                        "Fn::Join": [
-                                            ":",
-                                            [
-                                                "arn:aws:rds:*",
-                                                {
-                                                    "Ref": "AWS::AccountId"
-                                                },
-                                                "snapshot:*"
-                                            ]
-                                        ]
-                                    }
-                                },
-                                {
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "rds:AddTagsToResource",
-                                        "rds:RemoveTagsFromResource",
-                                        "rds:DescribeDBSnapshots",
-                                        "rds:StartDBInstance",
-                                        "rds:StopDBInstance"
-                                    ],
-                                    "Resource": {
-                                        "Fn::Join": [
-                                            ":",
-                                            [
-                                                "arn:aws:rds:*",
-                                                {
-                                                    "Ref": "AWS::AccountId"
-                                                },
-                                                "db:*"
-                                            ]
-                                        ]
-                                    }
-                                },
-                                {
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "rds:StartDBCluster",
-                                        "rds:StopDBCluster"
-                                    ],
-                                    "Resource": [
-                                        {
-                                            "Fn::Join": [
-                                                ":",
-                                                [
-                                                    "arn:aws:rds:*",
-                                                    {
-                                                        "Ref": "AWS::AccountId"
-                                                    },
-                                                    "cluster:*"
-                                                ]
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "ec2:StartInstances",
-                                        "ec2:StopInstances",
-                                        "ec2:CreateTags",
-                                        "ec2:DeleteTags"
-                                    ],
-                                    "Resource": [
-                                        {
-                                            "Fn::Join": [
-                                                ":",
-                                                [
-                                                    "arn:aws:ec2:*",
-                                                    {
-                                                        "Ref": "AWS::AccountId"
-                                                    },
-                                                    "instance/*"
-                                                ]
-                                            ]
-                                        }
-                                    ]
-                                },
-                                {
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "rds:DescribeDBClusters",
-                                        "rds:DescribeDBInstances",
-        
-                                        "ec2:DescribeInstances",
-                                        "ec2:DescribeRegions",
-                                        "ec2:ModifyInstanceAttribute",
-
-                                        "ssm:DescribeMaintenanceWindows",
-
-                                        "tag:GetResources"
-                                    ],
-                                    "Resource": [
-                                        "*"
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                ]
-            }
-        }
-    },
-    "Outputs": {
-        "CrossAccountRole": {
-            "Value": {
-                "Fn::GetAtt": [
-                    "EC2SchedulerCrossAccountRole",
-                    "Arn"
-                ]
-            },
-            "Description": "Arn for cross account role for Instance scheduler, add this arn to the list of crossaccount roles (CrossAccountRoles) parameter of the Instance Scheduler template."
-        }
-    }
-}
+AWSTemplateFormatVersion: '2010-09-09'
+Description: '(SO0030) - Instance scheduler cross account role, version %version%'
+Parameters:
+    InstanceSchedulerAccount:
+        Type: String
+        AllowedPattern: '(^[0-9]{12}$)'
+        ConstraintDescription: Account number is a 12 digit number
+        Description: Account number of Instance Scheduler account to give access to manage EC2 and RDS  Instances in this account.
+Metadata:
+    'AWS::CloudFormation::Interface':
+        ParameterGroups:
+            - 
+                Label:
+                    default: Account
+                Parameters:
+                    - InstanceSchedulerAccount
+        ParameterLabels:
+            InstanceSchedulerAccount:
+                default: Primary account
+Resources:
+    EC2SchedulerCrossAccountRole:
+        Type: 'AWS::IAM::Role'
+        Metadata:
+            cfn_nag:
+                rules_to_suppress:
+                    - 
+                        id: W11
+                        reason: All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                    - 
+                        Effect: Allow
+                        Principal:
+                            AWS:
+                                'Fn::Join':
+                                    - ''
+                                    - 
+                                        - 'arn:aws:iam::'
+                                        - 
+                                            Ref: InstanceSchedulerAccount
+                                        - ':root'
+                            Service: lambda.amazonaws.com
+                        Action:
+                            - 'sts:AssumeRole'
+            Path: /
+            Policies:
+                - 
+                    PolicyName: EC2InstanceSchedulerRemote
+                    PolicyDocument:
+                        Version: '2012-10-17'
+                        Statement:
+                            - 
+                                Effect: Allow
+                                Action: 'rds:DeleteDBSnapshot'
+                                Resource:
+                                    'Fn::Join':
+                                        - ':'
+                                        - 
+                                            - 'arn:aws:rds:*'
+                                            - 
+                                                Ref: 'AWS::AccountId'
+                                            - 'snapshot:*'
+                            - 
+                                Effect: Allow
+                                Action:
+                                    - 'rds:AddTagsToResource'
+                                    - 'rds:RemoveTagsFromResource'
+                                    - 'rds:DescribeDBSnapshots'
+                                    - 'rds:StartDBInstance'
+                                    - 'rds:StopDBInstance'
+                                Resource:
+                                    'Fn::Join':
+                                        - ':'
+                                        - 
+                                            - 'arn:aws:rds:*'
+                                            - 
+                                                Ref: 'AWS::AccountId'
+                                            - 'db:*'
+                            - 
+                                Effect: Allow
+                                Action:
+                                    - 'rds:StartDBCluster'
+                                    - 'rds:StopDBCluster'
+                                Resource:
+                                    - 
+                                        'Fn::Join':
+                                            - ':'
+                                            - 
+                                                - 'arn:aws:rds:*'
+                                                - 
+                                                    Ref: 'AWS::AccountId'
+                                                - 'cluster:*'
+                            - 
+                                Effect: Allow
+                                Action:
+                                    - 'ec2:StartInstances'
+                                    - 'ec2:StopInstances'
+                                    - 'ec2:CreateTags'
+                                    - 'ec2:DeleteTags'
+                                Resource:
+                                    - 
+                                        'Fn::Join':
+                                            - ':'
+                                            - 
+                                                - 'arn:aws:ec2:*'
+                                                - 
+                                                    Ref: 'AWS::AccountId'
+                                                - 'instance/*'
+                            - 
+                                Effect: Allow
+                                Action:
+                                    - 'rds:DescribeDBClusters'
+                                    - 'rds:DescribeDBInstances'
+                                    - 'ec2:DescribeInstances'
+                                    - 'ec2:DescribeRegions'
+                                    - 'ec2:ModifyInstanceAttribute'
+                                    - 'ssm:DescribeMaintenanceWindows'
+                                    - 'tag:GetResources'
+                                Resource:
+                                    - '*'
+Outputs:
+    CrossAccountRole:
+        Value:
+            'Fn::GetAtt':
+                - EC2SchedulerCrossAccountRole
+                - Arn
+        Description: 'Arn for cross account role for Instance scheduler, add this arn to the list of crossaccount roles (CrossAccountRoles) parameter of the Instance Scheduler template.'
