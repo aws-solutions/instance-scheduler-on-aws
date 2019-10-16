@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -47,7 +47,7 @@ DEBUG_NO_SCHEDULE_TAG = "Instance {} has no schedule tag named {}"
 WARN_TAGGING_STARTED = "Error setting start or stop tags to started instance {}, ({})"
 WARN_TAGGING_STOPPED = "Error setting start or stop tags to stopped instance {}, ({})"
 WARN_RDS_TAG_VALUE = "Tag value \"{}\" for tag \"{}\" changed to \"{}\" because it did contain characters that are not allowed " \
-                     "in RDS tag values. The value can only contain only the set of Unicode letters, digits, " \
+                    "in RDS tag values. The value can only contain only the set of Unicode letters, digits, " \
                      "white-space, '_', '.', '/', '=', '+', '-'"
 
 MAINTENANCE_SCHEDULE_NAME = "RDS preferred Maintenance Window Schedule"
@@ -345,13 +345,13 @@ class RdsService:
             snapshot_name = "{}-stopped-{}".format(self._stack_name, inst.id).replace(" ", "")
             args["DBSnapshotIdentifier"] = snapshot_name
 
-        try:
-            if does_snapshot_exist(snapshot_name):
-                client.delete_db_snapshot_with_retries(DBSnapshotIdentifier=snapshot_name)
-                self._logger.info(INF_DELETE_SNAPSHOT, snapshot_name)
-        except Exception as ex:
-            self._logger.error(ERR_DELETING_SNAPSHOT, snapshot_name)
-    
+            try:
+                if does_snapshot_exist(snapshot_name):
+                    client.delete_db_snapshot_with_retries(DBSnapshotIdentifier=snapshot_name)
+                    self._logger.info(INF_DELETE_SNAPSHOT, snapshot_name)
+            except Exception as ex:
+                self._logger.error(ERR_DELETING_SNAPSHOT, snapshot_name)
+
         try:
             client.stop_db_instance_with_retries(**args)
             self._logger.info(INF_STOPPED_RESOURCE, "instance", inst.id)

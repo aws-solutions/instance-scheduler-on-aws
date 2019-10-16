@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -131,7 +131,7 @@ class InstanceSchedule:
         Test if an instance should be running at a specific moment in this schedule
         :param instance: the instance to test
         :param logger: logger for logging output of scheduling logic
-        :param dt: date time to use for scheduling, use Non for using the time specified in the constructor of the schedule
+        :param dt: date time to use for scheduling, use None for using the time specified in the constructor of the schedule
         :param check_adjacent_periods: check for adjacent periods in a schedule
         :return: desired state, instance type and name of the active period of the schedule if the state is running
         """
@@ -139,7 +139,7 @@ class InstanceSchedule:
         # gets the local time using the configured timezone
         def get_check_time(time):
             check_time = time if time else self.schedule_dt
-            return check_time
+            return check_time.astimezone(pytz.timezone(self.timezone))
 
         # actions for desired state is running
         def handle_running_state(inst, periods):
@@ -159,7 +159,7 @@ class InstanceSchedule:
 
             # reduce is removed from python3, replace by minimal implementation for python3 compatibility
             def _reduce(fn, items):
-                if items is None or len(items) == 0:
+                if items is None or len(list(items)) == 0:
                     return None
                 else:
                     result = items[0]
@@ -172,7 +172,7 @@ class InstanceSchedule:
             # nearest period in schedule with running state
             current_running_period = _reduce(latest_starttime, periods)
 
-            multiple_active_periods = len(periods) > 1
+            multiple_active_periods = len(list(periods)) > 1
 
             self._log_debug(DEBUG_ACTIVE_PERIOD_IN_SCHEDULE.format("s" if multiple_active_periods else "", self.name,
                                                                    ",".join('"' + per["period"].name + '"' for per in periods)))
@@ -223,8 +223,7 @@ class InstanceSchedule:
         periods_with_desired_states = self.get_periods_with_desired_states(localized_time)
 
         # get periods from the schema that have a running state
-        periods_with_running_state = filter(lambda period: period["state"] == InstanceSchedule.STATE_RUNNING,
-                                            periods_with_desired_states)
+        periods_with_running_state = [p for p in periods_with_desired_states if p["state"] == InstanceSchedule.STATE_RUNNING]
 
         if any(periods_with_running_state):
             return handle_running_state(instance, periods_with_running_state)
@@ -256,7 +255,8 @@ class InstanceSchedule:
     def get_periods_with_desired_states(self, time):
         periods_with_desired_states = [
             {
-                "period": p["period"], "instancetype": p.get("instancetype", None),
+                "period": p["period"], 
+                "instancetype": p.get("instancetype", None),
                 "state": p["period"].get_desired_state(self._logger, time)
             }
             for p in self.periods]

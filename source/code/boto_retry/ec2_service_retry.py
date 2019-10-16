@@ -15,7 +15,7 @@ class Ec2ServiceRetry(AwsApiServiceRetry):
               :param context: Lambda context that is used to calculate remaining execution time
               :param timeout: Timeout for method call. This time can not exceed the remaining time if a method is called
               within the context of a lambda function.
-              :param lambda_time_out_margin: If called within the context of a Lambda function this time should at least be 
+              :param lambda_time_out_margin: If called within the context of a Lambda function this time should at least be
               remaining before making a retry. This is to allow possible cleanup and logging actions in the remaining time
               """
         AwsApiServiceRetry.__init__(
@@ -35,7 +35,7 @@ class Ec2ServiceRetry(AwsApiServiceRetry):
         """
         Retries in case the snapshot creation rate is exceeded for a volume
         :param ex: Exception to test
-        :return: 
+        :return:
         """
         return type(ex) == ClientError and \
                ex.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0) == 400 and \
@@ -44,9 +44,9 @@ class Ec2ServiceRetry(AwsApiServiceRetry):
     @classmethod
     def resource_limit_exceeded(cls, ex):
         """
-        Retries in case resource limits are exceeded. 
-        :param ex: 
-        :return: 
+        Retries in case resource limits are exceeded.
+        :param ex:
+        :return:
         """
         return type(ex) == ClientError and \
                ex.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0) == 400 and \
@@ -55,9 +55,9 @@ class Ec2ServiceRetry(AwsApiServiceRetry):
     @classmethod
     def request_limit_exceeded(cls, ex):
         """
-        Retries in case resource limits are exceeded. 
-        :param ex: 
-        :return: 
+        Retries in case resource limits are exceeded.
+        :param ex:
+        :return:
         """
         return type(ex) == ClientError and \
                ex.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0) == 503 and \

@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -83,8 +83,8 @@ class SchedulerMetrics:
 
         if len(self._metrics_managed) > 0:
             metric_data = []
-            for service in self._metrics_managed.keys():
-                for name in self._metrics_managed[service].keys():
+            for service in list(self._metrics_managed):
+                for name in list(self._metrics_managed[service]):
                     metric_data.append(
                         build_metric(service, name, SchedulerMetrics.MANAGED_INSTANCES, self._metrics_managed[service]))
                     metric_data.append(

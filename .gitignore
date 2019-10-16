@@ -1,0 +1,11 @@
+.DS_Store
+
+*.zip
+deployment/open-source
+deployment/dist
+source/deploy
+
+.env
+source/code/sample_events
+.vscode
+__pycache__

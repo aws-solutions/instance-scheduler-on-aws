@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -23,7 +23,7 @@ import pytz
 import schedulers
 from boto_retry import get_client_with_retries
 from configuration.instance_schedule import InstanceSchedule
-from instance_states import InstanceStates
+from .instance_states import InstanceStates
 from util.metrics import send_metrics_data, allow_send_metrics
 from util.named_tuple_builder import as_namedtuple
 from util.scheduler_metrics import SchedulerMetrics
@@ -356,7 +356,7 @@ class InstanceScheduler:
 
     def _send_usage_metrics(self):
         usage_data = []
-        for s in self._usage_metrics.keys():
+        for s in list(self._usage_metrics):
             if len(self._usage_metrics[s]) == 0:
                 del self._usage_metrics[s]
         if len(self._usage_metrics) > 0:

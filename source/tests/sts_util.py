@@ -11,26 +11,22 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
-import json
-import sys
+import boto3
+import time
+from functools import lru_cache
 
-from collections import OrderedDict
+@lru_cache(maxsize=1)
+def get_rts_client():
+    return boto3.client("sts")
 
-
-def get_versioned_template(template_filename, bucket, solution, version):
-    with open(template_filename, "rt") as f:
-        template_text = "".join(f.readlines())
-        template_text = template_text.replace("%bucket%", bucket)
-        template_text = template_text.replace("%solution%", solution)
-        template_text = template_text.replace("%version%", version)
-        return json.loads(template_text, object_pairs_hook=OrderedDict)
-
-
-def main(template_file, bucket, solution, version):
-    template = get_versioned_template(template_file, bucket, solution, version)
-    print(json.dumps(template, indent=4))
-
-
-main(template_file=sys.argv[1], bucket=sys.argv[2], solution=sys.argv[3], version=sys.argv[4])
-
-exit(0)
+@lru_cache(maxsize=1)
+def get_assume_role_credentials(role_arn):
+    try:
+        assume_role = get_rts_client().assume_role(
+            RoleArn=role_arn,
+            RoleSessionName='is-122-remote-session'
+        )
+        return assume_role["Credentials"]
+    except Exception as e:
+        print(f'Failed to retrieve assume role credentials. Exception: {e}')
+        return None

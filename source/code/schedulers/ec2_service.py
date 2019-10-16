@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -36,7 +36,7 @@ STOP_BATCH_SIZE = 50
 
 ERR_STARTING_INSTANCES = "Error starting instances {}, ({})"
 ERR_STOPPING_INSTANCES = "Error stopping instances {}, ({})"
-ERR_MAINT_WINDOW_NOT_FOUND = "SSM maintenance window {} used in schedule {} not found"
+ERR_MAINT_WINDOW_NOT_FOUND_OR_DISABLED = "SSM maintenance window {} used in schedule {} not found or disabled"
 
 INF_FETCHED_INSTANCES = "Number of fetched ec2 instances is {}, number of instances in a schedulable state is {}"
 INF_FETCHING_INSTANCES = "Fetching ec2 instances for account {} in region {}"
@@ -44,6 +44,7 @@ INF_SETTING_SIZE = "Setting size for ec2 instance {} to {}"
 INF_ADD_KEYS = "Adding {} key(s) {} to instance(s) {}"
 INFO_REMOVING_KEYS = "Removing {} key(s) {} from instance(s) {}"
 INF_MAINT_WINDOW = "Created schedule {} from SSM maintence window, start is {}, end is {}"
+INF_MAINT_WINDOW_DISABLED = "SSM maintenance window {} ({}) is disabled"
 
 WARN_STARTED_INSTANCES_TAGGING = "Error deleting or creating tags for started instances {} ({})"
 WARN_STOPPED_INSTANCES_TAGGING = "Error deleting or creating tags for stopped instances {} ({})"
@@ -110,12 +111,18 @@ class Ec2Service:
                 while True:
                     resp = ssm.describe_maintenance_windows(**args)
                     for window in resp.get("WindowIdentities", []):
+                        if not window["Enabled"]:
+                            self._logger.info(INF_MAINT_WINDOW_DISABLED, window["Name"], window['WindowId'])
+                            continue
+
                         start = dateutil.parser.parse(window["NextExecutionTime"])
+                        scheduler_timezone = window.get("ScheduleTimezone", "UTC")
                         scheduler_interval = max(10, int(os.getenv(configuration.ENV_SCHEDULE_FREQUENCY)))
                         maintenace_schedule = self._schedule_from_maint_window(name=window["Name"],
                                                                                start=start,
                                                                                interval=scheduler_interval,
-                                                                               hours=window["Duration"])
+                                                                               hours=window["Duration"],
+                                                                               timezone=scheduler_timezone)
                         self._ssm_maintenance_windows[window["Name"]] = maintenace_schedule
 
                     next_token = resp.get("NextToken")
@@ -176,7 +183,7 @@ class Ec2Service:
         self._logger.info(INF_FETCHED_INSTANCES, number_of_instances, len(instances))
         return instances
 
-    def _schedule_from_maint_window(self, name, start, hours, interval):
+    def _schedule_from_maint_window(self, name, start, hours, interval, timezone):
         start_dt = start.replace(second=0, microsecond=0)
         start_before_begin = min(interval, 10)
         begin_dt = start_dt - timedelta(minutes=start_before_begin)
@@ -256,7 +263,7 @@ class Ec2Service:
             ]
 
         schedule = InstanceSchedule(name=name,
-                                    timezone="UTC",
+                                    timezone=timezone,
                                     description="{} maintenance window".format(name),
                                     enforced=True,
                                     periods=periods)
@@ -285,7 +292,7 @@ class Ec2Service:
             if schedule.use_maintenance_window and schedule.ssm_maintenance_window not in [None, ""]:
                 maintenance_window_schedule = self.ssm_maintenance_windows.get(schedule.ssm_maintenance_window, None)
                 if maintenance_window_schedule is None:
-                    self._logger.error(ERR_MAINT_WINDOW_NOT_FOUND, schedule.ssm_maintenance_window, schedule.name)
+                    self._logger.error(ERR_MAINT_WINDOW_NOT_FOUND_OR_DISABLED, schedule.ssm_maintenance_window, schedule.name)
                     self._ssm_maintenance_windows[schedule.ssm_maintenance_window] = "NOT-FOUND"
                 if maintenance_window_schedule == "NOT-FOUND":
                     maintenance_window_schedule = None

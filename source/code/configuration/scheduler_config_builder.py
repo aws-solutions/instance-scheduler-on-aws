@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -315,8 +315,8 @@ class SchedulerConfigBuilder:
     def configuration_from_dict(d):
         """
         This method builds a configuration object instance that is passed as a dictionary in the event of a lambda function
-        :param d: 
-        :return: 
+        :param d:
+        :return:
         """
 
         config_args = {}
@@ -400,8 +400,8 @@ class SchedulerConfigBuilder:
     def configuration_as_dict(config):
         """
         This method build a dictionary from a configuration instance to be passed safely in the event of a lambda function
-        :param config: 
-        :return: 
+        :param config:
+        :return:
         """
         result = {}
 
@@ -485,7 +485,7 @@ class SchedulerConfigBuilder:
     def is_valid_timezone(tz):
         """
         Generic and optimized method to test the validity of a timezone name
-        :param tz: 
+        :param tz:
         :return: True if the timezone is valid, else False
         """
         return SchedulerConfigBuilder.validated_timezone(tz) is not None

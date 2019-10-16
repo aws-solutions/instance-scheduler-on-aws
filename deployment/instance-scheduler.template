@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "(SO0030) - Instance scheduler, version %version%",
+    "Description": "(SO0030) - %solution%, version %version%",
     "Parameters": {
         "SchedulingActive": {
             "Type": "String",
@@ -795,7 +795,7 @@
                                                 "Ref": "AWS::AccountId"
                                             },
                                             "log-group",
-                                            { 
+                                            {
                                                 "Ref": "SchedulerLogGroup"
                                             },
                                             "*"
@@ -864,6 +864,8 @@
                         {
                             "Effect": "Allow",
                             "Action": [
+                                "rds:AddTagsToResource",
+                                "rds:RemoveTagsFromResource",
                                 "rds:StartDBCluster",
                                 "rds:StopDBCluster"
                             ],
@@ -1030,7 +1032,6 @@
                                 "ssm:DescribeMaintenanceWindows",
 
                                 "tag:GetResources",
-                                
                                 "sts:AssumeRole"
                             ],
                             "Resource": [
@@ -1171,10 +1172,10 @@
                             ]
                         ]
                     },
-                    "S3Key": "%prefix%instance-scheduler-%version%.zip"
+                    "S3Key": "%solution%/%version%/instance-scheduler.zip"
                 },
                 "Handler": "main.lambda_handler",
-                "Runtime": "python2.7",
+                "Runtime": "python3.7",
                 "Role": {
                     "Fn::GetAtt": [
                         "SchedulerRole",

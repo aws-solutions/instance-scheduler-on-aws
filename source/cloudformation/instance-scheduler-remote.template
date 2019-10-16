@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "(SO0030) - Instance scheduler cross account role, version %version%",
+    "Description": "(SO0030) - %solution% cross account role, version %version%",
     "Parameters": {
         "InstanceSchedulerAccount": {
             "Type": "String",
@@ -71,7 +71,11 @@
                             "Statement": [
                                 {
                                     "Effect": "Allow",
-                                    "Action": "rds:DeleteDBSnapshot",
+                                    "Action": [
+                                        "rds:DeleteDBSnapshot",
+                                        "rds:DescribeDBSnapshots",
+                                        "rds:StopDBInstance"
+                                    ],
                                     "Resource": {
                                         "Fn::Join": [
                                             ":",
@@ -110,6 +114,8 @@
                                 {
                                     "Effect": "Allow",
                                     "Action": [
+                                        "rds:AddTagsToResource",
+                                        "rds:RemoveTagsFromResource",
                                         "rds:StartDBCluster",
                                         "rds:StopDBCluster"
                                     ],
@@ -156,7 +162,6 @@
                                     "Action": [
                                         "rds:DescribeDBClusters",
                                         "rds:DescribeDBInstances",
-        
                                         "ec2:DescribeInstances",
                                         "ec2:DescribeRegions",
                                         "ec2:ModifyInstanceAttribute",

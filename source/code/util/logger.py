@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -90,7 +90,7 @@ class Logger:
 
         if self._context is None and str(os.getenv(ENV_SUPPRESS_LOG_STDOUT, False)).lower() != "true":
             print("> " + s)
-        self._buffer.append((long(t * 1000), s))
+        self._buffer.append((int(t * 1000), s))
 
         if len(self._buffer) >= self._buffer_size:
             self.flush()
@@ -116,16 +116,16 @@ class Logger:
         """
         Sets debug switch
         :param value: True to enable debugging, False to disable
-        :return: 
+        :return:
         """
         self._debug = value
 
     def publish_to_sns(self, level, msg):
         """
         Publish message to sns topic
-        :param msg: 
-        :param level: 
-        :return: 
+        :param msg:
+        :param level:
+        :return:
         """
         sns_arn = os.getenv(ENV_ISSUES_TOPIC_ARN, None)
         if sns_arn is not None:
@@ -137,7 +137,7 @@ class Logger:
         Logs informational message
         :param msg: Message format string
         :param args: Message parameters
-        :return: 
+        :return:
         """
         self._emit(LOG_LEVEL_INFO, msg, *args)
 
@@ -146,7 +146,7 @@ class Logger:
         Logs error message
         :param msg: Error message format string
         :param args: parameters
-        :return: 
+        :return:
         """
         s = self._emit(LOG_LEVEL_ERROR, msg, *args)
         self.publish_to_sns("Error", s)
@@ -156,7 +156,7 @@ class Logger:
         Logs warning message
         :param msg: Warning message format string
         :param args: parameters
-        :return: 
+        :return:
         """
         s = self._emit(LOG_LEVEL_WARNING, msg, *args)
         self.publish_to_sns("Warning", s)
@@ -174,7 +174,7 @@ class Logger:
     def clear(self):
         """
         Clear all buffered error messages
-        :return: 
+        :return:
         """
         self._buffer = []
 
@@ -188,7 +188,7 @@ class Logger:
     def flush(self):
         """
         Writes all buffered messages to CloudWatch Stream
-        :return: 
+        :return:
         """
 
         def get_next_log_token():

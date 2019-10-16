@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -19,7 +19,7 @@ from hashlib import sha256
 import boto3
 
 import configuration
-import setup_demo_data as demo_data
+import requesthandlers.setup_demo_data as demo_data
 from boto_retry import get_client_with_retries
 from configuration.config_admin import ConfigAdmin
 from util.custom_resource import CustomResource
@@ -206,7 +206,7 @@ class SchedulerSetupHandler(CustomResource):
     def set_lambda_logs_retention_period(self):
         """
         Aligns retention period for default Lambda log streams with settings
-        :return: 
+        :return:
         """
 
         if self.context is None:
@@ -248,11 +248,10 @@ class SchedulerSetupHandler(CustomResource):
             self._logger.error("Error creating sample schedules and periods {}".format(ex))
 
     def _send_create_metrics(self):
-
         metrics_data = {
             "Type": "stack",
             "Version": self._stack_version,
-            "StackHash": sha256(self.stack_id).hexdigest(),
+            "StackHash": sha256(self.stack_id.encode('utf-8')).hexdigest(),
             "Data": {
                 "Status": "stack_create",
                 "Region": self.region
@@ -266,7 +265,7 @@ class SchedulerSetupHandler(CustomResource):
         metrics_data = {
             "Type": "stack",
             "Version": self._stack_version,
-            "StackHash": sha256(self.stack_id).hexdigest(),
+            "StackHash": sha256(self.stack_id.encode('utf-8')).hexdigest(),
             "Data": {
                 "Status": "stack_delete",
                 "Region": self.region

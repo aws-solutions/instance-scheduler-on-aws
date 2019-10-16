@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -13,6 +13,7 @@
 
 import os
 import sys
+import json
 
 import boto3
 
@@ -32,7 +33,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Enter the name of the stack")
         # noinspection PyCompatibility
-        stack = raw_input("Enter name of the Scheduler Stack: ")
+        stack = input("Enter name of the Scheduler Stack: ")
     else:
         stack = sys.argv[1]
 
@@ -51,6 +52,10 @@ if __name__ == "__main__":
 
     except Exception as ex:
         print("error setting up environment, {}".format(ex))
+
+    #event = {}
+    #with open('sample_events/scheduler_setup_handler_event.json') as json_file:
+    #    event = json.load(json_file)
 
     event = {
         "source": "aws.events",

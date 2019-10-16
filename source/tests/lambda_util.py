@@ -11,26 +11,32 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
+import boto3
 import json
-import sys
+from functools import lru_cache
 
-from collections import OrderedDict
+@lru_cache(maxsize=1)
+def get_lambda_client():
+    return boto3.client("lambda")
 
+def get_lambda_env_variables(lambda_function_physical_resource_id):
+    try:
+        lambda_function = get_lambda_client().get_function(FunctionName=lambda_function_physical_resource_id)
+        env_variables = lambda_function["Configuration"]["Environment"]["Variables"]
+        return env_variables
+    except Exception as e:
+        print(f'Failed to retrieve environment variables. Exception: {e}')
+        return None
 
-def get_versioned_template(template_filename, bucket, solution, version):
-    with open(template_filename, "rt") as f:
-        template_text = "".join(f.readlines())
-        template_text = template_text.replace("%bucket%", bucket)
-        template_text = template_text.replace("%solution%", solution)
-        template_text = template_text.replace("%version%", version)
-        return json.loads(template_text, object_pairs_hook=OrderedDict)
+def invoke_lambda_function(function_name, event):
+    try:
+        response = get_lambda_client().invoke(
+            FunctionName=function_name,
+            InvocationType='RequestResponse',
+            LogType='Tail',
+            Payload=json.dumps(event))
+        print (f'Lambda function [{function_name}] invoke response: {response}')
+    except Exception as e:
+        print(f'Failed to execute lambda. Exception: {e}')
+        return None
 
-
-def main(template_file, bucket, solution, version):
-    template = get_versioned_template(template_file, bucket, solution, version)
-    print(json.dumps(template, indent=4))
-
-
-main(template_file=sys.argv[1], bucket=sys.argv[2], solution=sys.argv[3], version=sys.argv[4])
-
-exit(0)

@@ -1,10 +1,10 @@
 ######################################################################################################################
-#  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
-#  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        #
+#  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
 #                                                                                                                    #
-#      http://aws.amazon.com/asl/                                                                                    #
+#      http://www.apache.org/licenses/                                                                               #
 #                                                                                                                    #
 #  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES #
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
@@ -32,7 +32,7 @@ class AwsApiServiceRetry:
         :param context: Lambda context that is used to calculate remaining execution time
         :param timeout: Timeout for method call. This time can not exceed the remaining time if a method is called
         within the context of a lambda function.
-        :param lambda_time_out_margin: If called within the context of a Lambda function this time should at least be 
+        :param lambda_time_out_margin: If called within the context of a Lambda function this time should at least be
         remaining before making a retry. This is to allow possible cleanup and logging actions in the remaining time
         """
         self.default_strategies = [self.api_throttled, self.service_not_available]
@@ -46,8 +46,8 @@ class AwsApiServiceRetry:
     def api_throttled(cls, ex):
         """
         Tests if the API call was throttled
-        :param ex: 
-        :return: 
+        :param ex:
+        :return:
         """
         return "throttling" in ex.message.lower()
 
@@ -55,8 +55,8 @@ class AwsApiServiceRetry:
     def service_not_available(cls, ex):
         """
         Tests if the service was temporary not available
-        :param ex: 
-        :return: 
+        :param ex:
+        :return:
         """
         if type(ex) == ClientError:
             return False
