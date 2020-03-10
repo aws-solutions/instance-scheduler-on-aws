@@ -49,7 +49,10 @@ class AwsApiServiceRetry:
         :param ex:
         :return:
         """
-        return "throttling" in ex.message.lower()
+        return \
+            type(ex) == ClientError and \
+            ex.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0) == 400 and \
+            "throttl" in ex.response.get("Error", {}).get("Code", "").lower()
 
     @classmethod
     def service_not_available(cls, ex):

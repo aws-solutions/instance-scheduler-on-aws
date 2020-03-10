@@ -167,6 +167,7 @@
                                         "ec2:ModifyInstanceAttribute",
 
                                         "ssm:DescribeMaintenanceWindows",
+                                        "ssm:DescribeMaintenanceWindowExecutions",
 
                                         "tag:GetResources"
                                     ],

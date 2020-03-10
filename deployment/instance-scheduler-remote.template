@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "(SO0030) - %solution% cross account role, version %version%",
+    "Description": "(SO0030) - aws-instance-scheduler, version v1.3.1",
     "Parameters": {
         "InstanceSchedulerAccount": {
             "Type": "String",
@@ -167,6 +167,7 @@
                                         "ec2:ModifyInstanceAttribute",
 
                                         "ssm:DescribeMaintenanceWindows",
+                                        "ssm:DescribeMaintenanceWindowExecutions",
 
                                         "tag:GetResources"
                                     ],

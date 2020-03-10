@@ -15,7 +15,7 @@ import os
 import uuid
 from datetime import datetime
 
-from botocore.vendored import requests
+import requests
 
 import util
 from util import safe_json

@@ -752,6 +752,57 @@
         }
     },
     "Resources": {
+        "InstanceSchedulerEncryptionKey": {
+            "Type": "AWS::KMS::Key",
+            "Properties": {
+                "Description": "Key for SNS",
+                "Enabled": true,
+                "EnableKeyRotation": true,
+                "KeyPolicy": {
+                    "Statement": [
+                        {
+                        "Sid": "default",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": { 
+                                "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+                            }
+                        },
+                        "Action": "kms:*",
+                        "Resource": "*"
+                        },
+                        {
+                        "Sid": "Allows use of key",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "AWS": {
+                                "Fn::GetAtt": [
+                                    "SchedulerRole",
+                                    "Arn"
+                                ]
+                            }
+                        },
+                        "Action": [
+                            "kms:GenerateDataKey*",
+                            "kms:Decrypt"
+                        ],
+                        "Resource": "*"
+                        }
+                    ]
+                }
+            }
+        },
+
+        "InstanceSchedulerEncryptionKeyAlias": {
+            "Type": "AWS::KMS::Alias",
+            "Properties": {
+                "AliasName": "alias/instance-scheduler-encryption-key",
+                "TargetKeyId": {
+                    "Ref": "InstanceSchedulerEncryptionKey"
+                }
+            }
+        },
+
         "SchedulerPolicy": {
             "Type": "AWS::IAM::Policy",
             "Metadata": {
@@ -1030,12 +1081,28 @@
                                 "ssm:GetParameter",
                                 "ssm:GetParameters",
                                 "ssm:DescribeMaintenanceWindows",
+                                "ssm:DescribeMaintenanceWindowExecutions",
 
                                 "tag:GetResources",
                                 "sts:AssumeRole"
                             ],
                             "Resource": [
                                 "*"
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "kms:GenerateDataKey*",
+                                "kms:Decrypt"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "InstanceSchedulerEncryptionKey",
+                                        "Arn"
+                                    ]
+                                }
                             ]
                         }
                     ]
@@ -1141,6 +1208,9 @@
         "InstanceSchedulerSnsTopic": {
             "Type": "AWS::SNS::Topic",
             "Properties": {
+                "KmsMasterKeyId": {
+                    "Ref": "InstanceSchedulerEncryptionKey"
+                },
                 "DisplayName": {
                     "Ref": "AWS::StackName"
                 }
@@ -1148,6 +1218,17 @@
         },
         "Main": {
             "Type": "AWS::Lambda::Function",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W58",
+                            "reason": "All policies have been scoped to be as restrictive as possible. This lambda function has access to write logs."
+                        }
+
+                    ]
+                }
+            },
             "Properties": {
                 "FunctionName": {
                     "Fn::Join": [
@@ -1482,6 +1563,15 @@
                 "Ref": "InstanceSchedulerSnsTopic"
             },
             "Description": "Topic to subscribe to for notifications of errors and warnings"
+        },
+        "SchedulerRoleArn": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "SchedulerRole",
+                    "Arn"
+                ]
+            },
+            "Description": "Role for the instance scheduler lambda function"
         },
         "ServiceInstanceScheduleServiceToken": {
             "Value": {

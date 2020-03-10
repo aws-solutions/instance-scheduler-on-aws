@@ -15,7 +15,7 @@ import json
 import threading
 import uuid
 
-from botocore.vendored import requests
+import requests
 
 
 class CustomResource:
@@ -172,7 +172,7 @@ class CustomResource:
 
         headers = {
             'content-type': '',
-            'content-length': len(resp)
+            'content-length': str(len(resp))
         }
 
         # PUT request to cloudformation

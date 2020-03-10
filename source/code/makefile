@@ -53,10 +53,12 @@ lambda:$(py) main.py version.txt
 	mv version.py.org version.py
 	zip -r $(zip)  $(py)  version.txt
 	zip -r $(zip) models
-
 	zip -r $(zip) pytz
-
-
+	zip -r $(zip) requests
+	zip -r $(zip) urllib3
+	zip -r $(zip) chardet
+	zip -r $(zip) idna
+	zip -r $(zip) certifi
 ######################################################################################################################
 # cli                                                                                                                #
 ######################################################################################################################
