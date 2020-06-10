@@ -156,11 +156,12 @@ class ScheduleResourceHandler(CustomResource):
             create_period_args[configuration.DESCRIPTION] = "{}, {}".format(description_config,
                                                                             create_period_args[configuration.DESCRIPTION])
 
+        instance_type = period.get(PROP_INSTANCE_TYPE, None)
         period = self._admin.create_period(**create_period_args)
 
         self._logger.info(INF_PERIOD_CREATED, safe_json(period, 3))
 
-        return period_name, period.get(PROP_INSTANCE_TYPE, None)
+        return period_name, instance_type
 
     def _delete_periods(self):
         i = 0

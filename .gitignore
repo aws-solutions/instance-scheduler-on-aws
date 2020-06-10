@@ -9,3 +9,13 @@ source/deploy
 source/code/sample_events
 .vscode
 __pycache__
+
+# lambda specific folders
+source/code/certifi
+source/code/chardet
+source/code/idna
+source/code/requests
+source/code/urllib3
+source/code/pytz
+
+deployment/regional-s3-assets
