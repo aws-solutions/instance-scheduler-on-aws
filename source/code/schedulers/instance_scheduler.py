@@ -14,7 +14,7 @@
 from __future__ import print_function
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 import boto3
 
@@ -223,87 +223,14 @@ class InstanceScheduler:
         # test if the instance has a maintenance window in which it must be running
         if instance.maintenance_window is not None and schedule.use_maintenance_window is True:
             self._logger.info(INF_MAINTENANCE_WINDOW, instance.maintenance_window.name, instance.id)
-            start_time_list = []
 
-            '''
-            maintenance_period set to 90 days to check for the new maintenance window executions.
-            If there is an exception for the describe_maintenance_windows() the check for the maintenance
-            window will be skipped and the instance will operate as per the schedule defined in dynamo db.
-            '''
+            # get the desired start for the maintenance window at current UTC time
+            inst_state, inst_type, running_period = instance.maintenance_window.get_desired_state(
+                instance, logger=self._logger, dt=datetime.utcnow().replace(tzinfo=pytz.timezone("UTC")))
 
-            maintenance_period = 90
-            executed_after_time = datetime.today() - timedelta(days=maintenance_period)
-            ssm_client = boto3.client('ssm')
-            try:
-                resp_maintenance_windows = ssm_client.describe_maintenance_windows()
-            except Exception as error:
-                self._logger.error("Caught Exception while getting the maintenance window: {}".format(error))
-                resp_maintenance_windows = {}
-                resp_maintenance_windows.update({'WindowIdentities': []})
-
-            '''
-            Calculate the window end time for the maintenance window.
-            If there is an exception for the describe_maintenance_window_executions() the check for the maintenance
-            window will be skipped and the instance will operate as per the schedule defined in dynamo db.
-            '''
-
-            if len(resp_maintenance_windows['WindowIdentities']):
-                for entry in resp_maintenance_windows['WindowIdentities']:
-                    if entry['Name'] == instance.maintenance_window.name:
-                        window_id = entry['WindowId']
-                        window_duration = entry['Duration']
-                        try:
-                            resp_window_executions = ssm_client.describe_maintenance_window_executions(
-                                WindowId=window_id,
-                                Filters=[
-                                    {
-                                        'Key': 'ExecutedAfter',
-                                        'Values': [executed_after_time.strftime("%Y-%m-%dT%H:%M:%SZ")]
-                                    }
-                                ]
-                            )
-                        except Exception as error:
-                            self._logger.error(
-                                "Caught Exception while getting the maintenance window executions: {}".format(error))
-                            resp_window_executions = {}
-                        execution_list = resp_window_executions.get('WindowExecutions', [])
-                        next_token = resp_window_executions.get('NextToken', None)
-                        while next_token is not None:
-                            self._logger.info("Next Token Returned: {}".format(next_token))
-                            try:
-                                resp_window_executions = ssm_client.describe_maintenance_window_executions(
-                                    NextToken=next_token,
-                                    WindowId=window_id,
-                                    Filters=[
-                                        {
-                                            'Key': 'ExecutedAfter',
-                                            'Values': [executed_after_time.strftime("%Y-%m-%dT%H:%M:%SZ")]
-                                        }
-                                    ]
-                                )
-                            except Exception as error:
-                                self._logger.error(
-                                    "Caught Exception while getting the maintenance window executions: {}".format(
-                                        error))
-                                resp_window_executions = {}
-                            execution_list.extend(resp_window_executions.get('WindowExecutions', []))
-                            next_token = resp_window_executions.get('NextToken', None)
-                        
-                        for item in execution_list:
-                            start_time_list.append(item['StartTime'])
-                        if len(start_time_list):
-                            latest_start_time = max(start_time_list)
-                        else:
-                            break
-
-                        window_end_time = latest_start_time + timedelta(hours=window_duration)
-
-                        # check if the window end time is greater than the current time
-                        if datetime.now().replace(tzinfo=timezone.utc) < window_end_time:
-                            inst_state, inst_type, running_period = instance.maintenance_window.get_desired_state(
-                                instance, logger=self._logger, dt=datetime.utcnow().replace(tzinfo=pytz.timezone("UTC")))
-                            inst_state = InstanceSchedule.STATE_RUNNING
-                            return inst_state, inst_type
+            # if we're in the maintenance window return running state
+            if inst_state == InstanceSchedule.STATE_RUNNING:
+                return inst_state, inst_type
 
         # based on the schedule get the desired state and instance type for this instance
         inst_state, inst_type, _ = schedule.get_desired_state(instance, logger=self._logger)
@@ -317,10 +244,10 @@ class InstanceScheduler:
         resized_instances = {}
 
         self._logger.info(INF_PROCESSING_ACCOUNT,
-                          self._service.service_name.upper(), account.name, " using role " + account.role if account.role else "",
+                          self._service.service_name.upper(), account.name,
+                          " using role " + account.role if account.role else "",
                           ", ".join(self._configuration.regions))
 
-        # gets the desired state and type, uses caching for each schedule
 
         for region in self._regions:
 
@@ -342,14 +269,16 @@ class InstanceScheduler:
 
                 # handle terminated instances
                 if instance.is_terminated:
-                    self._logger.debug(DEBUG_SKIPPING_TERMINATED_INSTANCE, instance.instance_str, region, instance.account)
+                    self._logger.debug(DEBUG_SKIPPING_TERMINATED_INSTANCE, instance.instance_str, region,
+                                       instance.account)
                     self._instance_states.delete_instance_state(instance.id)
                     continue
 
                 # get the schedule for this instance
                 instance_schedule = self._configuration.get_schedule(instance.schedule_name)
                 if not instance_schedule:
-                    self._logger.warning(WARN_SKIPPING_UNKNOWN_SCHEDULE, instance.instance_str, region, instance.account,
+                    self._logger.warning(WARN_SKIPPING_UNKNOWN_SCHEDULE, instance.instance_str, region,
+                                         instance.account,
                                          instance.schedule_name)
                     continue
 
@@ -362,8 +291,10 @@ class InstanceScheduler:
 
                 # get the  previous desired instance state
                 last_desired_state = self._instance_states.get_instance_state(instance.id)
-                self._logger.debug(DEBUG_CURRENT_AND_DESIRED_STATE, instance_schedule.name, desired_state, last_desired_state,
-                                   instance.current_state, INF_DESIRED_TYPE.format(desired_type) if desired_type else "")
+                self._logger.debug(DEBUG_CURRENT_AND_DESIRED_STATE, instance_schedule.name, desired_state,
+                                   last_desired_state,
+                                   instance.current_state,
+                                   INF_DESIRED_TYPE.format(desired_type) if desired_type else "")
 
                 # last desired state None means this is the first time the instance is seen by the scheduler
                 if last_desired_state is InstanceSchedule.STATE_UNKNOWN:
@@ -373,10 +304,12 @@ class InstanceScheduler:
                             self._instance_states.set_instance_state(instance.id, InstanceSchedule.STATE_STOPPED)
                             self._logger.debug(DEBUG_NEW_INSTANCE, instance.instance_str)
                             continue
-                        self._process_new_desired_state(account, region, instance, desired_state, desired_type, last_desired_state,
+                        self._process_new_desired_state(account, region, instance, desired_state, desired_type,
+                                                        last_desired_state,
                                                         instance_schedule.retain_running)
                     else:
-                        self._process_new_desired_state(account, region, instance, desired_state, desired_type, last_desired_state,
+                        self._process_new_desired_state(account, region, instance, desired_state, desired_type,
+                                                        last_desired_state,
                                                         instance_schedule.retain_running)
 
                 # existing instance
@@ -384,18 +317,20 @@ class InstanceScheduler:
                 # if enforced check the actual state with the desired state enforcing the schedule state
                 elif instance_schedule.enforced:
                     if (instance.is_running and desired_state == InstanceSchedule.STATE_STOPPED) or (
-                                not instance.is_running and desired_state == InstanceSchedule.STATE_RUNNING):
+                            not instance.is_running and desired_state == InstanceSchedule.STATE_RUNNING):
                         self._logger.debug(DEBUG_ENFORCED_STATE, instance.instance_str,
                                            InstanceSchedule.STATE_RUNNING
                                            if instance.is_running
                                            else InstanceSchedule.STATE_STOPPED,
                                            desired_state)
-                        self._process_new_desired_state(account, region, instance, desired_state, desired_type, last_desired_state,
+                        self._process_new_desired_state(account, region, instance, desired_state, desired_type,
+                                                        last_desired_state,
                                                         instance_schedule.retain_running)
                 # if not enforced then compare the schedule state with the actual state so state of manually started/stopped
                 # instance it will honor that state
                 elif last_desired_state != desired_state:
-                    self._process_new_desired_state(account, region, instance, desired_state, desired_type, last_desired_state,
+                    self._process_new_desired_state(account, region, instance, desired_state, desired_type,
+                                                    last_desired_state,
                                                     instance_schedule.retain_running)
 
                 self._schedule_metrics.add_schedule_metrics(self._service.service_name, instance_schedule, instance)
@@ -413,8 +348,9 @@ class InstanceScheduler:
             if len(self._scheduler_stop_list):
                 stopped_instances[region] = [{i.id: {"schedule": i.schedule_name}} for i in self._scheduler_stop_list]
             if len(self._schedule_resize_list) > 0:
-                resized_instances[region] = [{i[0].id: {"schedule": i[0].schedule_name, "old": i[0].instancetype, "new": i[1]}} for
-                                             i in self._schedule_resize_list]
+                resized_instances[region] = [
+                    {i[0].id: {"schedule": i[0].schedule_name, "old": i[0].instancetype, "new": i[1]}} for
+                    i in self._schedule_resize_list]
             if allow_send_metrics():
                 self._collect_usage_metrics()
 
@@ -437,10 +373,10 @@ class InstanceScheduler:
             for action in self._usage_metrics:
                 for instance_type in self._usage_metrics.get(action, {}):
                     usage_data.append({
-                        "Service" : self._service.service_name,
-                        "Action" : action,
-                        "InstanceType" : instance_type,
-                        "Instances" : self._usage_metrics[action][instance_type],
+                        "Service": self._service.service_name,
+                        "Action": action,
+                        "InstanceType": instance_type,
+                        "Instances": self._usage_metrics[action][instance_type],
 
                     })
 
@@ -526,7 +462,8 @@ class InstanceScheduler:
                 if not instance.is_running:
 
                     inst_type = desired_type if desired_type is not None else instance.instancetype
-                    self._logger.debug(DEBUG_STARTED_REGION_INSTANCES, instance.instance_str, instance.region, inst_type)
+                    self._logger.debug(DEBUG_STARTED_REGION_INSTANCES, instance.instance_str, instance.region,
+                                       inst_type)
 
                     # for instances to be started test if resizing is required
                     if need_and_can_resize():
@@ -555,7 +492,7 @@ class InstanceScheduler:
                     self._logger.debug(DEBUG_STOPPED_REGION_INSTANCES, instance.instance_str, instance.region)
                     # append instance to list of instances to start
                     if desired_state == InstanceSchedule.STATE_STOPPED_FOR_RESIZE:
-                        instance = instance._replace(resized = True)
+                        instance = instance._replace(resized=True)
                     self._scheduler_stop_list.append(instance)
                     # stopped instance with desired state of running but in retained state mode
                     # (manually stopped in running period and already running at start)

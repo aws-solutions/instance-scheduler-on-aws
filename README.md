@@ -7,6 +7,7 @@ Scheduler for Cross-Account and Cross-Region scheduling for EC2 and RDS instance
 ## Setup
 
 Deploys from Cloudformation template generate by makefile
+Run the command:`pip3 install -r source/code/requirements.txt -t source/code/` to install the dependencies.
 Sample make command: `make bucket=solutions-test-reference solution=aws-instance-scheduler version=1.2.1`
 
 

@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "(SO0030) - aws-instance-scheduler, version v1.3.1",
+    "Description": "(SO0030) - aws-instance-scheduler, version v1.3.2",
     "Parameters": {
         "SchedulingActive": {
             "Type": "String",
@@ -598,7 +598,7 @@
             "ParameterGroups": [
                 {
                     "Label": {
-                        "default": "Scheduler (version %version%)"
+                        "default": "Scheduler (version v1.3.2)"
                     },
                     "Parameters": [
                         "TagName",
@@ -761,38 +761,37 @@
                 "KeyPolicy": {
                     "Statement": [
                         {
-                        "Sid": "default",
-                        "Effect": "Allow",
-                        "Principal": {
-                            "AWS": { 
-                                "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
-                            }
-                        },
-                        "Action": "kms:*",
-                        "Resource": "*"
+                            "Sid": "default",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Sub": "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"
+                                }
+                            },
+                            "Action": "kms:*",
+                            "Resource": "*"
                         },
                         {
-                        "Sid": "Allows use of key",
-                        "Effect": "Allow",
-                        "Principal": {
-                            "AWS": {
-                                "Fn::GetAtt": [
-                                    "SchedulerRole",
-                                    "Arn"
-                                ]
-                            }
-                        },
-                        "Action": [
-                            "kms:GenerateDataKey*",
-                            "kms:Decrypt"
-                        ],
-                        "Resource": "*"
+                            "Sid": "Allows use of key",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::GetAtt": [
+                                        "SchedulerRole",
+                                        "Arn"
+                                    ]
+                                }
+                            },
+                            "Action": [
+                                "kms:GenerateDataKey*",
+                                "kms:Decrypt"
+                            ],
+                            "Resource": "*"
                         }
                     ]
                 }
             }
         },
-
         "InstanceSchedulerEncryptionKeyAlias": {
             "Type": "AWS::KMS::Alias",
             "Properties": {
@@ -802,8 +801,7 @@
                 }
             }
         },
-
-        "SchedulerPolicy": {
+        "EC2DynamoDBPolicy": {
             "Type": "AWS::IAM::Policy",
             "Metadata": {
                 "cfn_nag": {
@@ -816,7 +814,7 @@
                 }
             },
             "Properties": {
-                "PolicyName": "SchedulerPolicy",
+                "PolicyName": "EC2DynamoDBPolicy",
                 "Roles": [
                     {
                         "Ref": "SchedulerRole"
@@ -825,6 +823,94 @@
                 "PolicyDocument": {
                     "Version": "2012-10-17",
                     "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "dynamodb:DeleteItem",
+                                "dynamodb:GetItem",
+                                "dynamodb:PutItem",
+                                "dynamodb:Query",
+                                "dynamodb:Scan",
+                                "dynamodb:BatchWriteItem"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            {
+                                                "Fn::Join": [
+                                                    ":",
+                                                    [
+                                                        "arn:aws:dynamodb",
+                                                        {
+                                                            "Ref": "AWS::Region"
+                                                        },
+                                                        {
+                                                            "Ref": "AWS::AccountId"
+                                                        },
+                                                        "table/"
+                                                    ]
+                                                ]
+                                            },
+                                            {
+                                                "Ref": "StateTable"
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            {
+                                                "Fn::Join": [
+                                                    ":",
+                                                    [
+                                                        "arn:aws:dynamodb",
+                                                        {
+                                                            "Ref": "AWS::Region"
+                                                        },
+                                                        {
+                                                            "Ref": "AWS::AccountId"
+                                                        },
+                                                        "table/"
+                                                    ]
+                                                ]
+                                            },
+                                            {
+                                                "Ref": "ConfigTable"
+                                            }
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            {
+                                                "Fn::Join": [
+                                                    ":",
+                                                    [
+                                                        "arn:aws:dynamodb",
+                                                        {
+                                                            "Ref": "AWS::Region"
+                                                        },
+                                                        {
+                                                            "Ref": "AWS::AccountId"
+                                                        },
+                                                        "table/"
+                                                    ]
+                                                ]
+                                            },
+                                            {
+                                                "Ref": "MaintenanceWindowTable"
+                                            }
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
                         {
                             "Effect": "Allow",
                             "Action": [
@@ -870,6 +956,77 @@
                                 }
                             ]
                         },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:DescribeLogStreams",
+                                "rds:DescribeDBClusters",
+                                "rds:DescribeDBInstances",
+                                "ec2:DescribeInstances",
+                                "ec2:DescribeRegions",
+                                "ec2:ModifyInstanceAttribute",
+                                "cloudwatch:PutMetricData",
+                                "ssm:DescribeMaintenanceWindows",
+                                "tag:GetResources"
+                            ],
+                            "Resource": [
+                                "*"
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "sts:AssumeRole"
+                            ],
+                            "Resource": [
+                                "arn:aws:iam::*:role/*EC2SchedulerCross*"
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "ssm:GetParameter",
+                                "ssm:GetParameters"
+                            ],
+                            "Resource": {
+                                "Fn::Join": [
+                                    ":",
+                                    [
+                                        "arn:aws:ssm:*",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        "parameter/*"
+                                    ]
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "SchedulerPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Metadata": {
+                "cfn_nag": {
+                    "rules_to_suppress": [
+                        {
+                            "id": "W12",
+                            "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+                        }
+                    ]
+                }
+            },
+            "Properties": {
+                "PolicyName": "SchedulerPolicy",
+                "Roles": [
+                    {
+                        "Ref": "SchedulerRole"
+                    }
+                ],
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
                         {
                             "Effect": "Allow",
                             "Action": [
@@ -960,69 +1117,6 @@
                         },
                         {
                             "Effect": "Allow",
-                            "Action": [
-                                "dynamodb:DeleteItem",
-                                "dynamodb:GetItem",
-                                "dynamodb:PutItem",
-                                "dynamodb:Query",
-                                "dynamodb:Scan",
-                                "dynamodb:BatchWriteItem"
-                            ],
-                            "Resource": [
-                                {
-                                    "Fn::Join": [
-                                        "",
-                                        [
-                                            {
-                                                "Fn::Join": [
-                                                    ":",
-                                                    [
-                                                        "arn:aws:dynamodb",
-                                                        {
-                                                            "Ref": "AWS::Region"
-                                                        },
-                                                        {
-                                                            "Ref": "AWS::AccountId"
-                                                        },
-                                                        "table/"
-                                                    ]
-                                                ]
-                                            },
-                                            {
-                                                "Ref": "StateTable"
-                                            }
-                                        ]
-                                    ]
-                                },
-                                {
-                                    "Fn::Join": [
-                                        "",
-                                        [
-                                            {
-                                                "Fn::Join": [
-                                                    ":",
-                                                    [
-                                                        "arn:aws:dynamodb",
-                                                        {
-                                                            "Ref": "AWS::Region"
-                                                        },
-                                                        {
-                                                            "Ref": "AWS::AccountId"
-                                                        },
-                                                        "table/"
-                                                    ]
-                                                ]
-                                            },
-                                            {
-                                                "Ref": "ConfigTable"
-                                            }
-                                        ]
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "Effect": "Allow",
                             "Action": "sns:Publish",
                             "Resource": [
                                 {
@@ -1062,32 +1156,6 @@
                                         ]
                                     ]
                                 }
-                            ]
-                        },
-                        {
-                            "Effect": "Allow",
-                            "Action": [
-                                "logs:DescribeLogStreams",
-
-                                "rds:DescribeDBClusters",
-                                "rds:DescribeDBInstances",
-
-                                "ec2:DescribeInstances",
-                                "ec2:DescribeRegions",
-                                "ec2:ModifyInstanceAttribute",
-
-                                "cloudwatch:PutMetricData",
-
-                                "ssm:GetParameter",
-                                "ssm:GetParameters",
-                                "ssm:DescribeMaintenanceWindows",
-                                "ssm:DescribeMaintenanceWindowExecutions",
-
-                                "tag:GetResources",
-                                "sts:AssumeRole"
-                            ],
-                            "Resource": [
-                                "*"
                             ]
                         },
                         {
@@ -1157,7 +1225,14 @@
                         "KeyType": "RANGE"
                     }
                 ],
-                "BillingMode": "PAY_PER_REQUEST"
+                "BillingMode": "PAY_PER_REQUEST",
+                "SSESpecification": {
+                    "SSEType": "KMS",
+                    "SSEEnabled": "True",
+                    "KMSMasterKeyId": {
+                        "Ref": "InstanceSchedulerEncryptionKey"
+                    }
+                }
             }
         },
         "ConfigTable": {
@@ -1183,7 +1258,43 @@
                         "KeyType": "RANGE"
                     }
                 ],
-                "BillingMode": "PAY_PER_REQUEST"
+                "BillingMode": "PAY_PER_REQUEST",
+                "SSESpecification": {
+                    "SSEType": "KMS",
+                    "SSEEnabled": "True",
+                    "KMSMasterKeyId": {
+                        "Ref": "InstanceSchedulerEncryptionKey"
+                    }
+                }
+            }
+        },
+        "MaintenanceWindowTable": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+                "AttributeDefinitions": [
+                    {
+                        "AttributeName": "Name",
+                        "AttributeType": "S"
+                    }
+                ],
+                "KeySchema": [
+                    {
+                        "AttributeName": "Name",
+                        "KeyType": "HASH"
+                    }
+                ],
+                "BillingMode": "PAY_PER_REQUEST",
+                "SSESpecification": {
+                    "SSEType": "KMS",
+                    "SSEEnabled": "True",
+                    "KMSMasterKeyId": {
+                        "Ref": "InstanceSchedulerEncryptionKey"
+                    }
+                },
+                "TimeToLiveSpecification": {
+                    "AttributeName": "TimeToLive",
+                    "Enabled": "TRUE"
+                }
             }
         },
         "SchedulerLogGroup": {
@@ -1225,7 +1336,6 @@
                             "id": "W58",
                             "reason": "All policies have been scoped to be as restrictive as possible. This lambda function has access to write logs."
                         }
-
                     ]
                 }
             },
@@ -1246,14 +1356,14 @@
                         "Fn::Join": [
                             "-",
                             [
-                                "%bucket%",
+                                "solutions",
                                 {
                                     "Ref": "AWS::Region"
                                 }
                             ]
                         ]
                     },
-                    "S3Key": "%solution%/%version%/instance-scheduler.zip"
+                    "S3Key": "aws-instance-scheduler/v1.3.2/instance-scheduler.zip"
                 },
                 "Handler": "main.lambda_handler",
                 "Runtime": "python3.7",
@@ -1268,8 +1378,11 @@
                         "CONFIG_TABLE": {
                             "Ref": "ConfigTable"
                         },
-                        "SCHEDULER_FREQUENCY" : {
-                            "Ref" : "SchedulerFrequency"
+                        "MAINTENANCE_WINDOW_TABLE": {
+                            "Ref": "MaintenanceWindowTable"
+                        },
+                        "SCHEDULER_FREQUENCY": {
+                            "Ref": "SchedulerFrequency"
                         },
                         "TAG_NAME": {
                             "Ref": "TagName"
@@ -1324,7 +1437,7 @@
                                     {
                                         "Ref": "AWS::StackName"
                                     },
-                                    "%version%"
+                                    "v1.3.2"
                                 ]
                             ]
                         },
@@ -1344,10 +1457,11 @@
                     "Ref": "MemorySize"
                 },
                 "Timeout": 300,
-                "Description": "EC2 and RDS instance scheduler, version %version%"
+                "Description": "EC2 and RDS instance scheduler, version v1.3.2"
             },
             "DependsOn": [
-                "SchedulerPolicy"
+                "SchedulerPolicy",
+                "EC2DynamoDBPolicy"
             ]
         },
         "SchedulerInvokePermission": {
@@ -1393,7 +1507,7 @@
         "SchedulerRule": {
             "Type": "AWS::Events::Rule",
             "Properties": {
-                "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version %version%",
+                "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version v1.3.2",
                 "ScheduleExpression": {
                     "Fn::FindInMap": [
                         "Timeouts",
@@ -1538,7 +1652,7 @@
                 "stopped_tags": {
                     "Ref": "StoppedTags"
                 },
-                "stack_version": "%version%"
+                "stack_version": "v1.3.2"
             },
             "DependsOn": [
                 "SchedulerLogGroup"
