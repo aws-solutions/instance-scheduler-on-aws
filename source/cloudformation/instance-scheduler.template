@@ -37,7 +37,7 @@
                 "No"
             ],
             "Default": "Yes",
-            "Description": "Create snapshot before stopping RDS instances(does not apply to Aurora Clusters)."
+            "Description": "Create snapshot before stopping RDS instances (does not apply to Aurora Clusters)."
         },
         "MemorySize": {
             "Type": "Number",
@@ -55,7 +55,7 @@
                 1536
             ],
             "Default": 128,
-            "Description": "Size of the Lambda function running the scheduler, increase size when processing large numbers of instances"
+            "Description": "Size of the Lambda function running the scheduler, increase size when processing large numbers of instances."
         },
         "UseCloudWatchMetrics": {
             "Type": "String",
@@ -97,7 +97,7 @@
                 "No"
             ],
             "Default": "No",
-            "Description": "Enable logging of detailed informtion in CloudWatch logs."
+            "Description": "Enable logging of detailed information in CloudWatch logs."
         },
         "TagName": {
             "Type": "String",
@@ -542,7 +542,7 @@
                 "US/Pacific",
                 "UTC"
             ],
-            "Description": "Choose the default Time Zone. Default is 'UTC'"
+            "Description": "Choose the default Time Zone. Default is 'UTC'."
         },
         "Regions": {
             "Type": "CommaDelimitedList",
@@ -1665,7 +1665,7 @@
             "Value": {
                 "Ref": "AWS::AccountId"
             },
-            "Description": "Account to give access to when creating cross-account access role fro cross account scenario "
+            "Description": "Account to give access to when creating cross-account access role for cross account scenario"
         },
         "ConfigurationTable": {
             "Value": {
