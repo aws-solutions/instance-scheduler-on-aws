@@ -54,6 +54,7 @@ class Logger:
         self._debug = debug
         self._cached_size = 0
         self._client = None
+        self._next_sequence_token = None
         self._loggroup = loggroup if loggroup is not None else get_loggroup(self._context)
 
         self._sns = None
@@ -193,6 +194,9 @@ class Logger:
 
         def get_next_log_token():
 
+            if self._next_sequence_token:
+                return self._next_sequence_token
+
             resp = self.client.describe_log_streams_with_retries(logGroupName=self._loggroup, logStreamNamePrefix=self._logstream)
             if "logStreams" in resp and len(resp["logStreams"]) > 0:
                 token = resp["logStreams"][0].get("uploadSequenceToken")
@@ -233,7 +237,8 @@ class Logger:
                 if next_token is not None:
                     put_event_args["sequenceToken"] = next_token
                 try:
-                    self.client.put_log_events(**put_event_args)
+                    r = self.client.put_log_events(**put_event_args)
+                    self._next_sequence_token = r['nextSequenceToken']
                     self._buffer = []
                     self._cached_size = 0
                     return
