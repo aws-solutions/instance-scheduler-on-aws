@@ -11,14 +11,16 @@
     },
     "Metadata": {
         "AWS::CloudFormation::Interface": {
-            "ParameterGroups": [{
-                "Label": {
-                    "default": "Account"
-                },
-                "Parameters": [
-                    "InstanceSchedulerAccount"
-                ]
-            }],
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Account"
+                    },
+                    "Parameters": [
+                        "InstanceSchedulerAccount"
+                    ]
+                }
+            ],
             "ParameterLabels": {
                 "InstanceSchedulerAccount": {
                     "default": "Primary account"
@@ -42,25 +44,33 @@
             "Properties": {
                 "AssumeRolePolicyDocument": {
                     "Version": "2012-10-17",
-                    "Statement": [{
-                        "Effect": "Allow",
-                        "Principal": {
-                            "AWS": {
-                                "Fn::Join": [
-                                    "", [
-                                        "arn:aws:iam::", {
-                                            "Ref": "InstanceSchedulerAccount"
-                                        },
-                                        ":root"
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "arn:",
+                                            {
+                                                "Ref": "AWS::Partition"
+                                            },
+                                            ":iam::",
+                                            {
+                                                "Ref": "InstanceSchedulerAccount"
+                                            },
+                                            ":root"
+                                        ]
                                     ]
-                                ]
+                                },
+                                "Service": "lambda.amazonaws.com"
                             },
-                            "Service": "lambda.amazonaws.com"
-                        },
-                        "Action": [
-                            "sts:AssumeRole"
-                        ]
-                    }]
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]	  
                 },
                 "Path": "/",
                 "Policies": [
@@ -80,7 +90,11 @@
                                         "Fn::Join": [
                                             ":",
                                             [
-                                                "arn:aws:rds:*",
+                                                "arn",
+                                                {
+                                                    "Ref": "AWS::Partition"
+                                                },
+                                                "rds:*",
                                                 {
                                                     "Ref": "AWS::AccountId"
                                                 },
@@ -102,7 +116,11 @@
                                         "Fn::Join": [
                                             ":",
                                             [
-                                                "arn:aws:rds:*",
+                                                "arn",
+                                                {
+                                                    "Ref": "AWS::Partition"
+                                                },
+                                                "rds:*",
                                                 {
                                                     "Ref": "AWS::AccountId"
                                                 },
@@ -124,7 +142,11 @@
                                             "Fn::Join": [
                                                 ":",
                                                 [
-                                                    "arn:aws:rds:*",
+                                                    "arn",
+                                                    {
+                                                        "Ref": "AWS::Partition"
+                                                    },
+                                                    "rds:*",
                                                     {
                                                         "Ref": "AWS::AccountId"
                                                     },
@@ -147,7 +169,11 @@
                                             "Fn::Join": [
                                                 ":",
                                                 [
-                                                    "arn:aws:ec2:*",
+                                                    "arn",
+                                                    {
+                                                        "Ref": "AWS::Partition"
+                                                    },
+                                                    "ec2:*",
                                                     {
                                                         "Ref": "AWS::AccountId"
                                                     },
@@ -165,10 +191,8 @@
                                         "ec2:DescribeInstances",
                                         "ec2:DescribeRegions",
                                         "ec2:ModifyInstanceAttribute",
-
                                         "ssm:DescribeMaintenanceWindows",
                                         "ssm:DescribeMaintenanceWindowExecutions",
-
                                         "tag:GetResources"
                                     ],
                                     "Resource": [

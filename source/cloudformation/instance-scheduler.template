@@ -815,7 +815,7 @@
                 }
             },
             "Properties": {
-                 "PolicyName": "EC2DynamoDBPolicy",
+                "PolicyName": "EC2DynamoDBPolicy",
                 "Roles": [
                     {
                         "Ref": "SchedulerRole"
@@ -824,7 +824,7 @@
                 "PolicyDocument": {
                     "Version": "2012-10-17",
                     "Statement": [
-                       {
+                        {
                             "Effect": "Allow",
                             "Action": [
                                 "dynamodb:DeleteItem",
@@ -843,7 +843,11 @@
                                                 "Fn::Join": [
                                                     ":",
                                                     [
-                                                        "arn:aws:dynamodb",
+                                                        "arn",
+                                                        {
+                                                            "Ref": "AWS::Partition"
+                                                        },
+                                                        "dynamodb",
                                                         {
                                                             "Ref": "AWS::Region"
                                                         },
@@ -868,7 +872,11 @@
                                                 "Fn::Join": [
                                                     ":",
                                                     [
-                                                        "arn:aws:dynamodb",
+                                                        "arn",
+                                                        {
+                                                            "Ref": "AWS::Partition"
+                                                        },
+                                                        "dynamodb",
                                                         {
                                                             "Ref": "AWS::Region"
                                                         },
@@ -893,7 +901,11 @@
                                                 "Fn::Join": [
                                                     ":",
                                                     [
-                                                        "arn:aws:dynamodb",
+                                                        "arn",
+                                                        {
+                                                            "Ref": "AWS::Partition"
+                                                        },
+                                                        "dynamodb",
                                                         {
                                                             "Ref": "AWS::Region"
                                                         },
@@ -925,7 +937,11 @@
                                     "Fn::Join": [
                                         ":",
                                         [
-                                            "arn:aws:logs",
+                                            "arn",
+                                            {
+                                                "Ref": "AWS::Partition"
+                                            },
+                                            "logs",
                                             {
                                                 "Ref": "AWS::Region"
                                             },
@@ -944,7 +960,11 @@
                                     "Fn::Join": [
                                         ":",
                                         [
-                                            "arn:aws:logs",
+                                            "arn",
+                                            {
+                                                "Ref": "AWS::Partition"
+                                            },
+                                            "logs",
                                             {
                                                 "Ref": "AWS::Region"
                                             },
@@ -979,9 +999,18 @@
                             "Action": [
                                 "sts:AssumeRole"
                             ],
-                            "Resource": [
-                                "arn:aws:iam::*:role/*EC2SchedulerCross*"
-                            ]
+                            "Resource": {
+                                "Fn::Join": [
+                                    ":",
+                                    [
+                                        "arn",
+                                        {
+                                            "Ref": "AWS::Partition"
+                                        },
+                                        "iam::*:role/*EC2SchedulerCross*"
+                                    ]
+                                ]
+                            }
                         },
                         {
                             "Effect": "Allow",
@@ -993,7 +1022,11 @@
                                 "Fn::Join": [
                                     ":",
                                     [
-                                        "arn:aws:ssm:*",
+                                        "arn",
+                                        {
+                                            "Ref": "AWS::Partition"
+                                        },
+                                        "ssm:*",
                                         {
                                             "Ref": "AWS::AccountId"
                                         },
@@ -1039,7 +1072,11 @@
                                 "Fn::Join": [
                                     ":",
                                     [
-                                        "arn:aws:rds:*",
+                                        "arn",
+                                        {
+                                            "Ref": "AWS::Partition"
+                                        },
+                                        "rds:*",
                                         {
                                             "Ref": "AWS::AccountId"
                                         },
@@ -1061,7 +1098,11 @@
                                 "Fn::Join": [
                                     ":",
                                     [
-                                        "arn:aws:rds:*",
+                                        "arn",
+                                        {
+                                            "Ref": "AWS::Partition"
+                                        },
+                                        "rds:*",
                                         {
                                             "Ref": "AWS::AccountId"
                                         },
@@ -1083,7 +1124,11 @@
                                     "Fn::Join": [
                                         ":",
                                         [
-                                            "arn:aws:rds:*",
+                                            "arn",
+                                            {
+                                                "Ref": "AWS::Partition"
+                                            },
+                                            "rds:*",
                                             {
                                                 "Ref": "AWS::AccountId"
                                             },
@@ -1106,7 +1151,11 @@
                                     "Fn::Join": [
                                         ":",
                                         [
-                                            "arn:aws:ec2:*",
+                                            "arn",
+                                            {
+                                                "Ref": "AWS::Partition"
+                                            },
+                                            "ec2:*",
                                             {
                                                 "Ref": "AWS::AccountId"
                                             },
@@ -1135,7 +1184,11 @@
                                     "Fn::Join": [
                                         ":",
                                         [
-                                            "arn:aws:lambda",
+                                            "arn",
+                                            {
+                                                "Ref": "AWS::Partition"
+                                            },
+                                            "lambda",
                                             {
                                                 "Ref": "AWS::Region"
                                             },
@@ -1472,7 +1525,11 @@
                     "Fn::Join": [
                         ":",
                         [
-                            "arn:aws:lambda",
+                            "arn",
+                            {
+                                "Ref": "AWS::Partition"
+                            },
+                            "lambda",
                             {
                                 "Ref": "AWS::Region"
                             },
@@ -1534,7 +1591,11 @@
                             "Fn::Join": [
                                 ":",
                                 [
-                                    "arn:aws:lambda",
+                                    "arn",
+                                    {
+                                        "Ref": "AWS::Partition"
+                                    },
+                                    "lambda",
                                     {
                                         "Ref": "AWS::Region"
                                     },
@@ -1699,4 +1760,3 @@
         }
     }
 }
-
