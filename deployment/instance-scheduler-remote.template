@@ -178,6 +178,20 @@
                                     "Resource": [
                                         "*"
                                     ]
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "kms:GenerateDataKey*",
+                                        "kms:CreateGrant",
+                                        "kms:Decrypt",
+                                        "kms:Encrypt"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::ImportValue" : "KeyArn-billing-non-pci"
+                                        }
+                                    ]
                                 }
                             ]
                         }

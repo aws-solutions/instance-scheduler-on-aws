@@ -1162,7 +1162,9 @@
                             "Effect": "Allow",
                             "Action": [
                                 "kms:GenerateDataKey*",
-                                "kms:Decrypt"
+                                "kms:Decrypt",
+                                "kms:CreateGrant",
+                                "kms:Encrypt"
                             ],
                             "Resource": [
                                 {
@@ -1170,6 +1172,9 @@
                                         "InstanceSchedulerEncryptionKey",
                                         "Arn"
                                     ]
+                                },
+                                {
+                                    "Fn::ImportValue" : "KeyArn-billing-non-pci"
                                 }
                             ]
                         }
