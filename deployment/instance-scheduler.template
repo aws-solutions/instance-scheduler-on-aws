@@ -1664,19 +1664,34 @@
             "Value": {
                 "Ref": "AWS::AccountId"
             },
-            "Description": "Account to give access to when creating cross-account access role fro cross account scenario "
+            "Description": "Account to give access to when creating cross-account access role fro cross account scenario ",
+            "Export" : {
+                "Name" : {
+                    "Fn::Sub": "${AWS::AccountId}"
+                }
+            }              
         },
         "ConfigurationTable": {
             "Value": {
                 "Ref": "ConfigTable"
             },
-            "Description": "Name of the DynomoDB configuration table"
+            "Description": "Name of the DynomoDB configuration table",
+            "Export" : {
+                "Name" : {
+                    "Fn::Sub": "${AWS::StackName}-${AWS::Region}-ConfigurationTable"
+                }
+            }            
         },
         "IssueSnsTopicArn": {
             "Value": {
                 "Ref": "InstanceSchedulerSnsTopic"
             },
-            "Description": "Topic to subscribe to for notifications of errors and warnings"
+            "Description": "Topic to subscribe to for notifications of errors and warnings",
+            "Export" : {
+                "Name" : {
+                    "Fn::Sub": "${AWS::StackName}-${AWS::Region}-IssueSnsTopicArn"
+                }
+            }            
         },
         "SchedulerRoleArn": {
             "Value": {
@@ -1685,7 +1700,12 @@
                     "Arn"
                 ]
             },
-            "Description": "Role for the instance scheduler lambda function"
+            "Description": "Role for the instance scheduler lambda function",
+            "Export" : {
+                "Name" : {
+                    "Fn::Sub": "${AWS::StackName}-${AWS::Region}-SchedulerRoleArn"
+                }
+            }            
         },
         "ServiceInstanceScheduleServiceToken": {
             "Value": {
@@ -1694,7 +1714,12 @@
                     "Arn"
                 ]
             },
-            "Description": "Arn to use as ServiceToken property for custom resource type Custom::ServiceInstanceSchedule"
+            "Description": "Arn to use as ServiceToken property for custom resource type Custom::ServiceInstanceSchedule",
+            "Export" : {
+                "Name" : {
+                    "Fn::Sub": "${AWS::StackName}-${AWS::Region}-ServiceInstanceScheduleServiceToken"
+                }
+            }            
         }
     }
 }
