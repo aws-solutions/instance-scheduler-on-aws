@@ -1675,7 +1675,7 @@
             "Value": {
                 "Ref": "ConfigTable"
             },
-            "Description": "Name of the DynomoDB configuration table",
+            "Description": "Name of the DynamoDB configuration table",
             "Export" : {
                 "Name" : {
                     "Fn::Sub": "${AWS::StackName}-${AWS::Region}-ConfigurationTable"
