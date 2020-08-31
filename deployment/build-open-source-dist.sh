@@ -86,7 +86,7 @@ find $dist_dir -iname "node_modules" -type d -exec rm -rf "{}" \; 2> /dev/null
 echo "find $dist_dir -iname "package-lock.json" -type f -exec rm -f "{}" \; 2> /dev/null"
 find $dist_dir -iname "package-lock.json" -type f -exec rm -f "{}" \; 2> /dev/null
 # Remove python related libraries from open source packaging
-files=("idna*" "pytz*" "urllib*" "certifi*" "chardet*" "requests*" "bin" "__pycache__" ".pytest_cache" "cdk.out")
+files=("idna*" "pytz*" "urllib*" "certifi*" "chardet*" "requests*" "__pycache__" ".pytest_cache" "cdk.out")
 for x in "${files[@]}";
     do 
       echo "Removing files: $x"
