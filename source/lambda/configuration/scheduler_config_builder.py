@@ -27,7 +27,7 @@ from configuration.setbuilders.month_setbuilder import MonthSetBuilder
 from configuration.setbuilders.monthday_setbuilder import MonthdaySetBuilder
 from configuration.setbuilders.weekday_setbuilder import WeekdaySetBuilder
 
-REGEX_SSM_PARAM = "{param:(.+?)\}"
+REGEX_SSM_PARAM = "{param:(.+?)}"
 
 ATTR_BEGINTIME = "begintime"
 ATTR_CROSS_ACCOUNT_ROLES = "cross_account_roles"
