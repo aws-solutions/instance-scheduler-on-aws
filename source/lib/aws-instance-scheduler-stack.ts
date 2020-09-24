@@ -612,7 +612,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     mappings.setValue("Timeouts", "10", "cron(0/10 * * * ? *)")
     mappings.setValue("Timeouts", "15", "cron(0/15 * * * ? *)")
     mappings.setValue("Timeouts", "30", "cron(0/30 * * * ? *)")
-    mappings.setValue("Timeouts", "60", "cron(0/1 * * ? *)")
+    mappings.setValue("Timeouts", "60", "cron(0 0/1 * * ? *)")
     mappings.setValue("Settings", "MetricsUrl", "https://metrics.awssolutionsbuilder.com/generic")
     mappings.setValue("Settings", "MetricsSolutionId", "S00030")
 
