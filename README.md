@@ -81,11 +81,11 @@ AWS Solutions use two buckets: a bucket for global access to templates, which is
 
 **Build the solution**
 
-From the *deployment* folder in your cloned repo, run build-s3-dist.sh, passing the root name of your bucket (ex. mybucket) and the version you are building (ex. v1.0.0). We recommend using a semver version based on the version downloaded from GitHub (ex. GitHub: v1.0.0, your build: v1.0.0.mybuild)
+From the *deployment* folder in your cloned repo, run build-s3-dist.sh, passing the root name of your bucket (ex. mybucket), name of the solution i.e. aws-instance-scheduler and the version you are building (ex. v1.3.3). We recommend using a similar version based on the version downloaded from GitHub (ex. GitHub: v1.3.3, your build: v1.3.3.mybuild)
 
 ```
 chmod +x build-s3-dist.sh
-build-s3-dist.sh <bucketname> <version>
+build-s3-dist.sh <bucketname> aws-instance-scheduler <version>
 ```
 
 **Run Unit Tests**
@@ -102,22 +102,22 @@ Confirm that all unit tests pass.
 
 Upload the template and the lambda to your bucket in the following pattern,
 ```
-s3://mybucket/aws-instance-scheduler/v1.3.3/instance-scheduler.zip (lambda Code)
+s3://mybucket-us-east-1/aws-instance-scheduler/v1.3.3/instance-scheduler.zip (lambda Code)
 ```
 
 Templates
 ```
-s3://mybucket-us-east-1/aws-instance-scheduler/v1.3.3/AwsInstanceScheduler.template
-s3://mybucket-us-east-1/aws-instance-scheduler/v1.3.3/AwsInstanceSchedulerRemote.template
+s3://mybucket/aws-instance-scheduler/v1.3.3/instance-scheduler.template
+s3://mybucket/aws-instance-scheduler/v1.3.3/instance-scheduler-remote.template
 ```
 
 ## Deploy
 
-See the (AWS Instance Scheduler Implementation Guide)[https://s3.amazonaws.com/solutions-reference/aws-instance-scheduler/latest/instance-scheduler.pdf] for deployment instructions, using the link to the AwsInstanceScheduler.template from your bucket, rather than the one for AWS Solutions. Ex. https://mybucket.s3.amazonaws.com/aws-instance-scheduler/v1.0.0.mybuild/AwsInstanceScheduler.template
+See the [AWS Instance Scheduler Implementation Guide](https://s3.amazonaws.com/solutions-reference/aws-instance-scheduler/latest/instance-scheduler.pdf) for deployment instructions, using the link to the instance-scheduler.template from your bucket, rather than the one for AWS Solutions. Ex. https://mybucket.s3.amazonaws.com/aws-instance-scheduler/v1.3.3.mybuild/instance-scheduler.template
 
 ## CDK Documentation
 
-AWS Instance Scheduler templates are generated using AWS CDK, for further information on CDK please refer to the (documentation)[https://docs.aws.amazon.com/cdk/latest/guide/getting_started.html].
+AWS Instance Scheduler templates are generated using AWS CDK, for further information on CDK please refer to the [documentation](https://docs.aws.amazon.com/cdk/latest/guide/getting_started.html)
 
 
 ***
