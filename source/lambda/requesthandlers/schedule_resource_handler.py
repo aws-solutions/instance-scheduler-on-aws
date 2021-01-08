@@ -31,6 +31,7 @@ ERR_INVALID_PERIOD_PROPERTY = "{} is not a valid property for a schedule period,
 PERIOD_DESCRIPTION = "Schedule {} period {}, do not delete or update manually"
 PERIOD_NAME = "{}-period-{:0>4d}"
 
+PROP_PERIOD_NAME = "Name"
 PROP_BEGIN_TIME = "BeginTime"
 PROP_DESCRIPTION = "Description"
 PROP_END_TIME = "EndTime"
@@ -72,6 +73,7 @@ VALID_SCHEDULE_PROPERTIES = [
     "Timeout"]
 
 VALID_PERIOD_PROPERTIES = [
+    PROP_PERIOD_NAME,
     PROP_BEGIN_TIME,
     PROP_DESCRIPTION,
     PROP_END_TIME,
@@ -128,11 +130,21 @@ class ScheduleResourceHandler(CustomResource):
             return name
         return "{}-{}".format(self.stack_name, name)
 
+    @property
+    def _periods_name_list(self):
+        periods = self.resource_properties.get(PROP_PERIODS,[])
+        periods_name_list = []
+        for period in periods:
+            periods_name_list.append(period[PROP_PERIOD_NAME])
+        return periods_name_list
+
     def _create_period(self, period):
 
         self.number_of_periods += 1
-
-        period_name = PERIOD_NAME.format(self._schedule_resource_name, self.number_of_periods)
+        
+        period_name = period.get(PROP_PERIOD_NAME, None)
+        if period_name is None:
+            period_name = PERIOD_NAME.format(self._schedule_resource_name, self.number_of_periods)
         self._logger.info(INF_PERIOD_NAME, period_name)
 
         for p in period:
@@ -164,15 +176,9 @@ class ScheduleResourceHandler(CustomResource):
         return period_name, period.get(PROP_INSTANCE_TYPE, None)
 
     def _delete_periods(self):
-        i = 0
-        while True:
-            i += 1
-            name = PERIOD_NAME.format(self._schedule_resource_name, i)
-            period = self._admin.delete_period(name, exception_if_not_exists=False)
-            if period is None:
-                break
-            else:
-                self._logger.info(INF_DELETED_PERIOD, name)
+        for period_name in self._periods_name_list:
+            self._admin.delete_period(period_name, exception_if_not_exists=False)
+            self._logger.info(INF_DELETED_PERIOD, period_name)
 
     def _create_schedule(self):
 
