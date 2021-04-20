@@ -1,0 +1,63 @@
+[
+  {
+    "ParameterKey": "SchedulingActive",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "SchedulingActive",
+    "ParameterValue": "Both"
+  },
+  {
+    "ParameterKey": "UseCloudWatchMetricss",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "LogRetentionDays",
+    "ParameterValue": "30"
+  },
+  {
+    "ParameterKey": "Trace",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "TagName",
+    "ParameterValue": "Schedule"
+  },
+  {
+    "ParameterKey": "DefaultTimezone",
+    "ParameterValue": "UTC"
+  },
+  {
+    "ParameterKey": "SchedulerActive",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "Regions",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "CrossAccountRoles",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "StartedTags",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "StoppedTags",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "SchedulerFrequency",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "ScheduleLambdaAccount",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "SendAnonymousData",
+    "ParameterValue": "Yes"
+  }
+]
+

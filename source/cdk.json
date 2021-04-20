@@ -1,0 +1,3 @@
+{
+  "app": "npx ts-node bin/aws-instance-scheduler.ts"
+}

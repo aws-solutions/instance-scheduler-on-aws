@@ -1,0 +1,151 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
+Object {
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Metadata": Object {
+    "AWS::CloudFormation::Interface": Object {
+      "ParameterGroups": Array [
+        Object {
+          "Label": Object {
+            "default": "Account",
+          },
+          "Parameters": Array [
+            "InstanceSchedulerAccount",
+          ],
+        },
+      ],
+      "ParameterLabels": Object {
+        "InstanceSchedulerAccount": Object {
+          "default": "Primary account",
+        },
+      },
+    },
+  },
+  "Outputs": Object {
+    "CrossAccountRole": Object {
+      "Description": "Arn for cross account role for Instance scheduler, add this arn to the list of crossaccount roles (CrossAccountRoles) parameter of the Instance Scheduler template.",
+      "Value": Object {
+        "Fn::GetAtt": Array [
+          "EC2SchedulerCrossAccountRole",
+          "Arn",
+        ],
+      },
+    },
+  },
+  "Parameters": Object {
+    "InstanceSchedulerAccount": Object {
+      "AllowedPattern": "(^[0-9]{12}$)",
+      "ConstraintDescription": "Account number is a 12 digit number",
+      "Description": "Account number of Instance Scheduler account to give access to manage EC2 and RDS  Instances in this account.",
+      "Type": "String",
+    },
+  },
+  "Resources": Object {
+    "EC2SchedulerCrossAccountRole": Object {
+      "Metadata": Object {
+        "cfn_nag": Object {
+          "rules_to_suppress": Array [
+            Object {
+              "id": "W11",
+              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+            },
+          ],
+        },
+      },
+      "Properties": Object {
+        "AssumeRolePolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
+                "AWS": Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      "arn:aws:iam::",
+                      Object {
+                        "Ref": "InstanceSchedulerAccount",
+                      },
+                      ":root",
+                    ],
+                  ],
+                },
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Path": "/",
+        "Policies": Array [
+          Object {
+            "PolicyDocument": Object {
+              "Statement": Array [
+                Object {
+                  "Action": Array [
+                    "rds:DeleteDBSnapshot",
+                    "rds:DescribeDBSnapshots",
+                    "rds:StopDBInstance",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "arn:aws:rds:*:111111111111:snapshot:*",
+                },
+                Object {
+                  "Action": Array [
+                    "rds:AddTagsToResource",
+                    "rds:RemoveTagsFromResource",
+                    "rds:DescribeDBSnapshots",
+                    "rds:StartDBInstance",
+                    "rds:StopDBInstance",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "arn:aws:rds:*:111111111111:db:*",
+                },
+                Object {
+                  "Action": Array [
+                    "rds:AddTagsToResource",
+                    "rds:RemoveTagsFromResource",
+                    "rds:StartDBCluster",
+                    "rds:StopDBCluster",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "arn:aws:rds:*:111111111111:cluster:*",
+                },
+                Object {
+                  "Action": Array [
+                    "ec2:StartInstances",
+                    "ec2:StopInstances",
+                    "ec2:CreateTags",
+                    "ec2:DeleteTags",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "arn:aws:ec2:*:111111111111:instance/*",
+                },
+                Object {
+                  "Action": Array [
+                    "rds:DescribeDBClusters",
+                    "rds:DescribeDBInstances",
+                    "ec2:DescribeInstances",
+                    "ec2:DescribeRegions",
+                    "ec2:ModifyInstanceAttribute",
+                    "ssm:DescribeMaintenanceWindows",
+                    "ssm:DescribeMaintenanceWindowExecutions",
+                    "tag:GetResources",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "EC2InstanceSchedulerRemote",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+  },
+}
+`;
