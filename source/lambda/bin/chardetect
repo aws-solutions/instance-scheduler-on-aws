@@ -1,4 +1,4 @@
-#!/root/.pyenv/versions/3.8.1/bin/python3.8
+#!/root/.pyenv/versions/3.8.8/bin/python3.8
 # -*- coding: utf-8 -*-
 import re
 import sys

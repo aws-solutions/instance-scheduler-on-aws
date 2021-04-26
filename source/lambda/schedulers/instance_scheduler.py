@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -86,8 +86,14 @@ class InstanceScheduler:
         self._logger = None
         self._context = None
 
+        partition = "aws"
+        try:
+            partition = boto3.client('sts').get_caller_identity()['Arn'].split(':')[1]
+        except Exception as ex:
+            print(ex)
+
         # valid regions for service
-        self._valid_regions = boto3.Session().get_available_regions(service.service_name)
+        self._valid_regions = boto3.Session().get_available_regions(service.service_name, partition)
 
         self._usage_metrics = {"Started": {}, "Stopped": {}, "Resized": {}}
 
@@ -379,7 +385,7 @@ class InstanceScheduler:
                         "Instances": self._usage_metrics[action][instance_type],
 
                     })
-
+                    
             send_metrics_data(usage_data, logger=self._logger)
 
     def _collect_usage_metrics(self):

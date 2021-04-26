@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -91,6 +91,14 @@ class SchedulerSetupHandler(CustomResource):
         :return: trace flag
         """
         return self.resource_properties.get(configuration.TRACE, "True")
+    
+    @property
+    def enable_SSM_maintenance_windows(self):
+        """
+        Returns global enable SSM Maintenance Windows flag
+        :return: ssm_enable_SSM_maintenance_windows flag
+        """
+        return self.resource_properties.get(configuration.ENABLE_SSM_MAINTENANCE_WINDOWS, "False")
 
     @property
     def regions(self):
@@ -146,16 +154,16 @@ class SchedulerSetupHandler(CustomResource):
     @property
     def schedule_clusters(self):
         """
-        Returns global trace flag
-        :return: trace flag
+        Returns global schedule clusters flag
+        :return: schedule_clusters flag
         """
         return self.resource_properties.get(configuration.SCHEDULE_CLUSTERS, "False")
 
     @property
     def create_rds_snapshot(self):
         """
-        Returns global trace flag
-        :return: trace flag
+        Returns global create RDS Snapshots flag
+        :return: create_rds_snapshot flag
         """
         return self.resource_properties.get(configuration.CREATE_RDS_SNAPSHOT, "True")
 
@@ -192,6 +200,7 @@ class SchedulerSetupHandler(CustomResource):
                                            schedule_lambda_account=self.schedule_lambda_account.lower() == "true",
                                            use_metrics=self.use_metrics.lower() == "true",
                                            trace=self.trace.lower() == "true",
+                                           enable_SSM_maintenance_windows=self.enable_SSM_maintenance_windows.lower() == "true",
                                            started_tags=self.started_tags,
                                            stopped_tags=self.stopped_tags)
 

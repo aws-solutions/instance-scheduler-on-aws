@@ -28,7 +28,11 @@ def test_ssm_maintenance_windows_1(mocker):
     mocker.patch.object(ec2_service, 'get_ssm_windows')
     ec2_service.get_ssm_windows.return_value = window_list
     mocker.patch.object(ec2_service, '_logger')
-    response = ec2_service.ssm_maintenance_windows
+    session = ""
+    account = "1111"
+    region = "us-east-1"
+    context = ""
+    response = ec2_service.ssm_maintenance_windows(session, context, account, region)
 
     assert response['mon-1'].periods[0]['period'].name == 'mon-1-period'
     assert response['mon-1'].periods[0]['period'].begintime == datetime.time(18, 50)
@@ -51,7 +55,11 @@ def test_ssm_maintenance_windows_2(mocker):
     mocker.patch.object(ec2_service, 'get_ssm_windows')
     ec2_service.get_ssm_windows.return_value = window_list
     mocker.patch.object(ec2_service, '_logger')
-    response = ec2_service.ssm_maintenance_windows
+    session = ""
+    account = "1111"
+    region = "us-east-1"
+    context = ""
+    response = ec2_service.ssm_maintenance_windows(session, context, account, region)
 
     assert response['mon-1'].periods[0]['period'].name == 'mon-1-period'
     assert response['mon-1'].periods[0]['period'].begintime == datetime.time(14, 50)
@@ -103,7 +111,11 @@ def test_get_ssm_windows(mocker):
     mocker.patch.object(ec2_service, 'process_ssm_window')
     mocker.patch.object(ec2_service, 'remove_unused_windows')
     ec2_service.get_ssm_windows_db.return_value = window_list
-    response = ec2_service.get_ssm_windows()
+    session = ""
+    context = ""
+    account = "1111"
+    region = "us-east-1"
+    response = ec2_service.get_ssm_windows(session, context, account, region)
     assert response == window_list
 
 
@@ -130,8 +142,10 @@ def test_process_ssm_window_1(mocker):
     }
     ec2_service = Ec2Service()
     mocker.patch.object(ec2_service, 'put_window_dynamodb')
-    response = ec2_service.process_ssm_window(window, ssm_windows_db)
-    ec2_service.put_window_dynamodb.assert_called_with(window)
+    account = "1111"
+    region = "us-east-1"
+    ec2_service.process_ssm_window(window, ssm_windows_db, account, region)
+    ec2_service.put_window_dynamodb.assert_called_with(window, account, region)
 
 
 def test_process_ssm_window_2(mocker):
@@ -166,5 +180,7 @@ def test_process_ssm_window_2(mocker):
     }
     ec2_service = Ec2Service()
     mocker.patch.object(ec2_service, 'put_window_dynamodb')
-    response = ec2_service.process_ssm_window(window, ssm_windows_db)
-    ec2_service.put_window_dynamodb.assert_called_with(window)
+    account = "1111"
+    region = "us-east-1"
+    ec2_service.process_ssm_window(window, ssm_windows_db, account, region)
+    ec2_service.put_window_dynamodb.assert_called_with(window, account, region)

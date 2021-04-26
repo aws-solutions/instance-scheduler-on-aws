@@ -19,17 +19,16 @@ import { AwsInstanceSchedulerStack } from '../lib/aws-instance-scheduler-stack';
 import { AwsInstanceSchedulerRemoteStack } from '../lib/aws-instance-scheduler-remote-stack';
 
 const SOLUTION_VERSION = process.env['DIST_VERSION'] || '%%VERSION%%';
-const SOLUTION_NAME = process.env['SOLUTION_NAME'];
-const SOLUTION_ID = process.env['SOLUTION_ID'];
-const SOLUTION_BUCKET = process.env['DIST_OUTPUT_BUCKET'];
-const SOLUTION_TMN = process.env['SOLUTION_TRADEMARKEDNAME'];
+const SOLUTION_NAME = process.env['SOLUTION_NAME'] ? process.env['SOLUTION_NAME'] : "aws-instance-scheduler";
+const SOLUTION_ID = process.env['SOLUTION_ID'] ? process.env['SOLUTION_ID'] : "SO0030";
+const SOLUTION_BUCKET = process.env['DIST_OUTPUT_BUCKET'] ? process.env['DIST_OUTPUT_BUCKET'] : "";
+const SOLUTION_TMN = process.env['SOLUTION_TRADEMARKEDNAME'] ? process.env['SOLUTION_TRADEMARKEDNAME'] : "aws-instance-scheduler";
 const SOLUTION_PROVIDER = 'AWS Solution Development';
 
 const app = new cdk.App();
 
-
-new AwsInstanceSchedulerStack(app, 'instance-scheduler', {
-    description: '(' + SOLUTION_ID + ') - ' + SOLUTION_NAME + ', version ' + SOLUTION_VERSION,
+new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
+    description: `(${SOLUTION_ID}) - The AWS CloudFormation template for deployment of the ${SOLUTION_NAME}, version: ${SOLUTION_VERSION}`,
     solutionId: SOLUTION_ID,
     solutionTradeMarkName: SOLUTION_TMN,
     solutionProvider: SOLUTION_PROVIDER,
@@ -37,8 +36,8 @@ new AwsInstanceSchedulerStack(app, 'instance-scheduler', {
     solutionName: SOLUTION_NAME,
     solutionVersion: SOLUTION_VERSION
 });
-new AwsInstanceSchedulerRemoteStack(app, 'instance-scheduler-remote', {
-    description:  '(' + SOLUTION_ID + ') - ' + SOLUTION_NAME + ' cross account role, version ' + SOLUTION_VERSION,
+new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
+    description:  `(${SOLUTION_ID}S) - The AWS CloudFormation template for ${SOLUTION_NAME} cross account role, version: ${SOLUTION_VERSION}`,
     solutionId: SOLUTION_ID,
     solutionTradeMarkName: SOLUTION_TMN,
     solutionProvider: SOLUTION_PROVIDER,

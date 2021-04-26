@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -156,12 +156,12 @@ class ScheduleResourceHandler(CustomResource):
         if description_config is not None:
             create_period_args[configuration.DESCRIPTION] = "{}, {}".format(description_config,
                                                                             create_period_args[configuration.DESCRIPTION])
-
         period = self._admin.create_period(**create_period_args)
+        instance_type = period.get(PROP_INSTANCE_TYPE, None)
 
         self._logger.info(INF_PERIOD_CREATED, safe_json(period, 3))
 
-        return period_name, period.get(PROP_INSTANCE_TYPE, None)
+        return period_name, instance_type
 
     def _delete_periods(self):
         i = 0

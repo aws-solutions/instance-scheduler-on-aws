@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -20,6 +20,11 @@ ENV_METRICS_URL = "METRICS_URL"
 ENV_SOLUTION_ID = "SOLUTION_ID"
 # Send metrics flag
 ENV_SEND_METRICS = "SEND_METRICS"
+# STACK_ID
+STACK_ID = "STACK_ID"
+# UUID_KEY
+UUID_KEY = "UUID_KEY"
+USER_AGENT_EXTRA = "USER_AGENT_EXTRA"
 
 
 def safe_json(d, indent=0):

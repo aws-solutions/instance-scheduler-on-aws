@@ -23,7 +23,16 @@ import '@aws-cdk/assert/jest';
 function getTestStack(): cdk.Stack {
   const envEU = { account: '111111111111', region: 'eu-west-1' };
   const app = new cdk.App();
-  const stack = new instanceSchedulerStack.AwsInstanceSchedulerRemoteStack(app, 'stack', {env: envEU})
+  const stack = new instanceSchedulerStack.AwsInstanceSchedulerRemoteStack(app, 'stack', {
+    env: envEU,
+    description: "", 
+    solutionId: "SO0030",
+    solutionTradeMarkName: 'aws-instance-scheduler',
+    solutionProvider: 'AWS Solution Development',
+    solutionBucket: "solutions",
+    solutionName: 'aws-instance-scheduler',
+    solutionVersion: 'v1.4.0'
+  })
 
   const instanceSchedulerRemoteStackMetadata =
   {

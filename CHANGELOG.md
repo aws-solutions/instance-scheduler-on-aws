@@ -3,7 +3,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.4.0] - 2021-04-26
+### Added
+- Enable solution to be deployed as mutliple stacks in the same account/region
+### Fixed
+- Fix the SSM Maintenance window issue where solution was not fetching SSM Maintenance windows from other account/regions
+- Updated logging utility to remove incorrect timestamp
+- Fixed issue with scheduler stopping instances at UTC time even when configured with other timezones and Period having weekday configured as Wed#4. [Github Issue](https://github.com/awslabs/aws-instance-scheduler/issues/238)
+- Modified Anonymous Data reporting refer implementation guide for details.
+- Removed redundant logging of UTC timestamp along with the Account/Region default stamp in logs in AWS CloudWatch.
+- Fixed [Github Issue](https://github.com/awslabs/aws-instance-scheduler/issues/184) for scheduler-cli.
+
 ## [1.3.3] - 2020-08-31
+### Fixed
 - Update the project to utilize aws cdk constructs for cloudformation template creation.
 - Fix the issue for ensuring throttling is avoided to cloudwatch API's from github PR [#177](https://github.com/awslabs/aws-instance-scheduler/pull/177)
 ## [1.3.2] - 2020-06-22

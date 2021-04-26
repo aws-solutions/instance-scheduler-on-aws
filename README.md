@@ -38,30 +38,28 @@ wget https://github.com/awslabs/aws-instance-scheduler/archive/master.zip
 
 ```
 |- deployment/                - contains build scripts, deployment templates, and dist folders for staging assets.
-  |- cdk-solution-helper/     - helper function for converting CDK output to a format compatible with the AWS Solutions pipelines.
   |- build-open-source-dist.sh  - builds the open source package with cleaned assets and builds a .zip file in the /open-source folder for distribution to GitHub
   |- build-s3-dist.sh         - builds the solution and copies artifacts to the appropriate /global-s3-assets or /regional-s3-assets folders.
   |- run-unit-tests.sh         - runs the unit tests for the lambda files.
 |- source/                    - all source code, scripts, tests, etc.
   |- bin/
     |- aws-instance-scheduler.ts - the AWS Instance scheduler cdk app.
+  |- cli/                     - scheduler-cli source files.
   |- lambda/                  - Lambda function with source code and test cases.        
   |- lib/
     |- aws-instance-scheduler-stack.ts  - the main CDK stack for aws instance scheduler solution.
     |- aws-instance-scheduler-remote-stack.ts  - the main CDK stack for aws instance scheduler solution remote template.
   |- test/
     |- __snapshots__/
-    |- aws-instance-scheduler-remote-stack.test.ts   - unit and snapshot tests for aws instance scheduler.
+    |- aws-instance-scheduler-remote-stack.test.ts   - unit and snapshot tests for aws instance scheduler remote stack.
     |- aws-instance-scheduler-stack.test.ts   - unit and snapshot tests for aws instance scheduler.
   |- cdk.json                 - config file for CDK.
   |- jest.config.js           - config file for unit tests.
   |- package.json             - package file for the aws instance scheduler CDK project.
   |- README.md                - doc file for the CDK project.
   |- run-all-tests.sh         - runs all tests within the /source folder. Referenced in the buildspec and build scripts.
+  |- tsconfig.json            - typescript configurations.
 |- .gitignore
-|- .viperlightignore          - Viperlight scan ignore configuration  (accepts file, path, or line item).
-|- .viperlightrc              - Viperlight scan configuration.
-|- buildspec.yml              - main build specification for CodeBuild to perform builds and execute unit tests.
 |- CHANGELOG.md               - required for every solution to include changes based on version to auto-build release notes.
 |- CODE_OF_CONDUCT.md         - standardized open source file for all solutions.
 |- CONTRIBUTING.md            - standardized open source file for all solutions.
@@ -81,7 +79,7 @@ AWS Solutions use two buckets: a bucket for global access to templates, which is
 
 **Build the solution**
 
-From the *deployment* folder in your cloned repo, run build-s3-dist.sh, passing the root name of your bucket (ex. mybucket), name of the solution i.e. aws-instance-scheduler and the version you are building (ex. v1.3.3). We recommend using a similar version based on the version downloaded from GitHub (ex. GitHub: v1.3.3, your build: v1.3.3.mybuild)
+From the *deployment* folder in your cloned repo, run build-s3-dist.sh, passing the root name of your bucket (ex. mybucket), name of the solution i.e. aws-instance-scheduler and the version you are building (ex. v1.4.0). We recommend using a similar version based on the version downloaded from GitHub (ex. GitHub: v1.4.0, your build: v1.4.0.mybuild)
 
 ```
 chmod +x build-s3-dist.sh
@@ -102,18 +100,18 @@ Confirm that all unit tests pass.
 
 Upload the template and the lambda to your bucket in the following pattern,
 ```
-s3://mybucket-us-east-1/aws-instance-scheduler/v1.3.3/instance-scheduler.zip (lambda Code)
+s3://mybucket-us-east-1/aws-instance-scheduler/v1.4.0/instance-scheduler.zip (lambda Code)
 ```
 
 Templates
 ```
-s3://mybucket/aws-instance-scheduler/v1.3.3/instance-scheduler.template
-s3://mybucket/aws-instance-scheduler/v1.3.3/instance-scheduler-remote.template
+s3://mybucket/aws-instance-scheduler/v1.4.0/instance-scheduler.template
+s3://mybucket/aws-instance-scheduler/v1.4.0/instance-scheduler-remote.template
 ```
 
 ## Deploy
 
-See the [AWS Instance Scheduler Implementation Guide](https://s3.amazonaws.com/solutions-reference/aws-instance-scheduler/latest/instance-scheduler.pdf) for deployment instructions, using the link to the instance-scheduler.template from your bucket, rather than the one for AWS Solutions. Ex. https://mybucket.s3.amazonaws.com/aws-instance-scheduler/v1.3.3.mybuild/instance-scheduler.template
+See the [AWS Instance Scheduler Implementation Guide](https://s3.amazonaws.com/solutions-reference/aws-instance-scheduler/latest/instance-scheduler.pdf) for deployment instructions, using the link to the instance-scheduler.template from your bucket, rather than the one for AWS Solutions. Ex. https://mybucket.s3.amazonaws.com/aws-instance-scheduler/v1.4.0.mybuild/instance-scheduler.template
 
 ## CDK Documentation
 
@@ -122,7 +120,7 @@ AWS Instance Scheduler templates are generated using AWS CDK, for further inform
 
 ***
 
-Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
 

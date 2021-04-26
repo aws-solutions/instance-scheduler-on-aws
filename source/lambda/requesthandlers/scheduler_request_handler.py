@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -16,12 +16,14 @@ from datetime import datetime
 
 import configuration
 import schedulers
+import pytz
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
 from schedulers import SCHEDULER_TYPES
 from schedulers.instance_scheduler import InstanceScheduler
 from util.logger import Logger
 
-INF_HANDLER = "Handler {} scheduling request for service(s) {}, account(s) {}, region(s) {} at {}"
+INF_HANDLER = "Handler {} scheduling request for service(s) {}, account(s) {}, region(s) {} at {},\
+ time stamp is based on the default timezone selected for the solution."
 INF_SCHEDULER_RESULT = "Scheduler result {}"
 
 LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
@@ -112,7 +114,8 @@ class SchedulerRequestHandler:
 
             # setup logging for the service/account/region
             s = "-".join([LOG_STREAM_PREFIX, service, "-".join(account_names), "-".join(self.configuration.regions)])
-            dt = datetime.utcnow()
+            
+            dt = datetime.now(pytz.timezone(self.configuration.default_timezone))
             logstream = LOG_STREAM.format(s, dt.year, dt.month, dt.day)
             self._logger = Logger(logstream=logstream, buffersize=60 if self.configuration.trace else 30, context=self._context,
                                   debug=self.configuration.trace)
@@ -123,7 +126,7 @@ class SchedulerRequestHandler:
                     ", ".join(self.configuration.scheduled_services),
                     ", ".join(list(self.account_names)),
                     ", ".join(list(self.configuration.regions)),
-                    datetime.now()))
+                    datetime.now(pytz.timezone(self.configuration.default_timezone))))
 
                 # run the scheduler for the service
                 result[service] = scheduler.run(state_table=self.state_table, scheduler_config=self.configuration,

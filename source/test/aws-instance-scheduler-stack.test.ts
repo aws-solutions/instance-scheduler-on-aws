@@ -24,13 +24,14 @@ function getTestStack(): cdk.Stack {
   const app = new cdk.App();
   const envEU = { account: '111111111111', region: 'eu-west-1' };
   const stack = new instanceSchedulerStack.AwsInstanceSchedulerStack(app, 'stack', {
-    env: envEU, 
+    env: envEU,
+    description: "", 
     solutionId: "SO0030",
     solutionTradeMarkName: 'aws-instance-scheduler',
     solutionProvider: 'AWS Solution Development',
     solutionBucket: "solutions",
     solutionName: 'aws-instance-scheduler',
-    solutionVersion: 'v1.3.3'
+    solutionVersion: 'v1.4.0'
   })
 
   const instanceSchedulerStackMetadata =
@@ -39,7 +40,7 @@ function getTestStack(): cdk.Stack {
       "ParameterGroups": [
         {
           "Label": {
-            "default": "Scheduler (version v1.3.3)"
+            "default": "Scheduler (version v1.4.0)"
           },
           "Parameters": [
             "TagName",
