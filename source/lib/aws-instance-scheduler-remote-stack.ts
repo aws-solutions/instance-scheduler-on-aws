@@ -18,9 +18,19 @@ import * as cdk from '@aws-cdk/core';
 import * as iam from '@aws-cdk/aws-iam';
 import { ArnPrincipal, CompositePrincipal, Effect, PolicyStatement } from "@aws-cdk/aws-iam";
 
+export interface AwsInstanceSchedulerRemoteStackProps extends cdk.StackProps {
+    readonly description: string,
+    readonly solutionId: string,
+    readonly solutionTradeMarkName: string,
+    readonly solutionProvider: string,
+    readonly solutionBucket: string,
+    readonly solutionName: string,
+    readonly solutionVersion: string
+  }
+
 export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
 
-    constructor(scope: cdk.Construct, id: string, props?: any) {
+    constructor(scope: cdk.Construct, id: string, props: AwsInstanceSchedulerRemoteStackProps) {
         super(scope, id, props);
 
         //CFN Parameters
@@ -31,7 +41,9 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
             constraintDescription: 'Account number is a 12 digit number'
         });
 
-        let accountPrincipal = new ArnPrincipal('arn:aws:iam::' + instanceSchedulerAccount.valueAsString + ':root');
+        let accountPrincipal = new ArnPrincipal(cdk.Fn.sub('arn:${AWS::Partition}:iam::${accountId}:root', {
+            accountId: instanceSchedulerAccount.valueAsString
+        }));
         let servicePrincipal = new iam.ServicePrincipal('lambda.amazonaws.com')
 
         let principalPolicyStatement = new PolicyStatement();
@@ -55,7 +67,7 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                             ],
                             effect: Effect.ALLOW,
                             resources: [
-                                'arn:aws:rds:*:' + this.account + ':snapshot:*'
+                                cdk.Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:snapshot:*")
                             ]
                         }),
                         new PolicyStatement({
@@ -68,7 +80,7 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                             ],
                             effect: Effect.ALLOW,
                             resources: [
-                                'arn:aws:rds:*:' + this.account + ':db:*'
+                                cdk.Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:db:*")
                             ]
                         }),
                         new PolicyStatement({
@@ -80,7 +92,7 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                             ],
                             effect: Effect.ALLOW,
                             resources: [
-                                'arn:aws:rds:*:' + this.account + ':cluster:*'
+                                cdk.Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:cluster:*")
                             ]
                         }),
                         new PolicyStatement({
@@ -92,7 +104,7 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                             ],
                             effect: Effect.ALLOW,
                             resources: [
-                                'arn:aws:ec2:*:' + this.account + ':instance/*'
+                                cdk.Fn.sub("arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:instance/*")
                             ]
                         }),
                         new PolicyStatement({
@@ -101,7 +113,6 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                                 'rds:DescribeDBInstances',
                                 'ec2:DescribeInstances',
                                 'ec2:DescribeRegions',
-                                'ec2:ModifyInstanceAttribute',
                                 'ssm:DescribeMaintenanceWindows',
                                 'ssm:DescribeMaintenanceWindowExecutions',
                                 'tag:GetResources'
@@ -116,12 +127,26 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
             }
         })
 
+        new iam.Policy(this, "Ec2ModifyInstanceAttrPolicy", {
+            roles: [ec2SchedulerCrossAccountRole],
+            statements: [
+                new PolicyStatement({
+                    actions: [
+                        'ec2:ModifyInstanceAttribute'
+                    ],
+                    effect: Effect.ALLOW,
+                    resources: [
+                        cdk.Fn.sub("arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:instance/*")
+                    ]
+                })
+            ]
+        })
+
         //CFN Output
         new cdk.CfnOutput(this, 'CrossAccountRole', {
             value: ec2SchedulerCrossAccountRole.roleArn,
             description: 'Arn for cross account role for Instance scheduler, add this arn to the list of crossaccount roles (CrossAccountRoles) parameter of the Instance Scheduler template.'
         })
-
 
         const ec2SchedulerCrossAccountRole_cfn_ref = ec2SchedulerCrossAccountRole.node.defaultChild as iam.CfnRole
         ec2SchedulerCrossAccountRole_cfn_ref.overrideLogicalId('EC2SchedulerCrossAccountRole')
@@ -157,8 +182,5 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
             }
         }
         stack.templateOptions.templateFormatVersion = '2010-09-09'
-
-
-
     }
 }

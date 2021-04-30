@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -56,6 +56,7 @@ ATTR_STOPPED_TAGS = "stopped_tags"
 ATTR_TAGNAME = "tag_name"
 ATTR_TIMEZONE = "timezone"
 ATTR_TRACE = "trace"
+ATTR_ENABLE_SSM_MAINTENANCE_WINDOWS = "enable_SSM_maintenance_windows"
 ATTR_USE_MAINTENANCE_WINDOW = "use_maintenance_window"
 ATTR_SSM_MAINTENANCE_WINDOW = "ssm_maintenance_window"
 ATTR_USE_METRICS = "use_metrics"
@@ -127,6 +128,7 @@ class SchedulerConfigBuilder:
                                    schedules=self._build_schedules(config, get_default_timezone(config), scheduler_metrics,
                                                                    config_date),
                                    trace=config.get(configuration.TRACE, False),
+                                   enable_SSM_maintenance_windows=config.get(configuration.ENABLE_SSM_MAINTENANCE_WINDOWS, False),
                                    use_metrics=scheduler_metrics,
                                    cross_account_roles=cross_account_roles,
                                    schedule_lambda_account=config.get(configuration.SCHEDULE_LAMBDA_ACCOUNT, True),
@@ -212,7 +214,7 @@ class SchedulerConfigBuilder:
             # ignore periods if there is an always on or if override_status option is used
             if not override_status:
                 # use current date and time for timezone of schedule
-                current_schema_dt = dt.replace(tzinfo=SchedulerConfigBuilder._get_timezone(timezone))
+                current_schema_dt = dt.now(SchedulerConfigBuilder._get_timezone(timezone))
                 periods_for_schedule = self._get_schedule_periods(schedule_config, current_schema_dt)
 
             return InstanceSchedule(name=get_schedule_name(schedule_config),
@@ -323,6 +325,7 @@ class SchedulerConfigBuilder:
         for attr in [ATTR_TAGNAME,
                      ATTR_DEFAULT_TIMEZONE,
                      ATTR_TRACE,
+                     ATTR_ENABLE_SSM_MAINTENANCE_WINDOWS,
                      ATTR_SCHEDULE_CLUSTERS,
                      ATTR_CREATE_RDS_SNAPSHOT,
                      ATTR_USE_METRICS,
@@ -408,6 +411,7 @@ class SchedulerConfigBuilder:
         for attr in [ATTR_TAGNAME,
                      ATTR_DEFAULT_TIMEZONE,
                      ATTR_TRACE,
+                     ATTR_ENABLE_SSM_MAINTENANCE_WINDOWS,
                      ATTR_USE_METRICS,
                      ATTR_SCHEDULE_CLUSTERS,
                      ATTR_CREATE_RDS_SNAPSHOT,

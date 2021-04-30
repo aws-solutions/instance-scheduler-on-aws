@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -24,6 +24,7 @@ INF_SCHEDULE_DISPLAY = "Configuration:\n" \
                        "Tagname = \"{}\"\n" \
                        "Default timezone = \"{}\"\n" \
                        "Trace = \"{}\"\n" \
+                       "Enable SSM Maintenance Windows = \"{}\"\n" \
                        "Use metrics = \"{}\"\n" \
                        "Regions = \"{}\"\n" \
                        "Started tags = \"{}\"\n" \
@@ -47,6 +48,7 @@ class SchedulerConfig:
                  default_timezone,
                  schedules,
                  trace,
+                 enable_SSM_maintenance_windows,
                  use_metrics,
                  cross_account_roles,
                  schedule_lambda_account,
@@ -62,6 +64,7 @@ class SchedulerConfig:
         :param default_timezone: default timezone for schedules
         :param schedules: instance running schedules
         :param trace: set to true for detailed logging
+        :param enable_SSM_maintenance_windows: set to true for enable solution to retrieve SSM Maintenance Windows.
         :param use_metrics: global flag to enable metrics collection
         :param cross_account_roles: cross account roles for cross account scheduling
         :param schedule_lambda_account: set to true to schedule instances in account in which scheduler is installed
@@ -73,6 +76,7 @@ class SchedulerConfig:
         self.schedules = schedules
         self.default_timezone = default_timezone
         self.trace = trace
+        self.enable_SSM_maintenance_windows = enable_SSM_maintenance_windows
         self.use_metrics = use_metrics
         self.regions = regions
         self.cross_account_roles = cross_account_roles
@@ -138,6 +142,7 @@ class SchedulerConfig:
                                         self.tag_name,
                                         self.default_timezone,
                                         str(self.trace),
+                                        str(self.enable_SSM_maintenance_windows),
                                         str(self.use_metrics),
                                         ", ".join(self.regions),
                                         str(self.started_tags),

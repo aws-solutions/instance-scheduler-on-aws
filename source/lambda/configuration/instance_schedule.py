@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -101,18 +101,18 @@ class InstanceSchedule:
         if self.timezone:
             attributes.append("timezone is {}".format(str(self.timezone)))
         if self.stop_new_instances is not None:
-            attributes.append("new instanced are {}stopped".format("" if self.stop_new_instances else "not "))
+            attributes.append("new instanced are {} stopped".format("" if self.stop_new_instances else "not "))
         if self.use_maintenance_window is not None:
-            attributes.append("maintenance windows are {}used to start instances".format("" if self.use_maintenance_window else "not "))
+            attributes.append("maintenance windows are {} used to start instances".format("" if self.use_maintenance_window else "not "))
         if self.ssm_maintenance_window is not None and self.use_maintenance_window:
-            attributes.append("SSM maintenance window is {}used to start EC2 instances".format(self.ssm_maintenance_window))
+            attributes.append("SSM maintenance window is {} used to start EC2 instances".format(self.ssm_maintenance_window))
         if self.enforced is not None:
-            attributes.append("schedule state is {}enforced to start or stop instances".format("" if self.enforced else "not "))
+            attributes.append("schedule state is {} enforced to start or stop instances".format("" if self.enforced else "not "))
         if self.hibernate is not None:
-            attributes.append("stopped ec2 instances are is {}hibernated when stopped".format("" if self.hibernate else "not "))
+            attributes.append("stopped ec2 instances are is {} hibernated when stopped".format("" if self.hibernate else "not "))
         if self.retain_running is not None:
             attributes.append(
-                "instances are {}stopped if at the and of a period if they were already running at the start of the period".format(
+                "instances are {} stopped if at the and of a period if they were already running at the start of the period".format(
                     "not" if self.retain_running else ""))
 
         if self.periods and len(self.periods) > 0:
@@ -135,7 +135,7 @@ class InstanceSchedule:
         :param check_adjacent_periods: check for adjacent periods in a schedule
         :return: desired state, instance type and name of the active period of the schedule if the state is running
         """
-
+        
         # gets the local time using the configured timezone
         def get_check_time(time):
             check_time = time if time else self.schedule_dt

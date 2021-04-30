@@ -20,6 +20,10 @@
     "ParameterValue": "Yes"
   },
   {
+    "ParameterKey": "EnableSSMaintenanceWindows",
+    "ParameterValue": "No"
+  },
+  {
     "ParameterKey": "TagName",
     "ParameterValue": "Schedule"
   },

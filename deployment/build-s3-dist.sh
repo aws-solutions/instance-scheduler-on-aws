@@ -1,28 +1,19 @@
 #!/bin/bash
 #
-# This script packages your project into a solution distributable that can be
-# used as an input to the solution builder validation pipeline.
-# 
-# This script will perform the following tasks:
-#   1. Remove any old dist files from previous runs.
-#   2. Install dependencies for the cdk-solution-helper; responsible for 
-#      converting standard 'cdk synth' output into solution assets.
-#   3. Build and synthesize your CDK project.
-#   4. Run the cdk-solution-helper on template outputs and organize
-#      those outputs into the /global-s3-assets folder.
-#   5. Organize source code artifacts into the /regional-s3-assets folder.
-#   6. Remove any temporary files used for staging.
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
-# Parameters:
-#  - source-bucket-base-name: Name for the S3 bucket location where the template will source the Lambda
-#    code from. The template will append '-[region_name]' to this bucket name.
-#    For example: ./build-s3-dist.sh solutions v1.0.0
-#    The template will then expect the source code to be located in the solutions-[region_name] bucket
-#  - solution-name: name of the solution for consistency
-#  - version-code: version of the package
+#  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
+#  with the License. A copy of the License is located at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  or in the 'license' file accompanying this file. This file is distributed on an 'AS IS' BASIS, WITHOUT WARRANTIES
+#  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions
+#  and limitations under the License.
+#
 
 # Important: CDK global version number
-cdk_version=1.53.0
+cdk_version=1.96.0
 
 # Check to see if the required parameters have been provided:
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
@@ -43,6 +34,10 @@ staging_dist_dir="$template_dir/staging"
 template_dist_dir="$template_dir/global-s3-assets"
 build_dist_dir="$template_dir/regional-s3-assets"
 source_dir="$template_dir/../source"
+
+
+[ "$DEBUG" == 'true' ] && set -x
+set -e
 
 echo "------------------------------------------------------------------------------"
 echo "[Init] Remove any old dist files from previous runs"
@@ -68,8 +63,8 @@ echo "--------------------------------------------------------------------------
 # Install the global aws-cdk package
 echo "cd $source_dir"
 cd $source_dir
-echo "npm install -g aws-cdk@$cdk_version"
-npm install -g aws-cdk@$cdk_version
+echo "npm install aws-cdk@$cdk_version"
+npm install aws-cdk@$cdk_version
 
 echo "------------------------------------------------------------------------------"
 echo "NPM Install in the source folder"
@@ -79,18 +74,11 @@ echo "--------------------------------------------------------------------------
 echo "npm install"
 npm install
 
-# Run npm run build && npm run test for the cdk component unit tests
-echo "npm run build && npm run test"
-npm run build && npm run test
-
-# Run all the python tests.
-echo "$template_dir/run-unit-tests.sh"
-$template_dir/run-unit-tests.sh 
-
-
 # Run 'cdk synth' to generate raw solution outputs
-echo "cdk synth --output=$staging_dist_dir"
-cdk synth --output=$staging_dist_dir
+echo "cd "$source_dir""
+cd "$source_dir"
+echo "node_modules/aws-cdk/bin/cdk synth --output=$staging_dist_dir"
+npm run build && node_modules/aws-cdk/bin/cdk synth --output=$staging_dist_dir --no-version-reporting
 
 # Remove unnecessary output files
 echo "cd $staging_dist_dir"
@@ -128,7 +116,7 @@ mv version.py version.py.org
 sed "s/%version%/$DIST_VERSION/g" version.py.org > version.py
 
 echo "Install all the python dependencies in the staging directory before packaging"
-pip install -r $source_dir/lambda/requirements.txt -t $staging_dist_dir/lambda/
+pip install -U -r $source_dir/lambda/requirements.txt -t $staging_dist_dir/lambda/
 
 echo "Build lambda distribution packaging"
 zip -q --recurse-paths ./instance-scheduler.zip version.txt main.py version.py configuration/* requesthandlers/* chardet/* urllib3/* idna/* requests/* schedulers/* util/* boto_retry/* models/* pytz/* certifi/*
@@ -139,7 +127,15 @@ echo "cd into the scheduler cli folder ./cli"
 
 cd ../cli
 echo "Build the scheduler cli package"
-zip -q --recurse-paths ./scheduler-cli.zip scheduler-cli/* setup.py instance-scheduler-cli-runner.py
+mv ./setup.py ./setup.bak.py
+echo "update the version in setup.py"
+sed "s/#version#/$DIST_VERSION/g" ./setup.bak.py > ./setup.py
+rm setup.bak.py
+echo "update the version in scheduler_cli.py"
+mv ./scheduler_cli/scheduler_cli.py ./scheduler_cli/scheduler_cli.bak.py
+sed "s/#version#/$DIST_VERSION/g" ./scheduler_cli/scheduler_cli.bak.py > ./scheduler_cli/scheduler_cli.py
+rm ./scheduler_cli/scheduler_cli.bak.py
+zip -q --recurse-paths ./scheduler-cli.zip scheduler_cli/* setup.py instance-scheduler-cli-runner.py
 
 echo "Copy the scheduler cli package to $build_dist_dir"
 cp -pr ./scheduler-cli.zip $build_dist_dir/ 

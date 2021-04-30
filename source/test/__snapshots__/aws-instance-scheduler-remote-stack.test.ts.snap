@@ -3,6 +3,7 @@
 exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
 Object {
   "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "",
   "Metadata": Object {
     "AWS::CloudFormation::Interface": Object {
       "ParameterGroups": Array [
@@ -61,15 +62,13 @@ Object {
               "Effect": "Allow",
               "Principal": Object {
                 "AWS": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "arn:aws:iam::",
-                      Object {
+                  "Fn::Sub": Array [
+                    "arn:\${AWS::Partition}:iam::\${accountId}:root",
+                    Object {
+                      "accountId": Object {
                         "Ref": "InstanceSchedulerAccount",
                       },
-                      ":root",
-                    ],
+                    },
                   ],
                 },
                 "Service": "lambda.amazonaws.com",
@@ -90,7 +89,9 @@ Object {
                     "rds:StopDBInstance",
                   ],
                   "Effect": "Allow",
-                  "Resource": "arn:aws:rds:*:111111111111:snapshot:*",
+                  "Resource": Object {
+                    "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:snapshot:*",
+                  },
                 },
                 Object {
                   "Action": Array [
@@ -101,7 +102,9 @@ Object {
                     "rds:StopDBInstance",
                   ],
                   "Effect": "Allow",
-                  "Resource": "arn:aws:rds:*:111111111111:db:*",
+                  "Resource": Object {
+                    "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:db:*",
+                  },
                 },
                 Object {
                   "Action": Array [
@@ -111,7 +114,9 @@ Object {
                     "rds:StopDBCluster",
                   ],
                   "Effect": "Allow",
-                  "Resource": "arn:aws:rds:*:111111111111:cluster:*",
+                  "Resource": Object {
+                    "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:cluster:*",
+                  },
                 },
                 Object {
                   "Action": Array [
@@ -121,7 +126,9 @@ Object {
                     "ec2:DeleteTags",
                   ],
                   "Effect": "Allow",
-                  "Resource": "arn:aws:ec2:*:111111111111:instance/*",
+                  "Resource": Object {
+                    "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
+                  },
                 },
                 Object {
                   "Action": Array [
@@ -129,7 +136,6 @@ Object {
                     "rds:DescribeDBInstances",
                     "ec2:DescribeInstances",
                     "ec2:DescribeRegions",
-                    "ec2:ModifyInstanceAttribute",
                     "ssm:DescribeMaintenanceWindows",
                     "ssm:DescribeMaintenanceWindowExecutions",
                     "tag:GetResources",
@@ -145,6 +151,29 @@ Object {
         ],
       },
       "Type": "AWS::IAM::Role",
+    },
+    "Ec2ModifyInstanceAttrPolicy4B693ACF": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "ec2:ModifyInstanceAttribute",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "Ec2ModifyInstanceAttrPolicy4B693ACF",
+        "Roles": Array [
+          Object {
+            "Ref": "EC2SchedulerCrossAccountRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
   },
 }

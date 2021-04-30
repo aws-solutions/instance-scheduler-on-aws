@@ -3,7 +3,16 @@
 exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
 Object {
   "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "",
   "Mappings": Object {
+    "Send": Object {
+      "AnonymousUsage": Object {
+        "Data": "Yes",
+      },
+      "ParameterKey": Object {
+        "UniqueId": "/Solutions/aws-instance-scheduler/UUID/",
+      },
+    },
     "mappings": Object {
       "EnabledDisabled": Object {
         "No": "DISABLED",
@@ -38,7 +47,7 @@ Object {
       "ParameterGroups": Array [
         Object {
           "Label": Object {
-            "default": "Scheduler (version v1.3.3)",
+            "default": "Scheduler (version v1.4.0)",
           },
           "Parameters": Array [
             "TagName",
@@ -132,7 +141,7 @@ Object {
   },
   "Outputs": Object {
     "AccountId": Object {
-      "Description": "Account to give access to when creating cross-account access role fro cross account scenario ",
+      "Description": "Account to give access to when creating cross-account access role for cross account scenario ",
       "Value": "111111111111",
     },
     "ConfigurationTable": Object {
@@ -176,7 +185,7 @@ Object {
         "No",
       ],
       "Default": "No",
-      "Description": "Create snapshot before stopping RDS instances(does not apply to Aurora Clusters).",
+      "Description": "Create snapshot before stopping RDS instances (does not apply to Aurora Clusters).",
       "Type": "String",
     },
     "CrossAccountRoles": Object {
@@ -618,7 +627,16 @@ Object {
         "UTC",
       ],
       "Default": "UTC",
-      "Description": "Choose the default Time Zone. Default is 'UTC'",
+      "Description": "Choose the default Time Zone. Default is 'UTC'.",
+      "Type": "String",
+    },
+    "EnableSSMMaintenanceWindows": Object {
+      "AllowedValues": Array [
+        "Yes",
+        "No",
+      ],
+      "Default": "No",
+      "Description": "Enable the solution to load SSM Maintenance Windows, so that they can be used for EC2 instance Scheduling.",
       "Type": "String",
     },
     "LogRetentionDays": Object {
@@ -719,15 +737,6 @@ Object {
       "Description": "Activate or deactivate scheduling.",
       "Type": "String",
     },
-    "SendAnonymousData": Object {
-      "AllowedValues": Array [
-        "Yes",
-        "No",
-      ],
-      "Default": "Yes",
-      "Description": "Send Anonymous Metrics Data.",
-      "Type": "String",
-    },
     "StartedTags": Object {
       "Description": "Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances",
       "Type": "String",
@@ -749,7 +758,7 @@ Object {
         "No",
       ],
       "Default": "No",
-      "Description": "Enable logging of detailed informtion in CloudWatch logs.",
+      "Description": "Enable logging of detailed information in CloudWatch logs.",
       "Type": "String",
     },
     "UseCloudWatchMetrics": Object {
@@ -787,6 +796,9 @@ Object {
             "KeyType": "RANGE",
           },
         ],
+        "PointInTimeRecoverySpecification": Object {
+          "PointInTimeRecoveryEnabled": true,
+        },
         "SSESpecification": Object {
           "KMSMasterKeyId": Object {
             "Ref": "InstanceSchedulerEncryptionKey",
@@ -813,17 +825,14 @@ Object {
         "PolicyDocument": Object {
           "Statement": Array [
             Object {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Resource": "arn:aws:iam::*:role/*EC2SchedulerCross*",
-            },
-            Object {
               "Action": Array [
                 "ssm:GetParameter",
                 "ssm:GetParameters",
               ],
               "Effect": "Allow",
-              "Resource": "arn:aws:ssm:*:111111111111:parameter/*",
+              "Resource": Object {
+                "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:parameter/*",
+              },
             },
             Object {
               "Action": Array [
@@ -832,7 +841,6 @@ Object {
                 "rds:DescribeDBInstances",
                 "ec2:DescribeInstances",
                 "ec2:DescribeRegions",
-                "ec2:ModifyInstanceAttribute",
                 "cloudwatch:PutMetricData",
                 "ssm:DescribeMaintenanceWindows",
                 "tag:GetResources",
@@ -849,7 +857,9 @@ Object {
               ],
               "Effect": "Allow",
               "Resource": Array [
-                "arn:aws:logs:eu-west-1:111111111111:log-group:/aws/lambda/*",
+                Object {
+                  "Fn::Sub": "arn:\${AWS::Partition}:logs:\${AWS::Region}:\${AWS::AccountId}:log-group:/aws/lambda/*",
+                },
                 Object {
                   "Fn::GetAtt": Array [
                     "SchedulerLogGroup",
@@ -862,6 +872,36 @@ Object {
           "Version": "2012-10-17",
         },
         "PolicyName": "EC2DynamoDBPolicy",
+        "Roles": Array [
+          Object {
+            "Ref": "SchedulerRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "Ec2PermissionsB6E87802": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "ec2:ModifyInstanceAttribute",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
+              },
+            },
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::Sub": "arn:\${AWS::Partition}:iam::*:role/*EC2SchedulerCross*",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "Ec2PermissionsB6E87802",
         "Roles": Array [
           Object {
             "Ref": "SchedulerRole",
@@ -959,7 +999,18 @@ Object {
     },
     "InstanceSchedulerEncryptionKeyAlias": Object {
       "Properties": Object {
-        "AliasName": "alias/instance-scheduler-encryption-key",
+        "AliasName": Object {
+          "Fn::Join": Array [
+            "",
+            Array [
+              "alias/",
+              Object {
+                "Ref": "AWS::StackName",
+              },
+              "-instance-scheduler-encryption-key",
+            ],
+          ],
+        },
         "TargetKeyId": Object {
           "Fn::GetAtt": Array [
             "InstanceSchedulerEncryptionKey",
@@ -971,11 +1022,11 @@ Object {
     },
     "InstanceSchedulerSnsTopic": Object {
       "Properties": Object {
-        "DisplayName": Object {
-          "Ref": "AWS::StackName",
-        },
         "KmsMasterKeyId": Object {
-          "Ref": "InstanceSchedulerEncryptionKey",
+          "Fn::GetAtt": Array [
+            "InstanceSchedulerEncryptionKey",
+            "Arn",
+          ],
         },
       },
       "Type": "AWS::SNS::Topic",
@@ -983,7 +1034,9 @@ Object {
     "Main": Object {
       "DependsOn": Array [
         "EC2DynamoDBPolicy",
+        "Ec2PermissionsB6E87802",
         "SchedulerPolicy",
+        "SchedulerRDSPolicy2E7C328A",
         "SchedulerRoleDefaultPolicy66F774B8",
         "SchedulerRole",
       ],
@@ -991,8 +1044,16 @@ Object {
         "cfn_nag": Object {
           "rules_to_suppress": Array [
             Object {
+              "id": "W89",
+              "reason": "This Lambda function does not need to access any resource provisioned within a VPC.",
+            },
+            Object {
               "id": "W58",
-              "reason": "Lambda functions has the required permission to write CloudWatch Logs. It uses custom policy instead of arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole with more tighter permissions.",
+              "reason": "This Lambda function has permission provided to write to CloudWatch logs using the iam roles.",
+            },
+            Object {
+              "id": "W92",
+              "reason": "Lambda function is only used by the event rule periodically, concurrent calls are very limited.",
             },
           ],
         },
@@ -1000,9 +1061,9 @@ Object {
       "Properties": Object {
         "Code": Object {
           "S3Bucket": "solutions-eu-west-1",
-          "S3Key": "aws-instance-scheduler/v1.3.3/instance-scheduler.zip",
+          "S3Key": "aws-instance-scheduler/v1.4.0/instance-scheduler.zip",
         },
-        "Description": "EC2 and RDS instance scheduler, version v1.3.3",
+        "Description": "EC2 and RDS instance scheduler, version v1.4.0",
         "Environment": Object {
           "Variables": Object {
             "ACCOUNT": "111111111111",
@@ -1012,6 +1073,15 @@ Object {
             },
             "DDB_TABLE_NAME": Object {
               "Ref": "StateTable",
+            },
+            "ENABLE_SSM_MAINTENANCE_WINDOWS": Object {
+              "Fn::FindInMap": Array [
+                "mappings",
+                "TrueFalse",
+                Object {
+                  "Ref": "EnableSSMMaintenanceWindows",
+                },
+              ],
             },
             "ENV_BOTO_RETRY_LOGGING": "FALSE",
             "ISSUES_TOPIC_ARN": Object {
@@ -1033,13 +1103,16 @@ Object {
             "SCHEDULER_FREQUENCY": Object {
               "Ref": "SchedulerFrequency",
             },
-            "SCHEDULER_RULE": "aws-instance-schedulerscheduling_rule",
             "SEND_METRICS": Object {
               "Fn::FindInMap": Array [
                 "mappings",
                 "TrueFalse",
                 Object {
-                  "Ref": "SendAnonymousData",
+                  "Fn::FindInMap": Array [
+                    "Send",
+                    "AnonymousUsage",
+                    "Data",
+                  ],
                 },
               ],
             },
@@ -1050,9 +1123,13 @@ Object {
                 "MetricsSolutionId",
               ],
             },
+            "STACK_ID": Object {
+              "Ref": "AWS::StackId",
+            },
             "STACK_NAME": Object {
               "Ref": "AWS::StackName",
             },
+            "START_EC2_BATCH_SIZE": "5",
             "STATE_TABLE": Object {
               "Ref": "StateTable",
             },
@@ -1076,8 +1153,16 @@ Object {
                   Object {
                     "Ref": "AWS::StackName",
                   },
-                  "-v1.3.3",
+                  "-v1.4.0",
                 ],
+              ],
+            },
+            "USER_AGENT_EXTRA": "AwsSolution/SO0030/v1.4.0",
+            "UUID_KEY": Object {
+              "Fn::FindInMap": Array [
+                "Send",
+                "ParameterKey",
+                "UniqueId",
               ],
             },
           },
@@ -1105,6 +1190,9 @@ Object {
         },
         "Runtime": "python3.7",
         "Timeout": 300,
+        "TracingConfig": Object {
+          "Mode": "Active",
+        },
       },
       "Type": "AWS::Lambda::Function",
     },
@@ -1116,6 +1204,10 @@ Object {
             "AttributeName": "Name",
             "AttributeType": "S",
           },
+          Object {
+            "AttributeName": "account-region",
+            "AttributeType": "S",
+          },
         ],
         "BillingMode": "PAY_PER_REQUEST",
         "KeySchema": Array [
@@ -1123,7 +1215,14 @@ Object {
             "AttributeName": "Name",
             "KeyType": "HASH",
           },
+          Object {
+            "AttributeName": "account-region",
+            "KeyType": "RANGE",
+          },
         ],
+        "PointInTimeRecoverySpecification": Object {
+          "PointInTimeRecoveryEnabled": true,
+        },
         "SSESpecification": Object {
           "KMSMasterKeyId": Object {
             "Ref": "InstanceSchedulerEncryptionKey",
@@ -1165,6 +1264,15 @@ Object {
         "default_timezone": Object {
           "Ref": "DefaultTimezone",
         },
+        "enable_SSM_maintenance_windows": Object {
+          "Fn::FindInMap": Array [
+            "mappings",
+            "TrueFalse",
+            Object {
+              "Ref": "EnableSSMMaintenanceWindows",
+            },
+          ],
+        },
         "log_retention_days": Object {
           "Ref": "LogRetentionDays",
         },
@@ -1203,7 +1311,7 @@ Object {
             },
           ],
         },
-        "stack_version": "v1.3.3",
+        "stack_version": "v1.4.0",
         "started_tags": Object {
           "Ref": "StartedTags",
         },
@@ -1238,6 +1346,16 @@ Object {
     },
     "SchedulerLogGroup": Object {
       "DeletionPolicy": "Delete",
+      "Metadata": Object {
+        "cfn_nag": Object {
+          "rules_to_suppress": Array [
+            Object {
+              "id": "W84",
+              "reason": "CloudWatch log groups only have transactional data from the Lambda function, this template has to be supported in gov cloud which doesn't yet have the feature to provide kms key id to cloudwatch log group.",
+            },
+          ],
+        },
+      },
       "Properties": Object {
         "LogGroupName": Object {
           "Fn::Join": Array [
@@ -1263,15 +1381,6 @@ Object {
           "Statement": Array [
             Object {
               "Action": Array [
-                "rds:DeleteDBSnapshot",
-                "rds:DescribeDBSnapshots",
-                "rds:StopDBInstance",
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:rds:*:111111111111:snapshot:*",
-            },
-            Object {
-              "Action": Array [
                 "rds:AddTagsToResource",
                 "rds:RemoveTagsFromResource",
                 "rds:DescribeDBSnapshots",
@@ -1279,7 +1388,9 @@ Object {
                 "rds:StopDBInstance",
               ],
               "Effect": "Allow",
-              "Resource": "arn:aws:rds:*:111111111111:db:*",
+              "Resource": Object {
+                "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:db:*",
+              },
             },
             Object {
               "Action": Array [
@@ -1289,7 +1400,9 @@ Object {
                 "ec2:DeleteTags",
               ],
               "Effect": "Allow",
-              "Resource": "arn:aws:ec2:*:111111111111:instance/*",
+              "Resource": Object {
+                "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
+              },
             },
             Object {
               "Action": "sns:Publish",
@@ -1302,16 +1415,7 @@ Object {
               "Action": "lambda:InvokeFunction",
               "Effect": "Allow",
               "Resource": Object {
-                "Fn::Join": Array [
-                  "",
-                  Array [
-                    "arn:aws:lambda:eu-west-1:111111111111:function:",
-                    Object {
-                      "Ref": "AWS::StackName",
-                    },
-                    "-InstanceSchedulerMain",
-                  ],
-                ],
+                "Fn::Sub": "arn:\${AWS::Partition}:lambda:\${AWS::Region}:\${AWS::AccountId}:function:\${AWS::StackName}-InstanceSchedulerMain",
               },
             },
             Object {
@@ -1327,6 +1431,33 @@ Object {
                 ],
               },
             },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "SchedulerPolicy",
+        "Roles": Array [
+          Object {
+            "Ref": "SchedulerRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "SchedulerRDSPolicy2E7C328A": Object {
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": Array [
+                "rds:DeleteDBSnapshot",
+                "rds:DescribeDBSnapshots",
+                "rds:StopDBInstance",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:snapshot:*",
+              },
+            },
             Object {
               "Action": Array [
                 "rds:AddTagsToResource",
@@ -1335,12 +1466,14 @@ Object {
                 "rds:StopDBCluster",
               ],
               "Effect": "Allow",
-              "Resource": "arn:aws:rds:*:111111111111:cluster:*",
+              "Resource": Object {
+                "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:cluster:*",
+              },
             },
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "SchedulerPolicy",
+        "PolicyName": "SchedulerRDSPolicy2E7C328A",
         "Roles": Array [
           Object {
             "Ref": "SchedulerRole",
@@ -1371,9 +1504,27 @@ Object {
       "Type": "AWS::IAM::Role",
     },
     "SchedulerRoleDefaultPolicy66F774B8": Object {
+      "Metadata": Object {
+        "cfn_nag": Object {
+          "rules_to_suppress": Array [
+            Object {
+              "id": "W12",
+              "reason": "Lambda needs the following minimum required permissions to send trace data to X-Ray and access ENIs in a VPC.",
+            },
+          ],
+        },
+      },
       "Properties": Object {
         "PolicyDocument": Object {
           "Statement": Array [
+            Object {
+              "Action": Array [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
             Object {
               "Action": Array [
                 "dynamodb:BatchGetItem",
@@ -1382,6 +1533,7 @@ Object {
                 "dynamodb:Query",
                 "dynamodb:GetItem",
                 "dynamodb:Scan",
+                "dynamodb:ConditionCheckItem",
                 "dynamodb:BatchWriteItem",
                 "dynamodb:PutItem",
                 "dynamodb:UpdateItem",
@@ -1425,6 +1577,16 @@ Object {
                 },
               ],
             },
+            Object {
+              "Action": Array [
+                "ssm:PutParameter",
+                "ssm:GetParameter",
+              ],
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::Sub": "arn:\${AWS::Partition}:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/Solutions/aws-instance-scheduler/UUID/*",
+              },
+            },
           ],
           "Version": "2012-10-17",
         },
@@ -1439,8 +1601,7 @@ Object {
     },
     "SchedulerRule": Object {
       "Properties": Object {
-        "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version v1.3.3",
-        "Name": "aws-instance-schedulerscheduling_rule",
+        "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version v1.4.0",
         "ScheduleExpression": Object {
           "Fn::FindInMap": Array [
             "mappings",
@@ -1497,6 +1658,9 @@ Object {
             "KeyType": "RANGE",
           },
         ],
+        "PointInTimeRecoverySpecification": Object {
+          "PointInTimeRecoveryEnabled": true,
+        },
         "SSESpecification": Object {
           "KMSMasterKeyId": Object {
             "Ref": "InstanceSchedulerEncryptionKey",
@@ -1508,7 +1672,7 @@ Object {
       "Type": "AWS::DynamoDB::Table",
       "UpdateReplacePolicy": "Delete",
     },
-    "instanceschedulerlambdaLambdaFunctionLambdaInvokePermissionB1734834": Object {
+    "instanceschedulerlambdaLambdaFunctionAwsEventsLambdaInvokePermission1F8E87DF9": Object {
       "Properties": Object {
         "Action": "lambda:InvokeFunction",
         "FunctionName": Object {
@@ -1556,7 +1720,11 @@ Object {
                     "Fn::Join": Array [
                       "",
                       Array [
-                        "arn:aws:logs:",
+                        "arn:",
+                        Object {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":logs:",
                         Object {
                           "Ref": "AWS::Region",
                         },

@@ -23,6 +23,7 @@ source_dir="$source_template_dir/../source"
 github_dir="$source_template_dir/../.github"
 dist_template_dir="$dist_dir/deployment"
 
+
 echo "------------------------------------------------------------------------------"
 echo "[Init] Remove any old dist files from previous runs"
 echo "------------------------------------------------------------------------------"

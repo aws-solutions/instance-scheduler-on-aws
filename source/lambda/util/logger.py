@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -17,7 +17,7 @@ from datetime import datetime
 
 import boto_retry
 
-LOG_FORMAT = "{:0>4d}-{:0>2d}-{:0>2d} - {:0>2d}:{:0>2d}:{:0>2d}.{:0>3s} - {:7s} : {}"
+LOG_FORMAT = "{:7s} : {}"
 
 ENV_LOG_GROUP = "LOG_GROUP"
 ENV_ISSUES_TOPIC_ARN = "ISSUES_TOPIC_ARN"
@@ -80,9 +80,7 @@ class Logger:
 
         s = msg if len(args) == 0 else msg.format(*args)
         t = time.time()
-        dt = datetime.fromtimestamp(t)
-        s = LOG_FORMAT.format(dt.year, dt.month, dt.day, dt.hour, dt.minute,
-                              dt.second, str(dt.microsecond)[0:3], level, s)
+        s = LOG_FORMAT.format(level, s)
 
         if self._cached_size + (len(s) + LOG_ENTRY_ADDITIONAL) > LOG_MAX_BATCH_SIZE:
             self.flush()

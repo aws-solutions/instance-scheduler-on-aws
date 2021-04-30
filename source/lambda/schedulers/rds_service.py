@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -455,4 +455,4 @@ class RdsService:
             except Exception as ex:
                 self._logger.error(ERR_STARTING_INSTANCE, "cluster" if rds_resource.is_cluster else "instance",
                                    rds_resource.instance_str, str(ex))
-                return
+        return

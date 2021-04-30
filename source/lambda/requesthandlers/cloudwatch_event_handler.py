@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -147,9 +147,7 @@ class CloudWatchEventHandler:
         Handler for cloudwatch event to run the scheduler
         :return: True
         """
-
-        return event.get("detail-type", "") == "Scheduled Event" and \
-               (os.getenv(configuration.ENV_SCHEDULER_RULE)== event.get("resources", ["/"])[0].split("/")[-1])
+        return event.get("detail-type", "") == "Scheduled Event"
 
     def _configuration_level_partitions(self, level=TOP_LEVEL):
 

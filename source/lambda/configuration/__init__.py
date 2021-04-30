@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -24,6 +24,7 @@ ENV_STACK = "STACK_NAME"
 ENV_TAG_NAME = "TAG_NAME"
 ENV_SCHEDULE_FREQUENCY = "SCHEDULER_FREQUENCY"
 ENV_TRACE = "TRACE"
+ENV_ENABLE_SSM_MAINTENANCE_WINDOWS = "ENABLE_SSM_MAINTENANCE_WINDOWS"
 ENV_USER_AGENT = "USER_AGENT"
 ENV_SCHEDULER_RULE = "SCHEDULER_RULE"
 
@@ -46,6 +47,9 @@ TIME_FORMAT_STRING = "%H:%M"
 
 # trace flag
 TRACE = "trace"
+
+# enable SSM maintenance windows
+ENABLE_SSM_MAINTENANCE_WINDOWS = "enable_SSM_maintenance_windows"
 
 # metrics flag
 METRICS = "use_metrics"

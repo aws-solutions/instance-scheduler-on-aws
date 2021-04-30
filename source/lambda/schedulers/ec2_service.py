@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -16,6 +16,7 @@ import time
 from datetime import timedelta, datetime, timezone
 import dateutil
 import jmespath
+import pytz
 from botocore.exceptions import ClientError
 
 import configuration
@@ -25,6 +26,7 @@ from boto_retry import get_client_with_retries
 from configuration import SchedulerConfigBuilder
 from configuration.instance_schedule import InstanceSchedule
 from configuration.running_period import RunningPeriod
+from boto3.dynamodb.conditions import Key
 
 # instances are started in batches, larger bathes are more efficient but smaller batches allow more instances
 # to start if we run into resource limits
@@ -102,14 +104,15 @@ class Ec2Service:
         if len(instance_buffer) > 0:
             yield instance_buffer
 
-    def get_ssm_windows_service(self):
+    def get_ssm_windows_service(self, session, context, account, region):
         """
         This function gets all the ssm windows which are enabled from SSM service.
 
         Returns:
             list of ssm windows
         """
-        ssm_client = boto3.client('ssm')
+        ssm_client = get_client_with_retries("ssm", ["describe_maintenance_windows"], context=context, session=session,
+                                         region=region)
         resp_maintenance_windows = {}
         try:
             resp_maintenance_windows = ssm_client.describe_maintenance_windows(
@@ -143,17 +146,19 @@ class Ec2Service:
                 self._logger.error("Caught Exception while getting the maintenance window: {}".format(error))
             next_token = resp_maintenance_windows.get('NextToken', None)
             ssm_window_list.extend(resp_maintenance_windows.get('WindowIdentities', []))
-
         return ssm_window_list
 
-    def get_ssm_windows_db(self):
+    def get_ssm_windows_db(self, account, region):
         """
         This function gets all the periods for a given ssm windows from the database.
         """
-
         maintenance_windows = {}
+        accountRegionString = account + ":" + region
         try:
-            maintenance_windows = self.maintenance_table.scan()
+            scan_kwargs = {
+                'FilterExpression': Key('account-region').eq(accountRegionString),
+            }
+            maintenance_windows = self.maintenance_table.scan(**scan_kwargs)
         except Exception as error:
             self._logger.error("Caught Exception while getting maintenance windows from Dynamodb: {}".format(error))
         window_list = maintenance_windows.get('Items', [])
@@ -161,15 +166,18 @@ class Ec2Service:
         while last_evaluated_key is not None:
             self._logger.debug(maintenance_windows['LastEvaluatedKey'])
             try:
-                maintenance_windows = self.maintenance_table.scan(ExclusiveStartKey=last_evaluated_key)
+                scan_kwargs = {
+                    'FilterExpression': Key('account-region').eq(accountRegionString),
+                    'ExclusiveStartKey': last_evaluated_key
+                }
+                maintenance_windows = self.maintenance_table.scan(**scan_kwargs)
             except Exception as error:
                 self._logger.error("Caught Exception while getting maintenance windows from Dynamodb: {}".format(error))
             last_evaluated_key = maintenance_windows.get('LastEvaluatedKey', None)
             window_list.extend(maintenance_windows.get('Items', []))
-
         return window_list
 
-    def process_ssm_window(self, window, ssm_windows_db):
+    def process_ssm_window(self, window, ssm_windows_db, account, region):
         """
         This function checks if the window is enabled before adding it to the db and update the db for disabled windows.
 
@@ -184,11 +192,11 @@ class Ec2Service:
                 current_window = window_db  # get the window from the db with the same name as the window from service
                 break
         if current_window.get('Name') is None:
-            self.put_window_dynamodb(window)
+            self.put_window_dynamodb(window, account, region)
             new_ssm_window = window
         else:
             if not self.check_window_running(current_window):
-                self.put_window_dynamodb(window)
+                self.put_window_dynamodb(window, account, region)
 
         return new_ssm_window
 
@@ -199,38 +207,53 @@ class Ec2Service:
         Parameters:
             SSM window object
         """
+        try:
+            duration = window['Duration']
+            if 'ScheduleTimezone' in window:
+                execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%M%z")
+            else:
+                execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%MZ")
+                window['ScheduleTimezone'] = "UTC"
 
-        duration = window['Duration']
-        execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%MZ")
-        window_begin_time = execution_time.replace(tzinfo=timezone.utc)
-        window_end_time = execution_time.replace(tzinfo=timezone.utc) + timedelta(hours=int(duration))
-        current_time = datetime.now().replace(tzinfo=timezone.utc)
+            tz = pytz.timezone(window['ScheduleTimezone'])    
+            window_begin_time = execution_time.replace(tzinfo=tz)
+            window_end_time = execution_time.replace(tzinfo=tz) + timedelta(hours=int(duration))
+            current_time = datetime.now(tz).replace(tzinfo=tz)
+            return window_begin_time < current_time < window_end_time
+        except Exception as ex:
+            self._logger.error("error in check_window_running {}".format(ex))
+            return False
 
-        return window_begin_time < current_time < window_end_time
-
-    def put_window_dynamodb(self, window):
+    def put_window_dynamodb(self, window, account, region):
         """
         This function adds the ssm window entry to the database.
 
         Parameters:
             SSM window object
         """
-        duration = window['Duration']
-        execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%MZ")
-        ttl = execution_time.replace(tzinfo=timezone.utc) + timedelta(hours=int(duration))
-        epoch_time_to_live = int(datetime(ttl.year, ttl.month, ttl.day, ttl.hour, ttl.minute).timestamp())
         try:
+            duration = window['Duration']
+            if 'ScheduleTimezone' in window:
+                execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%M%z")
+            else:
+                execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%MZ")
+                window['ScheduleTimezone'] = "UTC"
+
+            ttl = execution_time + timedelta(hours=int(duration))
+            epoch_time_to_live = int(datetime(ttl.year, ttl.month, ttl.day, ttl.hour, ttl.minute).timestamp())
             self.maintenance_table.put_item(
                 Item={
                     'Name': window['Name'],
                     'NextExecutionTime': window['NextExecutionTime'],
                     'Duration': window['Duration'],
                     'WindowId': window['WindowId'],
-                    'TimeToLive': epoch_time_to_live
+                    'TimeToLive': epoch_time_to_live,
+                    'account-region': account + ":" + region,
+                    'ScheduleTimezone': window['ScheduleTimezone']
                 }
             )
         except Exception as error:
-            self._logger.error("Caught Exception while putting maintenance window in Dynamodb: {}".format(error))
+            self._logger.info("Unable to put maintenance window in Dynamodb: {}".format(error))
 
     def remove_unused_windows(self, window_db, ssm_windows_service):
         """
@@ -243,20 +266,20 @@ class Ec2Service:
                 break
         if not window_found:
             try:  # if window from db is not found in the SSM response delete the entry from db
-                self.maintenance_table.delete_item(Key={'Name': window_db['Name']})
+                self.maintenance_table.delete_item(Key={'Name': window_db['Name'], 'account-region': window_db['account-region']})
             except Exception as error:
                 self._logger.error\
                     ("Caught Exception while deleting maintenance windows from Dynamodb: {}".format(error))
 
-    def get_ssm_windows(self):
+    def get_ssm_windows(self, session, context, account, region):
         """
         This function gets the list of the SSM maintenance windows
         """
         new_ssm_windows_list = []
-        ssm_windows_service = self.get_ssm_windows_service()
-        ssm_windows_db = self.get_ssm_windows_db()
+        ssm_windows_service = self.get_ssm_windows_service(session, context, account, region)
+        ssm_windows_db = self.get_ssm_windows_db(account, region)
         for window_service in ssm_windows_service:
-            new_maintenance_window = self.process_ssm_window(window_service, ssm_windows_db)
+            new_maintenance_window = self.process_ssm_window(window_service, ssm_windows_db, account, region)
             if new_maintenance_window:
                 new_ssm_windows_list.append(new_maintenance_window)
         for window_db in ssm_windows_db:
@@ -265,12 +288,12 @@ class Ec2Service:
             ssm_windows_db.append(window)
         return ssm_windows_db
 
-    @property
-    def ssm_maintenance_windows(self):
+
+    def ssm_maintenance_windows(self, session, context, account, region):
         if self._ssm_maintenance_windows is None:
             self._ssm_maintenance_windows = {}
             try:
-                window_list = self.get_ssm_windows()
+                window_list = self.get_ssm_windows(session, context, account, region)
                 for window in window_list:
                     start = dateutil.parser.parse(window["NextExecutionTime"])
                     scheduler_timezone = window.get("ScheduleTimezone", "UTC")
@@ -297,6 +320,13 @@ class Ec2Service:
         config = kwargs[schedulers.PARAM_CONFIG]
 
         self.schedules_with_hibernation = [s.name for s in config.schedules.values() if s.hibernate]
+
+        self._logger.info("Enable SSM Maintenance window is set to {}", config.enable_SSM_maintenance_windows)
+        if config.enable_SSM_maintenance_windows: 
+            # calling the get maintenance window for this account and region.
+            self._logger.debug("load the ssm maintenance windows for account {}, and region {}", account, region)
+            self._ssm_maintenance_windows = self.ssm_maintenance_windows(self._session, context, account, region)
+            self._logger.debug("finish loading the ssm maintenance windows")
 
         client = get_client_with_retries("ec2", ["describe_instances"], context=context, session=self._session,
                                          region=region)
@@ -443,7 +473,7 @@ class Ec2Service:
         schedule = config.schedules.get(schedule_name, None)
         if schedule is not None:
             if schedule.use_maintenance_window and schedule.ssm_maintenance_window not in [None, ""]:
-                maintenance_window_schedule = self.ssm_maintenance_windows.get(schedule.ssm_maintenance_window, None)
+                maintenance_window_schedule = self._ssm_maintenance_windows.get(schedule.ssm_maintenance_window, None)
                 if maintenance_window_schedule is None:
                     self._logger.error(ERR_MAINT_WINDOW_NOT_FOUND_OR_DISABLED, schedule.ssm_maintenance_window,
                                        schedule.name)
@@ -607,6 +637,12 @@ class Ec2Service:
                           t["Key"] not in start_tags_key_names]
         client = get_client_with_retries("ec2", ["start_instances", "describe_instances", "create_tags", "delete_tags"],
                                          context=self._context, session=self._session, region=self._region)
+
+        if os.environ['START_EC2_BATCH_SIZE'] is not None:
+            try:
+                START_BATCH_SIZE = int(os.environ['START_EC2_BATCH_SIZE'])
+            except Exception as ex:
+                self._logger.info(ex)
 
         for instance_batch in self.instance_batches(instances_to_start, START_BATCH_SIZE):
 

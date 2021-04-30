@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -150,10 +150,11 @@ def get_client_with_retries(service_name, methods, context=None, region=None, se
     if region is not None:
         args["region_name"] = region
 
-    user_agent = os.getenv("USER_AGENT", None)
-    if user_agent is not None:
-        session_config = botocore.config.Config(user_agent=user_agent)
-        args["config"] = session_config
+    user_agent_extra_string = os.getenv("USER_AGENT_EXTRA", None)
+    if user_agent_extra_string is not None:
+        solution_config = {"user_agent_extra": user_agent_extra_string}
+        config = botocore.config.Config(**solution_config) 
+        args["config"] = config
 
     aws_session = session if session is not None else boto3.Session()
 

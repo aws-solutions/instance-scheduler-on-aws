@@ -1,5 +1,5 @@
 ######################################################################################################################
-#  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
+#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           #
 #                                                                                                                    #
 #  Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance     #
 #  with the License. A copy of the License is located at                                                             #
@@ -14,6 +14,7 @@
 import json
 import os
 import re
+import pytz
 from datetime import datetime, timedelta
 
 import boto3
@@ -154,6 +155,7 @@ class ConfigAdmin:
                             configuration.SCHEDULE_LAMBDA_ACCOUNT,
                             configuration.TAGNAME,
                             configuration.TRACE,
+                            configuration.ENABLE_SSM_MAINTENANCE_WINDOWS,
                             ConfigAdmin.TYPE_ATTR,
                             configuration.SCHEDULED_SERVICES,
                             configuration.SCHEDULE_CLUSTERS,
@@ -191,6 +193,7 @@ class ConfigAdmin:
             # make sure these fields are valid booleans
             if attr in [configuration.METRICS,
                         configuration.TRACE,
+                        configuration.ENABLE_SSM_MAINTENANCE_WINDOWS,
                         configuration.SCHEDULE_LAMBDA_ACCOUNT,
                         configuration.CREATE_RDS_SNAPSHOT,
                         configuration.SCHEDULE_CLUSTERS]:
@@ -388,22 +391,28 @@ class ConfigAdmin:
         """
         if name is None or len(name) == 0:
             raise ValueError(ERR_GET_USAGE_SCHEDULE_NAME_EMPTY)
+        
+        schedule = self.configuration.get_schedule(name)
+        if schedule is None:
+            raise ValueError(ERR_GET_USAGE_SCHEDULE_NOT_FOUND.format(name))
+
         if startdate:
             if not isinstance(startdate, datetime):
                 try:
-                    start = datetime.strptime(startdate, "%Y%m%d")
+                    start = datetime.strptime(startdate, "%Y%m%d").replace(tzinfo=pytz.timezone(schedule.timezone))
                 except ValueError as ex:
                     raise ValueError(
                         ERR_GET_USAGE_INVALID_START_DATE.format(startdate, str(ex)))
             else:
                 start = startdate
         else:
-            start = startdate or datetime.now()
+            tz = pytz.timezone(schedule.timezone)
+            start = startdate or datetime.now(tz)
 
         if enddate:
             if not isinstance(enddate, datetime):
                 try:
-                    end = datetime.strptime(enddate, "%Y%m%d")
+                    end = datetime.strptime(enddate, "%Y%m%d").replace(tzinfo=pytz.timezone(schedule.timezone))
                 except ValueError as ex:
                     raise ValueError(
                         ERR_GET_USAGE_INVALID_END_DATE.format(enddate, str(ex)))
@@ -415,9 +424,6 @@ class ConfigAdmin:
         if start > end:
             raise ValueError(ERR_GET_USAGE_START_MUST_BE_LESS_OR_EQUAL_STOP)
 
-        schedule = self.configuration.get_schedule(name)
-        if schedule is None:
-            raise ValueError(ERR_GET_USAGE_SCHEDULE_NOT_FOUND.format(name))
         periods = self.calculate_schedule_usage_for_period(name, start_dt=start, stop_dt=end)
 
         # to json and back again using custom encoder to convert datetimes
