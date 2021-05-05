@@ -86,7 +86,7 @@ class ConfigAdmin:
     # regex for checking time formats H:MM and HH:MM
     TIME_REGEX = "^([0|1]?[0-9]|2[0-3]):[0-5][0-9]$"
 
-    SUPPORTED_SERVICES = ["ec2", "rds"]
+    SUPPORTED_SERVICES = ["ec2", "rds", "docdb"]
 
     class CustomEncoder(json.JSONEncoder):
         """
