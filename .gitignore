@@ -110,6 +110,7 @@ ENV/
 deployment/open-source
 deployment/dist
 source/deploy
+source/package-lock.json
 
 .env
 source/code/sample_events
