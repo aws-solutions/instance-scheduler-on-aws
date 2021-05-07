@@ -96,7 +96,7 @@ class DocDbService:
             args = {
                 "TagFilters": [{"Key": self._tagname}],
                 "ResourcesPerPage": 50,
-                "ResourceTypeFilters": ["rds:cluster"]  #TODO: validate if TypeFilter should be docdb or rds
+                "ResourceTypeFilters": ["rds:cluster"]
             }
 
             self._instance_tags = {}

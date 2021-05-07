@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #=======================================================================================================================
 # This script can be used to locally build, test, and deploy the AWS Instance Scheduler code outside of a bamboo pipeline.
 # It follows the steps describd in AWS' README.md file as well as basic deployment steps from the corresponding
@@ -22,7 +22,7 @@
 globalBucketName="a0050155-instance-scheduler-poc"
 regionalBucketName="a0050155-instance-scheduler-poc-us-east-1"
 instanceSchedulerName="stratus-scheduler-poc"
-version="00007"
+version="00007.1"
 stackName="stratus-scheduler-poc-stack"
 
 runStackAction() { 
@@ -42,6 +42,19 @@ runStackAction() {
   --profile saml \
   --capabilities CAPABILITY_IAM
 }
+
+# 
+aws --profile saml codestar list-user-profiles > /dev/null 2>&1
+if [ $? != 0 ]; then
+  echo "Generate AWS SAML credentials and try again."
+  exit 1
+fi 
+
+python --version | grep 'Python 3' > /dev/null 2>&1
+if [ $? != 0 ]; then
+  echo "Switch to Python 3 and try again"
+  exit 1
+fi 
 
 ### BUILD
 ## Execute build script

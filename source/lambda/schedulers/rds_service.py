@@ -239,7 +239,6 @@ class RdsService:
                 self._logger.debug(DEBUG_READ_REPLICA_SOURCE, db_id, ",".join(rds_inst["ReadReplicaDBInstanceIdentifiers"]))
                 return False
 
-            # updated this to ignore the docdb engine type
             if rds_inst["Engine"] in ["aurora"] or rds_inst["Engine"] in ["docdb"]:
                 return False
 
@@ -268,7 +267,6 @@ class RdsService:
                 self._logger.debug(DEBUG_NO_SCHEDULE_TAG, cluster_inst, self._tagname)
                 return False
 
-            # added this to ignore the docdb engine type
             if cluster_inst["Engine"] in ["docdb"]:
                 return False
 
