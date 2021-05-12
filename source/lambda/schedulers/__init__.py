@@ -12,6 +12,7 @@
 ######################################################################################################################
 from schedulers.ec2_service import Ec2Service
 from schedulers.rds_service import RdsService
+from schedulers.docdb_service import DocDbService
 
 INST_ALLOW_RESIZE = "allow_resize"
 INST_RESIZED = "resized"
@@ -55,7 +56,8 @@ PARAM_CLUSTERS = "clusters"
 
 SCHEDULER_TYPES = {
     "ec2": Ec2Service,
-    "rds": RdsService
+    "rds": RdsService,
+    "docdb": DocDbService
 }
 
 

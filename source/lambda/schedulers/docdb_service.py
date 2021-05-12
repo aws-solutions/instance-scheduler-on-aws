@@ -11,9 +11,6 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
-import copy
-import re
-
 import schedulers
 import re
 import copy
@@ -24,44 +21,40 @@ from configuration.running_period import RunningPeriod
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
 from configuration.setbuilders.weekday_setbuilder import WeekdaySetBuilder
 
-RESTRICTED_RDS_TAG_VALUE_SET_CHARACTERS = r"[^a-zA-Z0-9\s_\.:+/=\\@-]"
+RESTRICTED_DOCDB_TAG_VALUE_SET_CHARACTERS = r"[^a-zA-Z0-9\s_\.:+/=\\@-]"
 
-ERR_STARTING_INSTANCE = "Error starting rds {} {} ({})"
-ERR_STOPPING_INSTANCE = "Error stopping rds {} {}, ({})"
-ERR_DELETING_SNAPSHOT = "Error deleting snapshot {}"
+ERR_STARTING_INSTANCE = "Error starting docdb {} {} ({})"
+ERR_STOPPING_INSTANCE = "Error stopping docdb {} {}, ({})"
 
-INF_ADD_TAGS = "Adding {} tags {} to instance {}"
-INF_DELETE_SNAPSHOT = "Deleted previous snapshot {}"
-INF_FETCHED = "Number of fetched rds {} is {}, number of schedulable  resources is {}"
-INF_FETCHING_RESOURCES = "Fetching rds {} for account {} in region {}"
-INF_REMOVE_KEYS = "Removing {} key(s) {} from instance {}"
-INF_STOPPED_RESOURCE = "Stopped rds {} \"{}\""
+INF_ADD_TAGS = "Adding {} tags {} to cluster {}"
+INF_FETCHED = "Number of fetched docdb {} is {}, number of schedulable  resources is {}"
+INF_FETCHING_RESOURCES = "Fetching docdb {} for account {} in region {}"
+INF_REMOVE_KEYS = "Removing {} key(s) {} from cluster {}"
+INF_STOPPED_RESOURCE = "Stopped docdb {} \"{}\""
 
-DEBUG_READ_REPLICA = "Can not schedule rds instance \"{}\" because it is a read replica of instance {}"
-DEBUG_READ_REPLICA_SOURCE = "Can not schedule rds instance \"{}\" because it is the source for read copy instance(s) {}"
-DEBUG_SKIPPING_INSTANCE = "Skipping rds {} {} because it is not in a start or stop-able state ({})"
-DEBUG_WITHOUT_SCHEDULE = "Skipping rds {} {} without schedule"
-DEBUG_SELECTED = "Selected rds instance {} in state ({}) for schedule {}"
-DEBUG_NO_SCHEDULE_TAG = "Instance {} has no schedule tag named {}"
+DEBUG_SKIPPING_INSTANCE = "Skipping docdb {} {} because it is not in a start or stop-able state ({})"
+DEBUG_WITHOUT_SCHEDULE = "Skipping docdb {} {} without schedule"
+DEBUG_SELECTED = "Selected docdb cluster {} in state ({}) for schedule {}"
+DEBUG_NO_SCHEDULE_TAG = "Cluster {} has no schedule tag named {}"
 
-WARN_TAGGING_STARTED = "Error setting start or stop tags to started instance {}, ({})"
-WARN_TAGGING_STOPPED = "Error setting start or stop tags to stopped instance {}, ({})"
-WARN_RDS_TAG_VALUE = "Tag value \"{}\" for tag \"{}\" changed to \"{}\" because it did contain characters that are not allowed " \
-                    "in RDS tag values. The value can only contain only the set of Unicode letters, digits, " \
+WARN_TAGGING_STARTED = "Error setting start or stop tags to started cluster {}, ({})"
+WARN_TAGGING_STOPPED = "Error setting start or stop tags to stopped cluster {}, ({})"
+WARN_DOCDB_TAG_VALUE = "Tag value \"{}\" for tag \"{}\" changed to \"{}\" because it did contain characters that are not allowed " \
+                    "in DOCDB tag values. The value can only contain only the set of Unicode letters, digits, " \
                      "white-space, '_', '.', '/', '=', '+', '-'"
 
-MAINTENANCE_SCHEDULE_NAME = "RDS preferred Maintenance Window Schedule"
-MAINTENANCE_PERIOD_NAME = "RDS preferred Maintenance Window Period"
+MAINTENANCE_SCHEDULE_NAME = "DOCDB preferred Maintenance Window Schedule"
+MAINTENANCE_PERIOD_NAME = "DOCDB preferred Maintenance Window Period"
 
 
-class RdsService:
-    RDS_STATE_AVAILABLE = "available"
-    RDS_STATE_STOPPED = "stopped"
+class DocDbService:
+    DOCDB_STATE_AVAILABLE = "available"
+    DOCDB_STATE_STOPPED = "stopped"
 
-    RDS_SCHEDULABLE_STATES = {RDS_STATE_AVAILABLE, RDS_STATE_STOPPED}
+    DOCDB_SCHEDULABLE_STATES = {DOCDB_STATE_AVAILABLE, DOCDB_STATE_STOPPED}
 
     def __init__(self):
-        self.service_name = "rds"
+        self.service_name = "docdb"
         self.allow_resize = False
         self._instance_tags = None
 
@@ -91,7 +84,7 @@ class RdsService:
         self._instance_tags = None
 
     @property
-    def rds_resource_tags(self):
+    def docdb_resource_tags(self):
 
         if self._instance_tags is None:
             tag_client = get_client_with_retries("resourcegroupstaggingapi",
@@ -103,7 +96,7 @@ class RdsService:
             args = {
                 "TagFilters": [{"Key": self._tagname}],
                 "ResourcesPerPage": 50,
-                "ResourceTypeFilters": ["rds:db", "rds:cluster"]
+                "ResourceTypeFilters": ["rds:cluster"]
             }
 
             self._instance_tags = {}
@@ -127,8 +120,8 @@ class RdsService:
     @staticmethod
     def build_schedule_from_maintenance_window(period_str):
         """
-        Builds a Instance running schedule based on an RDS preferred maintenance windows string in format ddd:hh:mm-ddd:hh:mm
-        :param period_str: rds maintenance windows string
+        Builds a Instance running schedule based on an DOCDB preferred maintenance windows string in format ddd:hh:mm-ddd:hh:mm
+        :param period_str: docdb maintenance windows string
         :return: Instance running schedule with timezone UTC
         """
 
@@ -183,7 +176,7 @@ class RdsService:
 
         self._init_scheduler(kwargs)
 
-        client = get_client_with_retries("rds", [fn_describe_name], context=self._context, session=self._session,
+        client = get_client_with_retries("docdb", [fn_describe_name], context=self._context, session=self._session,
                                          region=self._region)
 
         describe_arguments = {}
@@ -196,13 +189,13 @@ class RdsService:
         while True:
             self._logger.debug("Making {} call with parameters {}", fn_describe_name, describe_arguments)
             fn = getattr(client, fn_describe_name + "_with_retries")
-            rds_resp = fn(**describe_arguments)
-            for resource in rds_resp["DB" + resource_name]:
+            docdb_resp = fn(**describe_arguments)
+            for resource in docdb_resp["DB" + resource_name]:
                 number_of_resources += 1
 
                 if fn_is_schedulable(resource):
 
-                    resource_data = self._select_resource_data(rds_resource=resource, is_cluster=resource_name == "Clusters")
+                    resource_data = self._select_resource_data(docdb_resource=resource, is_cluster=resource_name == "Clusters")
 
                     schedule_name = resource_data[schedulers.INST_SCHEDULE]
                     if schedule_name not in [None, ""]:
@@ -212,62 +205,29 @@ class RdsService:
                         resources.append(resource_data)
                     else:
                         self._logger.debug(DEBUG_WITHOUT_SCHEDULE, resource_name[:-1], resource_data[schedulers.INST_ID])
-            if "Marker" in rds_resp:
-                describe_arguments["Marker"] = rds_resp["Marker"]
+            if "Marker" in docdb_resp:
+                describe_arguments["Marker"] = docdb_resp["Marker"]
             else:
                 break
         self._logger.info(INF_FETCHED, resource_name, number_of_resources, len(resources))
         return resources
 
-    def get_schedulable_rds_instances(self, kwargs):
-
-        def is_schedulable_instance(rds_inst):
-
-            db_id = rds_inst["DBInstanceIdentifier"]
-
-            state = rds_inst["DBInstanceStatus"]
-
-            if state not in RdsService.RDS_SCHEDULABLE_STATES:
-                self._logger.debug(DEBUG_SKIPPING_INSTANCE, "instance", db_id, state)
-                return False
-
-            if rds_inst.get("ReadReplicaSourceDBInstanceIdentifier", None) is not None:
-                self._logger.debug(DEBUG_READ_REPLICA, db_id, rds_inst["ReadReplicaSourceDBInstanceIdentifier"])
-                return False
-
-            if len(rds_inst.get("ReadReplicaDBInstanceIdentifiers", [])) > 0:
-                self._logger.debug(DEBUG_READ_REPLICA_SOURCE, db_id, ",".join(rds_inst["ReadReplicaDBInstanceIdentifiers"]))
-                return False
-
-            if rds_inst["Engine"] in ["aurora"] or rds_inst["Engine"] in ["docdb"]:
-                return False
-
-            if self.rds_resource_tags.get(rds_inst["DBInstanceArn"]) is None:
-                self._logger.debug(DEBUG_NO_SCHEDULE_TAG, rds_inst, self._tagname)
-                return False
-
-            return True
-
-        return self.get_schedulable_resources(fn_is_schedulable=is_schedulable_instance,
-                                              fn_describe_name="describe_db_instances",
-                                              kwargs=kwargs)
-
-    def get_schedulable_rds_clusters(self, kwargs):
+    def get_schedulable_docdb_clusters(self, kwargs):
         def is_schedulable(cluster_inst):
 
             db_id = cluster_inst["DBClusterIdentifier"]
 
             state = cluster_inst["Status"]
 
-            if state not in RdsService.RDS_SCHEDULABLE_STATES:
+            if state not in DocDbService.DOCDB_SCHEDULABLE_STATES:
                 self._logger.debug(DEBUG_SKIPPING_INSTANCE, "cluster", db_id, state)
                 return False
 
-            if self.rds_resource_tags.get(cluster_inst["DBClusterArn"]) is None:
-                self._logger.debug(DEBUG_NO_SCHEDULE_TAG, cluster_inst, self._tagname)
+            if cluster_inst["Engine"] not in ["docdb"]:
                 return False
 
-            if cluster_inst["Engine"] in ["docdb"]:
+            if self.docdb_resource_tags.get(cluster_inst["DBClusterArn"]) is None:
+                self._logger.debug(DEBUG_NO_SCHEDULE_TAG, cluster_inst, self._tagname)
                 return False
 
             return True
@@ -277,23 +237,20 @@ class RdsService:
                                               kwargs=kwargs)
 
     def get_schedulable_instances(self, kwargs):
-        instances = self.get_schedulable_rds_instances(kwargs)
-        if self._config.schedule_clusters:
-            instances += self.get_schedulable_rds_clusters(kwargs)
-        return instances
+        return self.get_schedulable_docdb_clusters(kwargs)                                        
 
-    def _select_resource_data(self, rds_resource, is_cluster):
+    def _select_resource_data(self, docdb_resource, is_cluster):
 
-        arn_for_tags = rds_resource["DBInstanceArn"] if not is_cluster else rds_resource["DBClusterArn"]
-        tags = self.rds_resource_tags.get(arn_for_tags, {})
+        arn_for_tags = docdb_resource["DBClusterArn"]
+        tags = self.docdb_resource_tags.get(arn_for_tags, {})
 
-        state = rds_resource["DBInstanceStatus"] if not is_cluster else rds_resource["Status"]
+        state = docdb_resource["Status"]
 
-        is_running = state == self.RDS_STATE_AVAILABLE
+        is_running = state == self.DOCDB_STATE_AVAILABLE
 
         instance_data = {
-            schedulers.INST_ID: rds_resource["DBInstanceIdentifier"] if not is_cluster else rds_resource["DBClusterIdentifier"],
-            schedulers.INST_ARN: rds_resource["DBInstanceArn"] if not is_cluster else rds_resource["DBClusterArn"],
+            schedulers.INST_ID: docdb_resource["DBClusterIdentifier"],
+            schedulers.INST_ARN: docdb_resource["DBClusterArn"],
             schedulers.INST_ALLOW_RESIZE: self.allow_resize,
             schedulers.INST_HIBERNATE: False,
             schedulers.INST_STATE: state,
@@ -301,10 +258,10 @@ class RdsService:
             schedulers.INST_IS_RUNNING: is_running,
             schedulers.INST_IS_TERMINATED: False,
             schedulers.INST_CURRENT_STATE: InstanceSchedule.STATE_RUNNING if is_running else InstanceSchedule.STATE_STOPPED,
-            schedulers.INST_INSTANCE_TYPE: rds_resource["DBInstanceClass"] if not is_cluster else "cluster",
-            schedulers.INST_ENGINE_TYPE: rds_resource["Engine"],
-            schedulers.INST_MAINTENANCE_WINDOW: RdsService.build_schedule_from_maintenance_window(
-                rds_resource["PreferredMaintenanceWindow"]),
+            schedulers.INST_INSTANCE_TYPE: "cluster",
+            schedulers.INST_ENGINE_TYPE: docdb_resource["Engine"],
+            schedulers.INST_MAINTENANCE_WINDOW: DocDbService.build_schedule_from_maintenance_window(
+                docdb_resource["PreferredMaintenanceWindow"]),
             schedulers.INST_TAGS: tags,
             schedulers.INST_NAME: tags.get("Name", ""),
             schedulers.INST_SCHEDULE: tags.get(self._tagname, None),
@@ -315,55 +272,31 @@ class RdsService:
     def resize_instance(self, kwargs):
         pass
 
-    def _validate_rds_tag_values(self, tags):
+    def _validate_docdb_tag_values(self, tags):
         result = copy.deepcopy(tags)
         for t in result:
             original_value = t.get("Value", "")
-            value = re.sub(RESTRICTED_RDS_TAG_VALUE_SET_CHARACTERS, " ", original_value)
+            value = re.sub(RESTRICTED_DOCDB_TAG_VALUE_SET_CHARACTERS, " ", original_value)
             value = value.replace("\n", " ")
             if value != original_value:
-                self._logger.warning(WARN_RDS_TAG_VALUE, original_value, t, value)
+                self._logger.warning(WARN_DOCDB_TAG_VALUE, original_value, t, value)
                 t["Value"] = value
         return result
 
     def _stop_instance(self, client, inst):
-
-        def does_snapshot_exist(name):
-
-            try:
-                resp = client.describe_db_snapshots_with_retries(DBSnapshotIdentifier=name, SnapshotType="manual")
-                snapshot = resp.get("DBSnapshots", None)
-                return snapshot is not None
-            except Exception as ex:
-                if type(ex).__name__ == "DBSnapshotNotFoundFault":
-                    return False
-                else:
-                    raise ex
-
         args = {
-            "DBInstanceIdentifier": inst.id
+            "DBClusterIdentifier": inst.id
         }
 
-        if self._config.create_rds_snapshot:
-            snapshot_name = "{}-stopped-{}".format(self._stack_name, inst.id).replace(" ", "")
-            args["DBSnapshotIdentifier"] = snapshot_name
-
-            try:
-                if does_snapshot_exist(snapshot_name):
-                    client.delete_db_snapshot_with_retries(DBSnapshotIdentifier=snapshot_name)
-                    self._logger.info(INF_DELETE_SNAPSHOT, snapshot_name)
-            except Exception as ex:
-                self._logger.error(ERR_DELETING_SNAPSHOT, snapshot_name)
-
         try:
-            client.stop_db_instance_with_retries(**args)
-            self._logger.info(INF_STOPPED_RESOURCE, "instance", inst.id)
+            client.stop_db_cluster_with_retries(**args)
+            self._logger.info(INF_STOPPED_RESOURCE, "cluster", inst.id)
         except Exception as ex:
-            self._logger.error(ERR_STOPPING_INSTANCE, "instance", inst.instance_str, str(ex))
+            self._logger.error(ERR_STOPPING_INSTANCE, "cluster", inst.instance_str, str(ex))
 
-    def _tag_stopped_resource(self, client, rds_resource):
+    def _tag_stopped_resource(self, client, docdb_resource):
 
-        stop_tags = self._validate_rds_tag_values(self._config.stopped_tags)
+        stop_tags = self._validate_docdb_tag_values(self._config.stopped_tags)
         if stop_tags is None:
             stop_tags = []
         stop_tags_key_names = [t["Key"] for t in stop_tags]
@@ -373,17 +306,17 @@ class RdsService:
         try:
             if start_tags_keys is not None and len(start_tags_keys):
                 self._logger.info(INF_REMOVE_KEYS, "start",
-                                  ",".join(["\"{}\"".format(k) for k in start_tags_keys]), rds_resource.arn)
-                client.remove_tags_from_resource_with_retries(ResourceName=rds_resource.arn, TagKeys=start_tags_keys)
+                                  ",".join(["\"{}\"".format(k) for k in start_tags_keys]), docdb_resource.arn)
+                client.remove_tags_from_resource_with_retries(ResourceName=docdb_resource.arn, TagKeys=start_tags_keys)
             if len(stop_tags) > 0:
-                self._logger.info(INF_ADD_TAGS, "stop", str(stop_tags), rds_resource.arn)
-                client.add_tags_to_resource_with_retries(ResourceName=rds_resource.arn, Tags=stop_tags)
+                self._logger.info(INF_ADD_TAGS, "stop", str(stop_tags), docdb_resource.arn)
+                client.add_tags_to_resource_with_retries(ResourceName=docdb_resource.arn, Tags=stop_tags)
         except Exception as ex:
-            self._logger.warning(WARN_TAGGING_STOPPED, rds_resource.id, str(ex))
+            self._logger.warning(WARN_TAGGING_STOPPED, docdb_resource.id, str(ex))
 
-    def _tag_started_instances(self, client, rds_resource):
+    def _tag_started_instances(self, client, docdb_resource):
 
-        start_tags = self._validate_rds_tag_values(self._config.started_tags)
+        start_tags = self._validate_docdb_tag_values(self._config.started_tags)
         if start_tags is None:
             start_tags = []
         start_tags_key_names = [t["Key"] for t in start_tags]
@@ -392,70 +325,60 @@ class RdsService:
         try:
             if stop_tags_keys is not None and len(stop_tags_keys):
                 self._logger.info(INF_REMOVE_KEYS, "stop",
-                                  ",".join(["\"{}\"".format(k) for k in stop_tags_keys]), rds_resource.arn)
-                client.remove_tags_from_resource_with_retries(ResourceName=rds_resource.arn, TagKeys=stop_tags_keys)
+                                  ",".join(["\"{}\"".format(k) for k in stop_tags_keys]), docdb_resource.arn)
+                client.remove_tags_from_resource_with_retries(ResourceName=docdb_resource.arn, TagKeys=stop_tags_keys)
             if start_tags is not None and len(start_tags) > 0:
-                self._logger.info(INF_ADD_TAGS, "start", str(start_tags), rds_resource.arn)
-                client.add_tags_to_resource_with_retries(ResourceName=rds_resource.arn, Tags=start_tags)
+                self._logger.info(INF_ADD_TAGS, "start", str(start_tags), docdb_resource.arn)
+                client.add_tags_to_resource_with_retries(ResourceName=docdb_resource.arn, Tags=start_tags)
         except Exception as ex:
-            self._logger.warning(WARN_TAGGING_STARTED, rds_resource.id, str(ex))
+            self._logger.warning(WARN_TAGGING_STARTED, docdb_resource.id, str(ex))
 
     # noinspection PyMethodMayBeStatic
     def stop_instances(self, kwargs):
 
         self._init_scheduler(kwargs)
 
-        methods = ["stop_db_instance",
-                   "stop_db_cluster",
-                   "describe_db_snapshots",
-                   "delete_db_snapshot",
+        methods = ["stop_db_cluster",
                    "add_tags_to_resource",
                    "remove_tags_from_resource"]
 
-        client = get_client_with_retries("rds", methods, context=self._context, session=self._session, region=self._region)
+        client = get_client_with_retries("docdb", methods, context=self._context, session=self._session, region=self._region)
 
         stopped_instances = kwargs["stopped_instances"]
 
-        for rds_resource in stopped_instances:
+        for docdb_resource in stopped_instances:
             try:
 
-                if rds_resource.is_cluster:
-                    client.stop_db_cluster_with_retries(DBClusterIdentifier=rds_resource.id)
-                    self._logger.info(INF_STOPPED_RESOURCE, "cluster", rds_resource.id)
-                else:
-                    self._stop_instance(client, rds_resource)
+                if docdb_resource.is_cluster:
+                    self._stop_instance(client, docdb_resource)
 
-                self._tag_stopped_resource(client, rds_resource)
+                self._tag_stopped_resource(client, docdb_resource)
 
-                yield rds_resource.id, InstanceSchedule.STATE_STOPPED
+                yield docdb_resource.id, InstanceSchedule.STATE_STOPPED
             except Exception as ex:
-                self._logger.error(ERR_STOPPING_INSTANCE, "cluster" if rds_resource.is_cluster else "instance",
-                                   rds_resource.instance_str, str(ex))
+                self._logger.error(ERR_STOPPING_INSTANCE, "cluster",
+                                   docdb_resource.instance_str, str(ex))
 
     # noinspection PyMethodMayBeStatic
     def start_instances(self, kwargs):
         self._init_scheduler(kwargs)
 
-        methods = ["start_db_instance",
-                   "start_db_cluster",
+        methods = ["start_db_cluster",
                    "add_tags_to_resource",
                    "remove_tags_from_resource"]
 
-        client = get_client_with_retries("rds", methods, context=self._context, session=self._session, region=self._region)
+        client = get_client_with_retries("docdb", methods, context=self._context, session=self._session, region=self._region)
 
         started_instances = kwargs["started_instances"]
-        for rds_resource in started_instances:
+        for docdb_resource in started_instances:
 
             try:
-                if rds_resource.is_cluster:
-                    client.start_db_cluster_with_retries(DBClusterIdentifier=rds_resource.id)
-                else:
-                    client.start_db_instance_with_retries(DBInstanceIdentifier=rds_resource.id)
+                if docdb_resource.is_cluster:
+                    client.start_db_cluster_with_retries(DBClusterIdentifier=docdb_resource.id)
 
-                self._tag_started_instances(client, rds_resource)
+                self._tag_started_instances(client, docdb_resource)
 
-                yield rds_resource.id, InstanceSchedule.STATE_RUNNING
+                yield docdb_resource.id, InstanceSchedule.STATE_RUNNING
             except Exception as ex:
-                self._logger.error(ERR_STARTING_INSTANCE, "cluster" if rds_resource.is_cluster else "instance",
-                                   rds_resource.instance_str, str(ex))
-        return
+                self._logger.error(ERR_STARTING_INSTANCE, "cluster",
+                                   docdb_resource.instance_str, str(ex))
