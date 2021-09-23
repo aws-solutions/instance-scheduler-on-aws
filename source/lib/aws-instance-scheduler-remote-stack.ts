@@ -121,7 +121,22 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                             resources:[
                                 '*'
                             ]
-                        })
+                        }),
+                        new PolicyStatement({
+                            actions: [
+                                'kms:DescribeKey',
+                                'kms:Encrypt',
+                                'kms:Decrypt',
+                                'kms:ReEncrypt*',
+                                'kms:CreateGrant',
+                                'kms:GenerateDataKey',
+                                'kms:GenerateDataKeyWithoutPlaintext'
+                            ],
+                            effect: Effect.ALLOW,
+                            resources:[
+                                '*'
+                            ]
+                        })                        
                     ]
                 })
             }
