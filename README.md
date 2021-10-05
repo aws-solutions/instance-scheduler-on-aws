@@ -1,4 +1,4 @@
-** [AWS Instance Scheduler](https://aws.amazon.com/solutions/implementations/instance-scheduler) | **[ðŸš§ Feature request](https://github.com/awslabs/aws-instance-scheduler/issues/new?assignees=&labels=feature-request%2C+enhancement&template=feature_request.md&title=)** | **[ðŸ› Bug Report](https://github.com/awslabs/aws-instance-scheduler/issues/new?assignees=&labels=bug%2C+triage&template=bug_report.md&title=)**
+** [AWS Instance Scheduler](https://aws.amazon.com/solutions/implementations/instance-scheduler) | **[🚧 Feature request](https://github.com/awslabs/aws-instance-scheduler/issues/new?assignees=&labels=feature-request%2C+enhancement&template=feature_request.md&title=)** | **[🐛 Bug Report](https://github.com/awslabs/aws-instance-scheduler/issues/new?assignees=&labels=bug%2C+triage&template=bug_report.md&title=)**
 
 Note: If you want to use the solution without building from source, navigate to Solution Landing Page
 
@@ -88,7 +88,7 @@ aws-instance-scheduler consists of:
 
 ## File Structure
 
-<prev>
+<pre>
 |- deployment/                - contains build scripts, deployment templates, and dist folders for staging assets.
   |- build-s3-dist.sh         - builds the solution and copies artifacts to the appropriate /global-s3-assets or /regional-s3-assets folders.
   |- run-unit-tests.sh         - runs the unit tests for the lambda files.
