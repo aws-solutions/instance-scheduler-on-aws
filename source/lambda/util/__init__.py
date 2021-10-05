@@ -14,6 +14,8 @@
 import json
 
 from util.custom_encoder import CustomEncoder
+import botocore.config
+import os
 
 ENV_METRICS_URL = "METRICS_URL"
 # Solution ID
@@ -26,6 +28,10 @@ STACK_ID = "STACK_ID"
 UUID_KEY = "UUID_KEY"
 USER_AGENT_EXTRA = "USER_AGENT_EXTRA"
 
+def get_config():
+    user_agent_extra_string = os.getenv("USER_AGENT_EXTRA", "AwsSolution/SO0030/v2.0.0")
+    solution_config = {"user_agent_extra": user_agent_extra_string, "retries": {'max_attempts': 5, 'mode': 'standard'}}
+    return botocore.config.Config(**solution_config) 
 
 def safe_json(d, indent=0):
     """

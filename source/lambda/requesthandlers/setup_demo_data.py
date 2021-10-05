@@ -46,21 +46,3 @@ SCHEDULE_UK_OFFICE_HOURS = {
     "periods": {"office-hours"},
     "timezone": "Europe/London"
 }
-SCHEDULE_STOPPED = {
-    "name": "stopped",
-    "description": "Instances stopped",
-    "override_status": "stopped",
-    "use_metrics": False
-}
-SCHEDULE_RUNNING = {
-    "name": "running",
-    "description": "Instances running",
-    "override_status": "running",
-    "use_metrics": False
-}
-SCHEDULE_SCALING = {
-    "name": "scale-up-down",
-    "description": "Vertical scaling on weekdays, based on UTC time",
-    "periods": {"working-days@t2.micro", "weekends@t2.nano"},
-    "timezone": "UTC"
-}

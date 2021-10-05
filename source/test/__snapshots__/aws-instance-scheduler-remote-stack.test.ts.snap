@@ -3,7 +3,67 @@
 exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
 Object {
   "AWSTemplateFormatVersion": "2010-09-09",
+  "Conditions": Object {
+    "IsMemberOfOrganization": Object {
+      "Fn::Equals": Array [
+        Object {
+          "Ref": "UsingAWSOrganizations",
+        },
+        "Yes",
+      ],
+    },
+    "IsSpokeAccountEqualToHubAccount": Object {
+      "Fn::Not": Array [
+        Object {
+          "Fn::Equals": Array [
+            Object {
+              "Ref": "InstanceSchedulerAccount",
+            },
+            "111111111111",
+          ],
+        },
+      ],
+    },
+    "IsUsingOrganizationAndNotHubAccount": Object {
+      "Fn::And": Array [
+        Object {
+          "Condition": "IsMemberOfOrganization",
+        },
+        Object {
+          "Condition": "IsSpokeAccountEqualToHubAccount",
+        },
+      ],
+    },
+  },
   "Description": "",
+  "Mappings": Object {
+    "mappings": Object {
+      "Ec2StartSSMDocument": Object {
+        "Name": "Scheduler-StartTaggedEC2Instances-v2.0.0",
+      },
+      "Ec2StopSSMDocument": Object {
+        "Name": "Scheduler-StopTaggedEC2Instances-v2.0.0",
+      },
+      "RDSInstancesStartSSMDocument": Object {
+        "Name": "Scheduler-StartTaggedRDSInstances-v2.0.0",
+      },
+      "RDSInstancesStopSSMDocument": Object {
+        "Name": "Scheduler-StopTaggedRDSInstances-v2.0.0",
+      },
+      "RDSTaggedClustersStartSSMDocument": Object {
+        "Name": "Scheduler-StartTaggedRDSClusters-v2.0.0",
+      },
+      "RDSTaggedClustersStopSSMDocument": Object {
+        "Name": "Scheduler-StopTaggedRDSClusters-v2.0.0",
+      },
+      "SchedulerEventBusName": Object {
+        "Name": "scheduler-event-bus",
+      },
+      "SchedulerExecutionRole": Object {
+        "Name": "Scheduler-AutomationExecutionRole",
+      },
+    },
+  },
   "Metadata": Object {
     "AWS::CloudFormation::Interface": Object {
       "ParameterGroups": Array [
@@ -38,7 +98,20 @@ Object {
     "InstanceSchedulerAccount": Object {
       "AllowedPattern": "(^[0-9]{12}$)",
       "ConstraintDescription": "Account number is a 12 digit number",
-      "Description": "Account number of Instance Scheduler account to give access to manage EC2 and RDS  Instances in this account.",
+      "Description": "Instance Scheduler Hub Account number to manage EC2 and RDS Resources in this account.",
+      "Type": "String",
+    },
+    "Namespace": Object {
+      "Description": "Unique identifier used to differentiate between multiple solution deployments. Example: Test or Prod",
+      "Type": "String",
+    },
+    "UsingAWSOrganizations": Object {
+      "AllowedValues": Array [
+        "Yes",
+        "No",
+      ],
+      "Default": "No",
+      "Description": "Use this setting to automate spoke account enrollment if using AWS Organizations.",
       "Type": "String",
     },
   },
@@ -49,6 +122,14 @@ Object {
           "rules_to_suppress": Array [
             Object {
               "id": "W11",
+              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+            },
+            Object {
+              "id": "W28",
+              "reason": "The role name is defined to allow cross account access from the hub account.",
+            },
+            Object {
+              "id": "W76",
               "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
             },
           ],
@@ -71,7 +152,10 @@ Object {
                     },
                   ],
                 },
-                "Service": "lambda.amazonaws.com",
+                "Service": Array [
+                  "lambda.amazonaws.com",
+                  "ssm.amazonaws.com",
+                ],
               },
             },
           ],
@@ -135,13 +219,144 @@ Object {
                     "rds:DescribeDBClusters",
                     "rds:DescribeDBInstances",
                     "ec2:DescribeInstances",
+                    "ec2:DescribeInstanceStatus",
                     "ec2:DescribeRegions",
+                    "ec2:DescribeTags",
                     "ssm:DescribeMaintenanceWindows",
                     "ssm:DescribeMaintenanceWindowExecutions",
+                    "ssm:GetAutomationExecution",
+                    "ssm:DescribeAutomationStepExecutions",
                     "tag:GetResources",
+                    "tag:TagResources",
                   ],
                   "Effect": "Allow",
                   "Resource": "*",
+                },
+                Object {
+                  "Action": "ssm:StartAutomationExecution",
+                  "Effect": "Allow",
+                  "Resource": Array [
+                    Object {
+                      "Fn::Join": Array [
+                        "",
+                        Array [
+                          Object {
+                            "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                          },
+                          Object {
+                            "Fn::FindInMap": Array [
+                              "mappings",
+                              "Ec2StartSSMDocument",
+                              "Name",
+                            ],
+                          },
+                          ":*",
+                        ],
+                      ],
+                    },
+                    Object {
+                      "Fn::Join": Array [
+                        "",
+                        Array [
+                          Object {
+                            "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                          },
+                          Object {
+                            "Fn::FindInMap": Array [
+                              "mappings",
+                              "Ec2StopSSMDocument",
+                              "Name",
+                            ],
+                          },
+                          ":*",
+                        ],
+                      ],
+                    },
+                    Object {
+                      "Fn::Join": Array [
+                        "",
+                        Array [
+                          Object {
+                            "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                          },
+                          Object {
+                            "Fn::FindInMap": Array [
+                              "mappings",
+                              "RDSInstancesStartSSMDocument",
+                              "Name",
+                            ],
+                          },
+                          ":*",
+                        ],
+                      ],
+                    },
+                    Object {
+                      "Fn::Join": Array [
+                        "",
+                        Array [
+                          Object {
+                            "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                          },
+                          Object {
+                            "Fn::FindInMap": Array [
+                              "mappings",
+                              "RDSInstancesStopSSMDocument",
+                              "Name",
+                            ],
+                          },
+                          ":*",
+                        ],
+                      ],
+                    },
+                    Object {
+                      "Fn::Join": Array [
+                        "",
+                        Array [
+                          Object {
+                            "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                          },
+                          Object {
+                            "Fn::FindInMap": Array [
+                              "mappings",
+                              "RDSTaggedClustersStartSSMDocument",
+                              "Name",
+                            ],
+                          },
+                          ":*",
+                        ],
+                      ],
+                    },
+                    Object {
+                      "Fn::Join": Array [
+                        "",
+                        Array [
+                          Object {
+                            "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                          },
+                          Object {
+                            "Fn::FindInMap": Array [
+                              "mappings",
+                              "RDSTaggedClustersStopSSMDocument",
+                              "Name",
+                            ],
+                          },
+                          ":*",
+                        ],
+                      ],
+                    },
+                    Object {
+                      "Fn::Sub": "arn:\${AWS::Partition}:ssm:*::automation-definition/AWS-StartRdsInstance:*",
+                    },
+                    Object {
+                      "Fn::Sub": "arn:\${AWS::Partition}:ssm:*::automation-definition/AWS-StopRdsInstance:*",
+                    },
+                    Object {
+                      "Fn::Sub": "arn:\${AWS::Partition}:ssm:*::automation-definition/AWS-SetRequiredTags:*",
+                    },
+                    Object {
+                      "Fn::Sub": "arn:\${AWS::Partition}:ssm:*::automation-definition/AWS-StartStopAuroraCluster:*",
+                    },
+                  ],
                 },
               ],
               "Version": "2012-10-17",
@@ -149,6 +364,20 @@ Object {
             "PolicyName": "EC2InstanceSchedulerRemote",
           },
         ],
+        "RoleName": Object {
+          "Fn::Sub": Array [
+            "\${Namespace}-\${Name}-\${AWS::Region}",
+            Object {
+              "Name": Object {
+                "Fn::FindInMap": Array [
+                  "mappings",
+                  "SchedulerExecutionRole",
+                  "Name",
+                ],
+              },
+            },
+          ],
+        },
       },
       "Type": "AWS::IAM::Role",
     },
@@ -163,6 +392,16 @@ Object {
                 "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
               },
             },
+            Object {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "EC2SchedulerCrossAccountRole",
+                  "Arn",
+                ],
+              },
+            },
           ],
           "Version": "2012-10-17",
         },
@@ -174,6 +413,131 @@ Object {
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "SSMParameterNamespace2002A907": Object {
+      "Condition": "IsUsingOrganizationAndNotHubAccount",
+      "DependsOn": Array [
+        "schedulerssmparameterstoreevent",
+      ],
+      "Properties": Object {
+        "Description": "This parameter is for Instance Scheduler solution to support accounts in AWS Organizations.",
+        "Name": "/instance-scheduler/do-not-delete-manually",
+        "Type": "String",
+        "Value": Object {
+          "Ref": "Namespace",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "SchedulerEventDeliveryPolicyD8B17948": Object {
+      "Condition": "IsUsingOrganizationAndNotHubAccount",
+      "Properties": Object {
+        "PolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "events:PutEvents",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::Sub": Array [
+                  "arn:\${AWS::Partition}:events:\${AWS::Region}:\${InstanceSchedulerAccount}:event-bus/\${Namespace}-\${EventBusName}",
+                  Object {
+                    "EventBusName": Object {
+                      "Fn::FindInMap": Array [
+                        "mappings",
+                        "SchedulerEventBusName",
+                        "Name",
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "SchedulerEventDeliveryPolicyD8B17948",
+        "Roles": Array [
+          Object {
+            "Ref": "SchedulerEventDeliveryRole5AE883C1",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "SchedulerEventDeliveryRole5AE883C1": Object {
+      "Condition": "IsUsingOrganizationAndNotHubAccount",
+      "Properties": Object {
+        "AssumeRolePolicyDocument": Object {
+          "Statement": Array [
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
+                "Service": "events.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "Event Role to add the permissions necessary to migrate a sender-receiver relationship to Use AWS Organizations",
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "schedulerssmparameterstoreevent": Object {
+      "Condition": "IsUsingOrganizationAndNotHubAccount",
+      "Properties": Object {
+        "Description": "Event rule to invoke Instance Scheduler lambda function to store spoke account id in configuration.",
+        "EventPattern": Object {
+          "account": Array [
+            "111111111111",
+          ],
+          "detail": Object {
+            "name": Array [
+              "/instance-scheduler/do-not-delete-manually",
+            ],
+            "operation": Array [
+              "Create",
+              "Delete",
+            ],
+            "type": Array [
+              "String",
+            ],
+          },
+          "detail-type": Array [
+            "Parameter Store Change",
+          ],
+          "source": Array [
+            "aws.ssm",
+          ],
+        },
+        "State": "ENABLED",
+        "Targets": Array [
+          Object {
+            "Arn": Object {
+              "Fn::Sub": Array [
+                "arn:\${AWS::Partition}:events:\${AWS::Region}:\${InstanceSchedulerAccount}:event-bus/\${Namespace}-\${EventBusName}",
+                Object {
+                  "EventBusName": Object {
+                    "Fn::FindInMap": Array [
+                      "mappings",
+                      "SchedulerEventBusName",
+                      "Name",
+                    ],
+                  },
+                },
+              ],
+            },
+            "Id": "Spoke-SSM-Parameter-Event",
+            "RoleArn": Object {
+              "Fn::GetAtt": Array [
+                "SchedulerEventDeliveryRole5AE883C1",
+                "Arn",
+              ],
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
     },
   },
 }

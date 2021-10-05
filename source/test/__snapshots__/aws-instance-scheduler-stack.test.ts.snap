@@ -3,6 +3,16 @@
 exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
 Object {
   "AWSTemplateFormatVersion": "2010-09-09",
+  "Conditions": Object {
+    "IsMemberOfOrganization": Object {
+      "Fn::Equals": Array [
+        Object {
+          "Ref": "UsingAWSOrganizations",
+        },
+        "Yes",
+      ],
+    },
+  },
   "Description": "",
   "Mappings": Object {
     "Send": Object {
@@ -14,9 +24,33 @@ Object {
       },
     },
     "mappings": Object {
+      "Ec2StartSSMDocument": Object {
+        "Name": "Scheduler-StartTaggedEC2Instances-v2.0.0",
+      },
+      "Ec2StopSSMDocument": Object {
+        "Name": "Scheduler-StopTaggedEC2Instances-v2.0.0",
+      },
       "EnabledDisabled": Object {
         "No": "DISABLED",
         "Yes": "ENABLED",
+      },
+      "RDSInstancesStartSSMDocument": Object {
+        "Name": "Scheduler-StartTaggedRDSInstances-v2.0.0",
+      },
+      "RDSInstancesStopSSMDocument": Object {
+        "Name": "Scheduler-StopTaggedRDSInstances-v2.0.0",
+      },
+      "RDSTaggedClustersStartSSMDocument": Object {
+        "Name": "Scheduler-StartTaggedRDSClusters-v2.0.0",
+      },
+      "RDSTaggedClustersStopSSMDocument": Object {
+        "Name": "Scheduler-StopTaggedRDSClusters-v2.0.0",
+      },
+      "SchedulerEventBusName": Object {
+        "Name": "scheduler-event-bus",
+      },
+      "SchedulerExecutionRole": Object {
+        "Name": "Scheduler-AutomationExecutionRole",
       },
       "Services": Object {
         "Both": "ec2,rds",
@@ -47,7 +81,7 @@ Object {
       "ParameterGroups": Array [
         Object {
           "Label": Object {
-            "default": "Scheduler (version v1.4.0)",
+            "default": "Scheduler (version v2.0.0)",
           },
           "Parameters": Array [
             "TagName",
@@ -181,16 +215,11 @@ Object {
   "Parameters": Object {
     "CreateRdsSnapshot": Object {
       "AllowedValues": Array [
-        "Yes",
         "No",
       ],
       "Default": "No",
-      "Description": "Create snapshot before stopping RDS instances (does not apply to Aurora Clusters).",
+      "Description": "(Not supported in v2.0) Create snapshot before stopping RDS instances (does not apply to Aurora Clusters).",
       "Type": "String",
-    },
-    "CrossAccountRoles": Object {
-      "Description": "Comma separated list of ARN's for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.",
-      "Type": "CommaDelimitedList",
     },
     "DefaultTimezone": Object {
       "AllowedValues": Array [
@@ -630,15 +659,6 @@ Object {
       "Description": "Choose the default Time Zone. Default is 'UTC'.",
       "Type": "String",
     },
-    "EnableSSMMaintenanceWindows": Object {
-      "AllowedValues": Array [
-        "Yes",
-        "No",
-      ],
-      "Default": "No",
-      "Description": "Enable the solution to load SSM Maintenance Windows, so that they can be used for EC2 instance Scheduling.",
-      "Type": "String",
-    },
     "LogRetentionDays": Object {
       "AllowedValues": Array [
         "1",
@@ -660,40 +680,21 @@ Object {
         "1827",
         "3653",
       ],
-      "Default": 30,
+      "Default": "30",
       "Description": "Retention days for scheduler logs.",
       "Type": "Number",
     },
-    "MemorySize": Object {
-      "AllowedValues": Array [
-        "128",
-        "384",
-        "512",
-        "640",
-        "768",
-        "896",
-        "1024",
-        "1152",
-        "1280",
-        "1408",
-        "1536",
-      ],
-      "Default": 128,
-      "Description": "Size of the Lambda function running the scheduler, increase size when processing large numbers of instances.",
-      "Type": "Number",
+    "Namespace": Object {
+      "Description": "Provide unique identifier to differentiate between multiple solution deployments (No Spaces). Example: Dev",
+      "Type": "String",
+    },
+    "Principals": Object {
+      "Description": "(Required) If using AWS Organizations, provide Organization ID. Eg. o-xxxxyyy. Else, comma separated list of remote account ids. Eg.: 1111111111, 2222222222",
+      "Type": "CommaDelimitedList",
     },
     "Regions": Object {
       "Description": "List of regions in which instances are scheduled, leave blank for current region only.",
       "Type": "CommaDelimitedList",
-    },
-    "ScheduleLambdaAccount": Object {
-      "AllowedValues": Array [
-        "Yes",
-        "No",
-      ],
-      "Default": "Yes",
-      "Description": "Schedule instances in this account.",
-      "Type": "String",
     },
     "ScheduleRdsClusters": Object {
       "AllowedValues": Array [
@@ -738,11 +739,13 @@ Object {
       "Type": "String",
     },
     "StartedTags": Object {
-      "Description": "Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances",
+      "Default": "ScheduleMessage=Started on {year}/{month}/{day} at {hour}:{minute} {timezone}",
+      "Description": "Comma separated list of tag names and values on the format name=value,name=value,.. that are set on started instances",
       "Type": "String",
     },
     "StoppedTags": Object {
-      "Description": "Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on stopped instances",
+      "Default": "ScheduleMessage=Stopped on {year}/{month}/{day} at {hour}:{minute} {timezone}",
+      "Description": "Comma separated list of tag names and values on the format name=value,name=value,.. that are set on stopped instances",
       "Type": "String",
     },
     "TagName": Object {
@@ -758,16 +761,16 @@ Object {
         "No",
       ],
       "Default": "No",
-      "Description": "Enable logging of detailed information in CloudWatch logs.",
+      "Description": "Allow 'debug' level logging in CloudWatch logs.",
       "Type": "String",
     },
-    "UseCloudWatchMetrics": Object {
+    "UsingAWSOrganizations": Object {
       "AllowedValues": Array [
         "Yes",
         "No",
       ],
       "Default": "No",
-      "Description": "Collect instance scheduling data using CloudWatch metrics.",
+      "Description": "Is the hub account member of the AWS Organizations?",
       "Type": "String",
     },
   },
@@ -818,6 +821,10 @@ Object {
               "id": "W12",
               "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
             },
+            Object {
+              "id": "W76",
+              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+            },
           ],
         },
       },
@@ -840,9 +847,9 @@ Object {
                 "rds:DescribeDBClusters",
                 "rds:DescribeDBInstances",
                 "ec2:DescribeInstances",
+                "ec2:DescribeInstanceStatus",
                 "ec2:DescribeRegions",
                 "cloudwatch:PutMetricData",
-                "ssm:DescribeMaintenanceWindows",
                 "tag:GetResources",
               ],
               "Effect": "Allow",
@@ -867,6 +874,16 @@ Object {
                   ],
                 },
               ],
+            },
+            Object {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": Object {
+                "Fn::GetAtt": Array [
+                  "SchedulerRole",
+                  "Arn",
+                ],
+              },
             },
           ],
           "Version": "2012-10-17",
@@ -895,7 +912,18 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Resource": Object {
-                "Fn::Sub": "arn:\${AWS::Partition}:iam::*:role/*EC2SchedulerCross*",
+                "Fn::Sub": Array [
+                  "arn:\${AWS::Partition}:iam::*:role/\${Namespace}-\${Name}-\${AWS::Region}",
+                  Object {
+                    "Name": Object {
+                      "Fn::FindInMap": Array [
+                        "mappings",
+                        "SchedulerExecutionRole",
+                        "Name",
+                      ],
+                    },
+                  },
+                ],
               },
             },
           ],
@@ -909,6 +937,23 @@ Object {
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "EventBusRuleLambdaPermission": Object {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Ref": "Main",
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": Object {
+          "Fn::GetAtt": Array [
+            "SchedulerEventBusResourcesschedulerssmparametercrossaccountevents21DB1768",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
     },
     "InstanceSchedulerEncryptionKey": Object {
       "DeletionPolicy": "Delete",
@@ -1020,6 +1065,1251 @@ Object {
       },
       "Type": "AWS::KMS::Alias",
     },
+    "InstanceSchedulerSSMDocumentsEC2StartSSMDocument2293466C": Object {
+      "Properties": Object {
+        "Content": Object {
+          "assumeRole": "{{ AutomationAssumeRole }}",
+          "description": "### Document Name - Scheduler-StartTaggedEC2Instances
+## What does this document do?
+This document finds the tagged EC2 instances and start them.
+
+## Input Parameters
+* TagKey: (Required) Tag Key to filter list of EC2 Instances
+* TagValue: (Required) Tag Value to filter list of EC2 Instances
+* ResourceTagMapList: (Required) The tags to add to the resources.
+* AutomationAssumeRole: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+",
+          "mainSteps": Array [
+            Object {
+              "action": "aws:executeAwsApi",
+              "description": "Describe EC2 instances with tag filter",
+              "inputs": Object {
+                "Api": "DescribeInstances",
+                "Filters": Array [
+                  Object {
+                    "Name": "{{ TagKey }}",
+                    "Values": "{{ TagValue }}",
+                  },
+                ],
+                "Service": "ec2",
+              },
+              "name": "getInstanceIds",
+              "onFailure": "Abort",
+              "outputs": Array [
+                Object {
+                  "Name": "instanceIds",
+                  "Selector": "$.Reservations..Instances..InstanceId",
+                  "Type": "StringList",
+                },
+                Object {
+                  "Name": "singleInstanceId",
+                  "Selector": "$.Reservations[0].Instances[0].InstanceId",
+                  "Type": "String",
+                },
+              ],
+            },
+            Object {
+              "action": "aws:branch",
+              "inputs": Object {
+                "Choices": Array [
+                  Object {
+                    "NextStep": "startInstances",
+                    "StartsWith": "i-",
+                    "Variable": "{{ getInstanceIds.singleInstanceId }}",
+                  },
+                ],
+              },
+              "isEnd": true,
+              "name": "checkInstanceListIsNotEmpty",
+            },
+            Object {
+              "action": "aws:changeInstanceState",
+              "description": "Start EC2 instances",
+              "inputs": Object {
+                "DesiredState": "running",
+                "InstanceIds": "{{ getInstanceIds.instanceIds }}",
+              },
+              "maxAttempts": 3,
+              "name": "startInstances",
+              "onFailure": "Abort",
+              "timeoutSeconds": 3600,
+            },
+            Object {
+              "action": "aws:createTags",
+              "inputs": Object {
+                "ResourceIds": "{{ getInstanceIds.instanceIds }}",
+                "ResourceType": "EC2",
+                "Tags": "{{ ResourceTagMapList }}",
+              },
+              "isEnd": true,
+              "maxAttempts": 3,
+              "name": "createResourceTags",
+              "onFailure": "Abort",
+            },
+          ],
+          "outputs": Array [
+            "getInstanceIds.instanceIds",
+          ],
+          "parameters": Object {
+            "AutomationAssumeRole": Object {
+              "default": "",
+              "description": "(Required) The ARN of the role that allows Automation to perform the actions on your behalf.",
+              "type": "String",
+            },
+            "ResourceTagMapList": Object {
+              "default": Array [
+                Object {
+                  "Key": "StateChanged",
+                  "Value": "Resource started by Instance Scheduler",
+                },
+              ],
+              "description": "(Required) The tags to add to the resources.",
+              "displayType": "textarea",
+              "type": "MapList",
+            },
+            "TagKey": Object {
+              "default": "tag:Schedule",
+              "description": "(Required) The tag name (key) to filter list of EC2 Instances",
+              "type": "String",
+            },
+            "TagValue": Object {
+              "description": "(Required) The schedule name (tag value) to filter list of EC2 Instances",
+              "type": "StringList",
+            },
+          },
+          "schemaVersion": "0.3",
+        },
+        "DocumentType": "Automation",
+        "Name": Object {
+          "Fn::FindInMap": Array [
+            "mappings",
+            "Ec2StartSSMDocument",
+            "Name",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Document",
+    },
+    "InstanceSchedulerSSMDocumentsEC2StopSSMDocumentC67A32E1": Object {
+      "Properties": Object {
+        "Content": Object {
+          "assumeRole": "{{ AutomationAssumeRole }}",
+          "description": "### Document Name - Scheduler-StopTaggedEC2Instances
+## What does this document do?
+This document finds the tagged EC2 instances and stop them.
+
+## Input Parameters
+* TagKey: (Required) Tag Key to filter list of EC2 Instances
+* TagValue: (Required) Tag Value to filter list of EC2 Instances
+* ResourceTagMapList: (Required) The tags to add to the resources.
+* AutomationAssumeRole: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+",
+          "mainSteps": Array [
+            Object {
+              "action": "aws:executeAwsApi",
+              "description": "Describe EC2 instances with tag filter",
+              "inputs": Object {
+                "Api": "DescribeInstances",
+                "Filters": Array [
+                  Object {
+                    "Name": "{{ TagKey }}",
+                    "Values": "{{ TagValue }}",
+                  },
+                ],
+                "Service": "ec2",
+              },
+              "name": "getInstanceIds",
+              "onFailure": "Abort",
+              "outputs": Array [
+                Object {
+                  "Name": "instanceIds",
+                  "Selector": "$.Reservations..Instances..InstanceId",
+                  "Type": "StringList",
+                },
+                Object {
+                  "Name": "singleInstanceId",
+                  "Selector": "$.Reservations[0].Instances[0].InstanceId",
+                  "Type": "String",
+                },
+              ],
+            },
+            Object {
+              "action": "aws:branch",
+              "inputs": Object {
+                "Choices": Array [
+                  Object {
+                    "NextStep": "stopInstances",
+                    "StartsWith": "i-",
+                    "Variable": "{{ getInstanceIds.singleInstanceId }}",
+                  },
+                ],
+              },
+              "isEnd": true,
+              "name": "checkInstanceListIsNotEmpty",
+            },
+            Object {
+              "action": "aws:changeInstanceState",
+              "description": "Stop EC2 instances",
+              "inputs": Object {
+                "DesiredState": "stopped",
+                "InstanceIds": "{{ getInstanceIds.instanceIds }}",
+              },
+              "maxAttempts": 3,
+              "name": "stopInstances",
+              "onFailure": "Abort",
+              "timeoutSeconds": 3600,
+            },
+            Object {
+              "action": "aws:createTags",
+              "inputs": Object {
+                "ResourceIds": "{{ getInstanceIds.instanceIds }}",
+                "ResourceType": "EC2",
+                "Tags": "{{ ResourceTagMapList }}",
+              },
+              "isEnd": true,
+              "maxAttempts": 3,
+              "name": "createResourceTags",
+              "onFailure": "Abort",
+            },
+          ],
+          "outputs": Array [
+            "getInstanceIds.instanceIds",
+          ],
+          "parameters": Object {
+            "AutomationAssumeRole": Object {
+              "default": "",
+              "description": "(Required) The ARN of the role that allows Automation to perform the actions on your behalf.",
+              "type": "String",
+            },
+            "ResourceTagMapList": Object {
+              "default": Array [
+                Object {
+                  "Key": "StateChanged",
+                  "Value": "Resource stopped by Instance Scheduler",
+                },
+              ],
+              "description": "(Required) The tags to add to the resources.",
+              "displayType": "textarea",
+              "type": "MapList",
+            },
+            "TagKey": Object {
+              "default": "tag:Schedule",
+              "description": "(Required) The tag name (key) to filter list of EC2 Instances",
+              "type": "String",
+            },
+            "TagValue": Object {
+              "description": "(Required) The schedule name (tag value) to filter list of EC2 Instances",
+              "type": "StringList",
+            },
+          },
+          "schemaVersion": "0.3",
+        },
+        "DocumentType": "Automation",
+        "Name": Object {
+          "Fn::FindInMap": Array [
+            "mappings",
+            "Ec2StopSSMDocument",
+            "Name",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Document",
+    },
+    "InstanceSchedulerSSMDocumentsRDSTaggedClustersStartSSMDocumentE782D5D8": Object {
+      "Properties": Object {
+        "Content": Object {
+          "assumeRole": "{{ AutomationAssumeRole }}",
+          "description": "### Document Name - Scheduler-StartTaggedRDSClusters
+## What does this document do?
+This document finds the tagged RDS Clusters and start them.
+
+## Input Parameters
+* TagKey: (Required) Tag Key to filter list of RDS DB Clusters
+* TagValue: (Required) Tag Value to filter list of RDS DB Clusters
+* SecondaryAutomationName: The secondary automation name invoked by this automation
+* ResourceTagMapList: The tags to add to the resources.
+* SolutionId: AWS Solution ID
+* SolutionVersion: AWS Solution version
+* AutomationAssumeRole: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+",
+          "mainSteps": Array [
+            Object {
+              "action": "aws:executeAwsApi",
+              "description": "Get tagged RDS DB Clusters",
+              "inputs": Object {
+                "Api": "GetResources",
+                "ResourceTypeFilters": Array [
+                  "rds:cluster",
+                ],
+                "Service": "resourcegroupstaggingapi",
+                "TagFilters": Array [
+                  Object {
+                    "Key": "{{ TagKey }}",
+                    "Values": "{{ TagValue }}",
+                  },
+                ],
+              },
+              "name": "getTaggedRDSClusterIds",
+              "onFailure": "Abort",
+              "outputs": Array [
+                Object {
+                  "Name": "rdsDbClusterArns",
+                  "Selector": "$.ResourceTagMappingList..ResourceARN",
+                  "Type": "StringList",
+                },
+                Object {
+                  "Name": "singleARN",
+                  "Selector": "$.ResourceTagMappingList[0].ResourceARN",
+                  "Type": "String",
+                },
+              ],
+            },
+            Object {
+              "action": "aws:branch",
+              "inputs": Object {
+                "Choices": Array [
+                  Object {
+                    "NextStep": "startRdsClusters",
+                    "StartsWith": "arn:",
+                    "Variable": "{{ getTaggedRDSClusterIds.singleARN }}",
+                  },
+                ],
+              },
+              "isEnd": true,
+              "name": "checkDBArnIsNotEmpty",
+            },
+            Object {
+              "action": "aws:executeScript",
+              "inputs": Object {
+                "Handler": "start_rds_secondary_ssm_automation",
+                "InputPayload": Object {
+                  "Action": "{{ Action }}",
+                  "ExecutionRoleArn": "{{ AutomationAssumeRole }}",
+                  "RdsResourceArns": "{{ getTaggedRDSClusterIds.rdsDbClusterArns }}",
+                  "Region": "{{global:REGION}}",
+                  "SecondaryAutomationName": "{{ SecondaryAutomationName }}",
+                  "SolutionId": "{{SolutionId}}",
+                  "SolutionVersion": "{{SolutionVersion}}",
+                },
+                "Runtime": "python3.7",
+                "Script": "import boto3
+import logging
+from botocore.config import Config
+
+
+def start_rds_secondary_ssm_automation(event, context) -> list:
+    \\"\\"\\"
+    start new SSM automation document to start or stop RDS clusters.
+    Parameters:
+    event (dict): event from SSM automation
+        example:
+            {
+                \\"RdsResourceArns\\": [
+                    \\"arn:aws:rds:us-east-1:account:cluster:cluster-3d3r\\",
+                    \\"arn:aws:rds:us-east-1:account:cluster:cluster-1\\",
+                    \\"arn:aws:rds:us-east-1:account:cluster:cluster-2\\",
+                    \\"arn:aws:rds:us-east-1:account:cluster:cluster-a1df\\"
+
+                    ],
+                \\"Action\\": \\"start\\"|\\"stop\\"
+                \\"Region\\": \\"us-east-1\\",
+                \\"SecondaryAutomationName\\": \\"secondary-automation-name\\",
+                \\"SolutionId\\": \\"SO0030\\",
+                \\"SolutionVersion\\": \\"v2.0.0\\",
+                \\"ExecutionRoleArn\\": \\"arn:aws:iam::account:role/role-name\\"
+            }
+    context (dict): context object
+
+    Returns:
+    list : list of secondary execution ids
+
+   \\"\\"\\"
+    logging.debug(context)
+    execution_ids = []
+    # handle empty arn list
+    if not event.get('RdsResourceArns'):
+        return execution_ids
+
+    ssm_client = get_client(event)
+    resource_list = get_resource_list(event.get('RdsResourceArns'))
+
+    for rds_cluster_name in resource_list:
+        execution_id = ssm_client.start_automation_execution(
+            # Launch SSM Doc via Automation
+            DocumentName=event.get('SecondaryAutomationName'),
+            Parameters={
+                \\"ClusterName\\": [
+                    rds_cluster_name
+                ],
+                \\"Action\\": [
+                    event.get('Action')
+                ],
+                \\"AutomationAssumeRole\\": [
+                    event.get('ExecutionRoleArn')
+                ]
+            }
+        )['AutomationExecutionId']
+        execution_ids.append(execution_id)
+
+    return execution_ids
+
+
+def get_client(event):
+    \\"\\"\\"Create Boto3 client for SSM service\\"\\"\\"
+    boto_config = Config(
+        user_agent_extra=f'AwsSolution/{event.get(\\"SolutionId\\")}/'
+                         f'{event.get(\\"SolutionVersion\\")}',
+        retries={
+            'mode': 'standard'
+        }
+    )
+
+    return boto3.client('ssm',
+                        region_name=event.get('Region'),
+                        config=boto_config)
+
+
+def get_resource_list(arn_list: list) -> list:
+    \\"\\"\\" Parse the arn list and return rds db or cluster ids\\"\\"\\"
+    cluster_separator = \\":cluster:\\"
+    cluster_prefix = \\"cluster-\\"
+
+    logging.info(\\"Found RDS Cluster list.\\")
+    cluster_ids = split_arn_list(arn_list, cluster_separator)
+    # filtering cluster ids for duplicate cluster ids
+    return [x for x in cluster_ids if not x.startswith(cluster_prefix)]
+
+
+def split_arn_list(arn_list, separator):
+    resource_ids = []
+    for arn in arn_list:
+        resource_id = arn.split(separator)[1]
+        resource_ids.append(resource_id)
+    return resource_ids",
+              },
+              "name": "startRdsClusters",
+              "outputs": Array [
+                Object {
+                  "Name": "RdsClusterArns",
+                  "Selector": "$.Payload.RdsClusterArns",
+                  "Type": "StringList",
+                },
+                Object {
+                  "Name": "SecondaryExecutionIds",
+                  "Selector": "$.Payload.SecondaryExecutionIds",
+                  "Type": "StringList",
+                },
+              ],
+            },
+            Object {
+              "action": "aws:executeAutomation",
+              "inputs": Object {
+                "DocumentName": "AWS-SetRequiredTags",
+                "RuntimeParameters": Object {
+                  "AutomationAssumeRole": "{{ AutomationAssumeRole }}",
+                  "RequiredTags": "{{ ResourceTagMapList }}",
+                  "ResourceARNs": "{{ getTaggedRDSClusterIds.rdsDbClusterArns }}",
+                },
+              },
+              "isEnd": true,
+              "maxAttempts": 3,
+              "name": "SetSchedulerResourceTags",
+              "onFailure": "Abort",
+              "timeoutSeconds": 3600,
+            },
+          ],
+          "outputs": Array [
+            "startRdsClusters.RdsClusterArns",
+          ],
+          "parameters": Object {
+            "Action": Object {
+              "allowedValues": Array [
+                "Start",
+              ],
+              "default": "Start",
+              "description": "(Required) The action to take on the cluster.",
+              "type": "String",
+            },
+            "AutomationAssumeRole": Object {
+              "default": "",
+              "description": "(Required) The ARN of the role that allows Automation to perform the actions on your behalf.",
+              "type": "String",
+            },
+            "ResourceTagMapList": Object {
+              "default": Array [
+                Object {
+                  "StateChanged": "Resource started by Instance Scheduler",
+                },
+              ],
+              "description": "(Required) The tags to add to the resources.",
+              "displayType": "textarea",
+              "type": "MapList",
+            },
+            "SecondaryAutomationName": Object {
+              "default": "AWS-StartStopAuroraCluster",
+              "description": "The secondary automation name",
+              "type": "String",
+            },
+            "SolutionId": Object {
+              "default": "SO0030",
+              "description": "SO0030",
+              "type": "String",
+            },
+            "SolutionVersion": Object {
+              "default": "v2.x",
+              "description": "Solution version number",
+              "type": "String",
+            },
+            "TagKey": Object {
+              "default": "Schedule",
+              "description": "The tag name (key) to filter list of RDS DB Clusters",
+              "type": "String",
+            },
+            "TagValue": Object {
+              "description": "The schedule name (tag value) to filter list of RDS DB Clusters",
+              "type": "StringList",
+            },
+          },
+          "schemaVersion": "0.3",
+        },
+        "DocumentType": "Automation",
+        "Name": Object {
+          "Fn::FindInMap": Array [
+            "mappings",
+            "RDSTaggedClustersStartSSMDocument",
+            "Name",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Document",
+    },
+    "InstanceSchedulerSSMDocumentsRDSTaggedClustersStopSSMDocumentC49E9F04": Object {
+      "Properties": Object {
+        "Content": Object {
+          "assumeRole": "{{ AutomationAssumeRole }}",
+          "description": "### Document Name - Scheduler-StopTaggedRDSClusters
+## What does this document do?
+This document finds the tagged RDS Clusters and stop them.
+
+## Input Parameters
+* TagKey: (Required) Tag Key to filter list of RDS DB Clusters
+* TagValue: (Required) Tag Value to filter list of RDS DB Clusters
+* SecondaryAutomationName: The secondary automation name invoked by this automation
+* ResourceTagMapList: The tags to add to the resources.
+* SolutionId: AWS Solution ID
+* SolutionVersion: AWS Solution version
+* AutomationAssumeRole: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+",
+          "mainSteps": Array [
+            Object {
+              "action": "aws:executeAwsApi",
+              "description": "Get tagged RDS DB Clusters",
+              "inputs": Object {
+                "Api": "GetResources",
+                "ResourceTypeFilters": Array [
+                  "rds:cluster",
+                ],
+                "Service": "resourcegroupstaggingapi",
+                "TagFilters": Array [
+                  Object {
+                    "Key": "{{ TagKey }}",
+                    "Values": "{{ TagValue }}",
+                  },
+                ],
+              },
+              "name": "getTaggedRDSClusterIds",
+              "onFailure": "Abort",
+              "outputs": Array [
+                Object {
+                  "Name": "rdsDbClusterArns",
+                  "Selector": "$.ResourceTagMappingList..ResourceARN",
+                  "Type": "StringList",
+                },
+                Object {
+                  "Name": "singleARN",
+                  "Selector": "$.ResourceTagMappingList[0].ResourceARN",
+                  "Type": "String",
+                },
+              ],
+            },
+            Object {
+              "action": "aws:branch",
+              "inputs": Object {
+                "Choices": Array [
+                  Object {
+                    "NextStep": "stopRdsClusters",
+                    "StartsWith": "arn:",
+                    "Variable": "{{ getTaggedRDSClusterIds.singleARN }}",
+                  },
+                ],
+              },
+              "isEnd": true,
+              "name": "checkDBArnIsNotEmpty",
+            },
+            Object {
+              "action": "aws:executeScript",
+              "inputs": Object {
+                "Handler": "start_rds_secondary_ssm_automation",
+                "InputPayload": Object {
+                  "Action": "{{ Action }}",
+                  "ExecutionRoleArn": "{{ AutomationAssumeRole }}",
+                  "RdsResourceArns": "{{ getTaggedRDSClusterIds.rdsDbClusterArns }}",
+                  "Region": "{{global:REGION}}",
+                  "SecondaryAutomationName": "{{ SecondaryAutomationName }}",
+                  "SolutionId": "{{SolutionId}}",
+                  "SolutionVersion": "{{SolutionVersion}}",
+                },
+                "Runtime": "python3.7",
+                "Script": "import boto3
+import logging
+from botocore.config import Config
+
+
+def start_rds_secondary_ssm_automation(event, context) -> list:
+    \\"\\"\\"
+    start new SSM automation document to start or stop RDS clusters.
+    Parameters:
+    event (dict): event from SSM automation
+        example:
+            {
+                \\"RdsResourceArns\\": [
+                    \\"arn:aws:rds:us-east-1:account:cluster:cluster-3d3r\\",
+                    \\"arn:aws:rds:us-east-1:account:cluster:cluster-1\\",
+                    \\"arn:aws:rds:us-east-1:account:cluster:cluster-2\\",
+                    \\"arn:aws:rds:us-east-1:account:cluster:cluster-a1df\\"
+                    ],
+                \\"Action\\": \\"start\\"|\\"stop\\"
+                \\"Region\\": \\"us-east-1\\",
+                \\"SecondaryAutomationName\\": \\"secondary-automation-name\\",
+                \\"SolutionId\\": \\"SO0030\\",
+                \\"SolutionVersion\\": \\"v2.0.0\\",
+                \\"ExecutionRoleArn\\": \\"arn:aws:iam::account:role/role-name\\"
+            }
+    context (dict): context object
+
+    Returns:
+    list : list of secondary execution ids
+
+   \\"\\"\\"
+    logging.debug(context)
+    execution_ids = []
+    # handle empty arn list
+    if not event.get('RdsResourceArns'):
+        return execution_ids
+
+    ssm_client = get_client(event)
+    resource_list = get_resource_list(event.get('RdsResourceArns'))
+
+    for rds_cluster_name in resource_list:
+        execution_id = ssm_client.start_automation_execution(
+            # Launch SSM Doc via Automation
+            DocumentName=event.get('SecondaryAutomationName'),
+            Parameters={
+                \\"ClusterName\\": [
+                    rds_cluster_name
+                ],
+                \\"Action\\": [
+                    event.get('Action')
+                ],
+                \\"AutomationAssumeRole\\": [
+                    event.get('ExecutionRoleArn')
+                ]
+            }
+        )['AutomationExecutionId']
+        execution_ids.append(execution_id)
+
+    return execution_ids
+
+
+def get_client(event):
+    \\"\\"\\"Create Boto3 client for SSM service\\"\\"\\"
+    boto_config = Config(
+        user_agent_extra=f'AwsSolution/{event.get(\\"SolutionId\\")}/'
+                         f'{event.get(\\"SolutionVersion\\")}',
+        retries={
+            'mode': 'standard'
+        }
+    )
+
+    return boto3.client('ssm',
+                        region_name=event.get('Region'),
+                        config=boto_config)
+
+
+def get_resource_list(arn_list: list) -> list:
+    \\"\\"\\" Parse the arn list and return rds db or cluster ids\\"\\"\\"
+    cluster_separator = \\":cluster:\\"
+    cluster_prefix = \\"cluster-\\"
+
+    logging.info(\\"Found RDS Cluster list.\\")
+    cluster_ids = split_arn_list(arn_list, cluster_separator)
+    # filtering cluster ids for duplicate cluster ids
+    return [x for x in cluster_ids if not x.startswith(cluster_prefix)]
+
+
+def split_arn_list(arn_list, separator):
+    resource_ids = []
+    for arn in arn_list:
+        resource_id = arn.split(separator)[1]
+        resource_ids.append(resource_id)
+    return resource_ids",
+              },
+              "name": "stopRdsClusters",
+              "outputs": Array [
+                Object {
+                  "Name": "RdsClusterArns",
+                  "Selector": "$.Payload.RdsClusterArns",
+                  "Type": "StringList",
+                },
+                Object {
+                  "Name": "SecondaryExecutionIds",
+                  "Selector": "$.Payload.SecondaryExecutionIds",
+                  "Type": "StringList",
+                },
+              ],
+            },
+            Object {
+              "action": "aws:executeAutomation",
+              "inputs": Object {
+                "DocumentName": "AWS-SetRequiredTags",
+                "RuntimeParameters": Object {
+                  "AutomationAssumeRole": "{{ AutomationAssumeRole }}",
+                  "RequiredTags": "{{ ResourceTagMapList }}",
+                  "ResourceARNs": "{{ getTaggedRDSClusterIds.rdsDbClusterArns }}",
+                },
+              },
+              "isEnd": true,
+              "maxAttempts": 3,
+              "name": "SetSchedulerResourceTags",
+              "onFailure": "Abort",
+              "timeoutSeconds": 3600,
+            },
+          ],
+          "outputs": Array [
+            "stopRdsClusters.RdsClusterArns",
+          ],
+          "parameters": Object {
+            "Action": Object {
+              "allowedValues": Array [
+                "Stop",
+              ],
+              "default": "Stop",
+              "description": "(Required) The action to take on the cluster.",
+              "type": "String",
+            },
+            "AutomationAssumeRole": Object {
+              "default": "",
+              "description": "(Required) The ARN of the role that allows Automation to perform the actions on your behalf.",
+              "type": "String",
+            },
+            "ResourceTagMapList": Object {
+              "default": Array [
+                Object {
+                  "StateChanged": "Resource started by Instance Scheduler",
+                },
+              ],
+              "description": "(Required) The tags to add to the resources.",
+              "displayType": "textarea",
+              "type": "MapList",
+            },
+            "SecondaryAutomationName": Object {
+              "default": "AWS-StartStopAuroraCluster",
+              "description": "The secondary automation name",
+              "type": "String",
+            },
+            "SolutionId": Object {
+              "default": "SO0030",
+              "description": "SO0030",
+              "type": "String",
+            },
+            "SolutionVersion": Object {
+              "default": "v2.x",
+              "description": "Solution version number",
+              "type": "String",
+            },
+            "TagKey": Object {
+              "default": "Schedule",
+              "description": "The tag name (key) to filter list of RDS DB Clusters",
+              "type": "String",
+            },
+            "TagValue": Object {
+              "description": "The schedule name (tag value) to filter list of RDS DB Clusters",
+              "type": "StringList",
+            },
+          },
+          "schemaVersion": "0.3",
+        },
+        "DocumentType": "Automation",
+        "Name": Object {
+          "Fn::FindInMap": Array [
+            "mappings",
+            "RDSTaggedClustersStopSSMDocument",
+            "Name",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Document",
+    },
+    "InstanceSchedulerSSMDocumentsRDSTaggedInstancesStartSSMDocument961DA9C3": Object {
+      "Properties": Object {
+        "Content": Object {
+          "assumeRole": "{{ AutomationAssumeRole }}",
+          "description": "### Document Name - Scheduler-StartTaggedRDSInstances
+## What does this document do?
+This document finds the tagged RDS instances and start them.
+
+## Input Parameters
+* TagKey: (Required) Tag Key to filter list of RDS DB Instances
+* TagValue: (Required) Tag Value to filter list of RDS DB Instances
+* SecondaryAutomationName: The secondary automation name invoked by this automation
+* ResourceTagMapList: The tags to add to the resources.
+* SolutionId: AWS Solution ID
+* SolutionVersion: AWS Solution version
+* AutomationAssumeRole: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+",
+          "mainSteps": Array [
+            Object {
+              "action": "aws:executeAwsApi",
+              "description": "Get tagged RDS DB instances",
+              "inputs": Object {
+                "Api": "GetResources",
+                "ResourceTypeFilters": Array [
+                  "rds:db",
+                ],
+                "Service": "resourcegroupstaggingapi",
+                "TagFilters": Array [
+                  Object {
+                    "Key": "{{ TagKey }}",
+                    "Values": "{{ TagValue }}",
+                  },
+                ],
+              },
+              "name": "getTaggedRDSInstanceIds",
+              "onFailure": "Abort",
+              "outputs": Array [
+                Object {
+                  "Name": "rdsDbInstanceArns",
+                  "Selector": "$.ResourceTagMappingList..ResourceARN",
+                  "Type": "StringList",
+                },
+                Object {
+                  "Name": "singleARN",
+                  "Selector": "$.ResourceTagMappingList[0].ResourceARN",
+                  "Type": "String",
+                },
+              ],
+            },
+            Object {
+              "action": "aws:branch",
+              "inputs": Object {
+                "Choices": Array [
+                  Object {
+                    "NextStep": "startRdsInstances",
+                    "StartsWith": "arn:",
+                    "Variable": "{{ getTaggedRDSInstanceIds.singleARN }}",
+                  },
+                ],
+              },
+              "isEnd": true,
+              "name": "checkDBArnIsNotEmpty",
+            },
+            Object {
+              "action": "aws:executeScript",
+              "inputs": Object {
+                "Handler": "start_rds_secondary_ssm_automation",
+                "InputPayload": Object {
+                  "ExecutionRoleArn": "{{ AutomationAssumeRole }}",
+                  "RdsResourceArns": "{{ getTaggedRDSInstanceIds.rdsDbInstanceArns }}",
+                  "Region": "{{ global:REGION }}",
+                  "SecondaryAutomationName": "{{ SecondaryAutomationName }}",
+                  "SolutionId": "{{ SolutionId }}",
+                  "SolutionVersion": "{{ SolutionVersion }}",
+                },
+                "Runtime": "python3.7",
+                "Script": "import boto3
+import logging
+from botocore.config import Config
+
+
+def start_rds_secondary_ssm_automation(event, context) -> list:
+    \\"\\"\\"
+    start new SSM automation document to start or stop RDS instances.
+    Parameters:
+    event (dict): event from SSM automation
+        example:
+            {
+                \\"RdsResourceArns\\": [
+                    \\"arn:aws:rds:us-east-1:account:db:database-name-1\\",
+                    \\"arn:aws:rds:us-east-1:account:db:database-name-2\\"
+                    ],
+                \\"Region\\": \\"us-east-1\\",
+                \\"SecondaryAutomationName\\": \\"secondary-automation-name\\",
+                \\"SolutionId\\": \\"SO0030\\",
+                \\"SolutionVersion\\": \\"v2.0.0\\",
+                \\"ExecutionRoleArn\\": \\"arn:aws:iam::account:role/role-name\\"
+            }
+    context (dict): context object
+
+    Returns:
+    list : list of secondary execution ids
+
+   \\"\\"\\"
+    logging.debug(context)
+    execution_ids = []
+    # handle empty arn list
+    if not event.get('RdsResourceArns'):
+        return execution_ids
+
+    ssm_client = get_client(event)
+    resource_list = split_arn_list(event.get('RdsResourceArns'))
+
+    for rds_instance_id in resource_list:
+        execution_id = ssm_client.start_automation_execution(
+            # Launch SSM Doc via Automation
+            DocumentName=event.get('SecondaryAutomationName'),
+            Parameters={
+                \\"InstanceId\\": [
+                    rds_instance_id
+                ],
+                \\"AutomationAssumeRole\\": [
+                    event.get('ExecutionRoleArn')
+                ]
+            }
+        )['AutomationExecutionId']
+        execution_ids.append(execution_id)
+
+    return execution_ids
+
+
+def get_client(event):
+    \\"\\"\\"Create Boto3 client for SSM service\\"\\"\\"
+    boto_config = Config(
+        user_agent_extra=f'AwsSolution/{event.get(\\"SolutionId\\")}/'
+                         f'{event.get(\\"SolutionVersion\\")}',
+        retries={
+            'mode': 'standard'
+        }
+    )
+
+    return boto3.client('ssm',
+                        region_name=event.get('Region'),
+                        config=boto_config)
+
+
+def split_arn_list(arn_list):
+    separator = ':db:'
+    resource_ids = []
+    for arn in arn_list:
+        resource_id = arn.split(separator)[1]
+        resource_ids.append(resource_id)
+    return resource_ids",
+              },
+              "name": "startRdsInstances",
+            },
+            Object {
+              "action": "aws:executeAutomation",
+              "inputs": Object {
+                "DocumentName": "AWS-SetRequiredTags",
+                "RuntimeParameters": Object {
+                  "AutomationAssumeRole": "{{ AutomationAssumeRole }}",
+                  "RequiredTags": "{{ ResourceTagMapList }}",
+                  "ResourceARNs": "{{ getTaggedRDSInstanceIds.rdsDbInstanceArns }}",
+                },
+              },
+              "isEnd": true,
+              "maxAttempts": 3,
+              "name": "createResourceTags",
+              "onFailure": "Abort",
+              "timeoutSeconds": 3600,
+            },
+          ],
+          "outputs": Array [
+            "getTaggedRDSInstanceIds.rdsDbInstanceArns",
+          ],
+          "parameters": Object {
+            "AutomationAssumeRole": Object {
+              "default": "",
+              "description": "(Required) The ARN of the role that allows Automation to perform the actions on your behalf.",
+              "type": "String",
+            },
+            "ResourceTagMapList": Object {
+              "default": Array [
+                Object {
+                  "StateChanged": "Resource started by Instance Scheduler",
+                },
+              ],
+              "description": "(Required) The tags to add to the resources.",
+              "displayType": "textarea",
+              "type": "MapList",
+            },
+            "SecondaryAutomationName": Object {
+              "default": "AWS-StartRdsInstance",
+              "description": "The secondary automation name",
+              "type": "String",
+            },
+            "SolutionId": Object {
+              "default": "SO0030",
+              "description": "SO0030",
+              "type": "String",
+            },
+            "SolutionVersion": Object {
+              "default": "v2.x",
+              "description": "Solution version number",
+              "type": "String",
+            },
+            "TagKey": Object {
+              "default": "Schedule",
+              "description": "The tag name (key) to filter list of RDS DB Instances",
+              "type": "String",
+            },
+            "TagValue": Object {
+              "description": "The schedule name (tag value) to filter list of RDS DB Instances",
+              "type": "StringList",
+            },
+          },
+          "schemaVersion": "0.3",
+        },
+        "DocumentType": "Automation",
+        "Name": Object {
+          "Fn::FindInMap": Array [
+            "mappings",
+            "RDSInstancesStartSSMDocument",
+            "Name",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Document",
+    },
+    "InstanceSchedulerSSMDocumentsRDSTaggedInstancesStopSSMDocument3478C1AF": Object {
+      "Properties": Object {
+        "Content": Object {
+          "assumeRole": "{{ AutomationAssumeRole }}",
+          "description": "### Document Name - Scheduler-StopTaggedRDSInstances
+## What does this document do?
+This document finds the tagged RDS instances and stop them.
+
+## Input Parameters
+* TagKey: (Required) Tag Key to filter list of RDS DB Instances
+* TagValue: (Required) Tag Value to filter list of RDS DB Instances
+* SecondaryAutomationName: The secondary automation name invoked by this automation
+* ResourceTagMapList: The tags to add to the resources.
+* SolutionId: AWS Solution ID
+* SolutionVersion: AWS Solution version
+* AutomationAssumeRole: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+",
+          "mainSteps": Array [
+            Object {
+              "action": "aws:executeAwsApi",
+              "description": "Get tagged RDS DB instances",
+              "inputs": Object {
+                "Api": "GetResources",
+                "ResourceTypeFilters": Array [
+                  "rds:db",
+                ],
+                "Service": "resourcegroupstaggingapi",
+                "TagFilters": Array [
+                  Object {
+                    "Key": "{{ TagKey }}",
+                    "Values": "{{ TagValue }}",
+                  },
+                ],
+              },
+              "name": "getTaggedRDSInstanceIds",
+              "onFailure": "Abort",
+              "outputs": Array [
+                Object {
+                  "Name": "rdsDbInstanceArns",
+                  "Selector": "$.ResourceTagMappingList..ResourceARN",
+                  "Type": "StringList",
+                },
+                Object {
+                  "Name": "singleARN",
+                  "Selector": "$.ResourceTagMappingList[0].ResourceARN",
+                  "Type": "String",
+                },
+              ],
+            },
+            Object {
+              "action": "aws:branch",
+              "inputs": Object {
+                "Choices": Array [
+                  Object {
+                    "NextStep": "stopRdsInstances",
+                    "StartsWith": "arn:",
+                    "Variable": "{{ getTaggedRDSInstanceIds.singleARN }}",
+                  },
+                ],
+              },
+              "isEnd": true,
+              "name": "checkDBArnIsNotEmpty",
+            },
+            Object {
+              "action": "aws:executeScript",
+              "inputs": Object {
+                "Handler": "start_rds_secondary_ssm_automation",
+                "InputPayload": Object {
+                  "ExecutionRoleArn": "{{ AutomationAssumeRole }}",
+                  "RdsResourceArns": "{{ getTaggedRDSInstanceIds.rdsDbInstanceArns }}",
+                  "Region": "{{ global:REGION }}",
+                  "SecondaryAutomationName": "{{ SecondaryAutomationName }}",
+                  "SolutionId": "{{ SolutionId }}",
+                  "SolutionVersion": "{{SolutionVersion}}",
+                },
+                "Runtime": "python3.7",
+                "Script": "import boto3
+import logging
+from botocore.config import Config
+
+
+def start_rds_secondary_ssm_automation(event, context) -> list:
+    \\"\\"\\"
+    start new SSM automation document to start or stop RDS instances.
+    Parameters:
+    event (dict): event from SSM automation
+        example:
+            {
+                \\"RdsResourceArns\\": [
+                    \\"arn:aws:rds:us-east-1:account:db:database-name-1\\",
+                    \\"arn:aws:rds:us-east-1:account:db:database-name-2\\"
+                    ],
+                \\"Region\\": \\"us-east-1\\",
+                \\"SecondaryAutomationName\\": \\"secondary-automation-name\\",
+                \\"SolutionId\\": \\"SO0030\\",
+                \\"SolutionVersion\\": \\"v2.0.0\\",
+                \\"ExecutionRoleArn\\": \\"arn:aws:iam::account:role/role-name\\"
+            }
+    context (dict): context object
+
+    Returns:
+    list : list of secondary execution ids
+
+   \\"\\"\\"
+    logging.debug(context)
+    execution_ids = []
+    # handle empty arn list
+    if not event.get('RdsResourceArns'):
+        return execution_ids
+
+    ssm_client = get_client(event)
+    resource_list = split_arn_list(event.get('RdsResourceArns'))
+
+    for rds_instance_id in resource_list:
+        execution_id = ssm_client.start_automation_execution(
+            # Launch SSM Doc via Automation
+            DocumentName=event.get('SecondaryAutomationName'),
+            Parameters={
+                \\"InstanceId\\": [
+                    rds_instance_id
+                ],
+                \\"AutomationAssumeRole\\": [
+                    event.get('ExecutionRoleArn')
+                ]
+            }
+        )['AutomationExecutionId']
+        execution_ids.append(execution_id)
+
+    return execution_ids
+
+
+def get_client(event):
+    \\"\\"\\"Create Boto3 client for SSM service\\"\\"\\"
+    boto_config = Config(
+        user_agent_extra=f'AwsSolution/{event.get(\\"SolutionId\\")}/'
+                         f'{event.get(\\"SolutionVersion\\")}',
+        retries={
+            'mode': 'standard'
+        }
+    )
+
+    return boto3.client('ssm',
+                        region_name=event.get('Region'),
+                        config=boto_config)
+
+
+def split_arn_list(arn_list):
+    separator = ':db:'
+    resource_ids = []
+    for arn in arn_list:
+        resource_id = arn.split(separator)[1]
+        resource_ids.append(resource_id)
+    return resource_ids",
+              },
+              "name": "stopRdsInstances",
+            },
+            Object {
+              "action": "aws:executeAutomation",
+              "inputs": Object {
+                "DocumentName": "AWS-SetRequiredTags",
+                "RuntimeParameters": Object {
+                  "AutomationAssumeRole": "{{ AutomationAssumeRole }}",
+                  "RequiredTags": "{{ ResourceTagMapList }}",
+                  "ResourceARNs": "{{ getTaggedRDSInstanceIds.rdsDbInstanceArns }}",
+                },
+              },
+              "isEnd": true,
+              "maxAttempts": 3,
+              "name": "createResourceTags",
+              "onFailure": "Abort",
+              "timeoutSeconds": 3600,
+            },
+          ],
+          "outputs": Array [
+            "getTaggedRDSInstanceIds.rdsDbInstanceArns",
+          ],
+          "parameters": Object {
+            "AutomationAssumeRole": Object {
+              "default": "",
+              "description": "(Required) The ARN of the role that allows Automation to perform the actions on your behalf.",
+              "type": "String",
+            },
+            "ResourceTagMapList": Object {
+              "default": Array [
+                Object {
+                  "StateChanged": "Resource started by Instance Scheduler",
+                },
+              ],
+              "description": "(Required) The tags to add to the resources.",
+              "displayType": "textarea",
+              "type": "MapList",
+            },
+            "SecondaryAutomationName": Object {
+              "default": "AWS-StopRdsInstance",
+              "description": "The secondary automation name",
+              "type": "String",
+            },
+            "SolutionId": Object {
+              "default": "SO0030",
+              "description": "SO0030",
+              "type": "String",
+            },
+            "SolutionVersion": Object {
+              "default": "v2.x",
+              "description": "Solution version number",
+              "type": "String",
+            },
+            "TagKey": Object {
+              "default": "Schedule",
+              "description": "The tag name (key) to filter list of RDS DB Instances",
+              "type": "String",
+            },
+            "TagValue": Object {
+              "description": "The schedule name (tag value) to filter list of RDS DB Instances",
+              "type": "StringList",
+            },
+          },
+          "schemaVersion": "0.3",
+        },
+        "DocumentType": "Automation",
+        "Name": Object {
+          "Fn::FindInMap": Array [
+            "mappings",
+            "RDSInstancesStopSSMDocument",
+            "Name",
+          ],
+        },
+      },
+      "Type": "AWS::SSM::Document",
+    },
     "InstanceSchedulerSnsTopic": Object {
       "Properties": Object {
         "KmsMasterKeyId": Object {
@@ -1061,38 +2351,39 @@ Object {
       "Properties": Object {
         "Code": Object {
           "S3Bucket": "solutions-eu-west-1",
-          "S3Key": "aws-instance-scheduler/v1.4.0/instance-scheduler.zip",
+          "S3Key": "aws-instance-scheduler/v2.0.0/instance-scheduler.zip",
         },
-        "Description": "EC2 and RDS instance scheduler, version v1.4.0",
+        "Description": "EC2 and RDS instance scheduler, version v2.0.0",
         "Environment": Object {
           "Variables": Object {
             "ACCOUNT": "111111111111",
-            "BOTO_RETRY": "5,10,30,0.25",
             "CONFIG_TABLE": Object {
               "Ref": "ConfigTable",
             },
             "DDB_TABLE_NAME": Object {
-              "Ref": "StateTable",
+              "Ref": "ConfigTable",
             },
-            "ENABLE_SSM_MAINTENANCE_WINDOWS": Object {
+            "EC2_START_SSM_DOC": Object {
               "Fn::FindInMap": Array [
                 "mappings",
-                "TrueFalse",
-                Object {
-                  "Ref": "EnableSSMMaintenanceWindows",
-                },
+                "Ec2StartSSMDocument",
+                "Name",
               ],
             },
-            "ENV_BOTO_RETRY_LOGGING": "FALSE",
+            "EC2_STOP_SSM_DOC": Object {
+              "Fn::FindInMap": Array [
+                "mappings",
+                "Ec2StopSSMDocument",
+                "Name",
+              ],
+            },
             "ISSUES_TOPIC_ARN": Object {
               "Ref": "InstanceSchedulerSnsTopic",
             },
             "LOG_GROUP": Object {
               "Ref": "SchedulerLogGroup",
             },
-            "MAINTENANCE_WINDOW_TABLE": Object {
-              "Ref": "MaintenanceWindowTable",
-            },
+            "MAX_ALLOWED_ACCOUNTS_IN_SSM_API": "50",
             "METRICS_URL": Object {
               "Fn::FindInMap": Array [
                 "mappings",
@@ -1100,8 +2391,39 @@ Object {
                 "MetricsUrl",
               ],
             },
+            "RDS_CLUSTERS_START_SSM_DOC": Object {
+              "Fn::FindInMap": Array [
+                "mappings",
+                "RDSTaggedClustersStartSSMDocument",
+                "Name",
+              ],
+            },
+            "RDS_CLUSTERS_STOP_SSM_DOC": Object {
+              "Fn::FindInMap": Array [
+                "mappings",
+                "RDSTaggedClustersStopSSMDocument",
+                "Name",
+              ],
+            },
+            "RDS_INSTANCES_START_SSM_DOC": Object {
+              "Fn::FindInMap": Array [
+                "mappings",
+                "RDSInstancesStartSSMDocument",
+                "Name",
+              ],
+            },
+            "RDS_INSTANCES_STOP_SSM_DOC": Object {
+              "Fn::FindInMap": Array [
+                "mappings",
+                "RDSInstancesStopSSMDocument",
+                "Name",
+              ],
+            },
             "SCHEDULER_FREQUENCY": Object {
               "Ref": "SchedulerFrequency",
+            },
+            "SCHEDULE_STATES_TABLE": Object {
+              "Ref": "ScheduleStatesTable",
             },
             "SEND_METRICS": Object {
               "Fn::FindInMap": Array [
@@ -1123,15 +2445,26 @@ Object {
                 "MetricsSolutionId",
               ],
             },
+            "SSM_ADMIN_ROLE_NAME": Object {
+              "Fn::GetAtt": Array [
+                "SchedulerRole",
+                "Arn",
+              ],
+            },
+            "SSM_EXECUTION_ROLE_NAME": Object {
+              "Fn::FindInMap": Array [
+                "mappings",
+                "SchedulerExecutionRole",
+                "Name",
+              ],
+            },
+            "SSM_MAX_CONCURRENCY": "100%",
+            "SSM_MAX_ERRORS": "100%",
             "STACK_ID": Object {
               "Ref": "AWS::StackId",
             },
             "STACK_NAME": Object {
               "Ref": "AWS::StackName",
-            },
-            "START_EC2_BATCH_SIZE": "5",
-            "STATE_TABLE": Object {
-              "Ref": "StateTable",
             },
             "TAG_NAME": Object {
               "Ref": "TagName",
@@ -1145,19 +2478,7 @@ Object {
                 },
               ],
             },
-            "USER_AGENT": Object {
-              "Fn::Join": Array [
-                "",
-                Array [
-                  "InstanceScheduler-",
-                  Object {
-                    "Ref": "AWS::StackName",
-                  },
-                  "-v1.4.0",
-                ],
-              ],
-            },
-            "USER_AGENT_EXTRA": "AwsSolution/SO0030/v1.4.0",
+            "USER_AGENT_EXTRA": "AwsSolution/SO0030/v2.0.0",
             "UUID_KEY": Object {
               "Fn::FindInMap": Array [
                 "Send",
@@ -1179,9 +2500,7 @@ Object {
           ],
         },
         "Handler": "main.lambda_handler",
-        "MemorySize": Object {
-          "Ref": "MemorySize",
-        },
+        "MemorySize": 1024,
         "Role": Object {
           "Fn::GetAtt": Array [
             "SchedulerRole",
@@ -1189,34 +2508,34 @@ Object {
           ],
         },
         "Runtime": "python3.7",
-        "Timeout": 300,
+        "Timeout": 900,
         "TracingConfig": Object {
           "Mode": "Active",
         },
       },
       "Type": "AWS::Lambda::Function",
     },
-    "MaintenanceWindowTable": Object {
+    "ScheduleStatesTable": Object {
       "DeletionPolicy": "Delete",
       "Properties": Object {
         "AttributeDefinitions": Array [
           Object {
-            "AttributeName": "Name",
+            "AttributeName": "name",
             "AttributeType": "S",
           },
           Object {
-            "AttributeName": "account-region",
+            "AttributeName": "service",
             "AttributeType": "S",
           },
         ],
         "BillingMode": "PAY_PER_REQUEST",
         "KeySchema": Array [
           Object {
-            "AttributeName": "Name",
+            "AttributeName": "name",
             "KeyType": "HASH",
           },
           Object {
-            "AttributeName": "account-region",
+            "AttributeName": "service",
             "KeyType": "RANGE",
           },
         ],
@@ -1246,6 +2565,9 @@ Object {
             "Arn",
           ],
         },
+        "aws_partition": Object {
+          "Fn::Sub": "\${AWS::Partition}",
+        },
         "config_table": Object {
           "Ref": "ConfigTable",
         },
@@ -1258,26 +2580,27 @@ Object {
             },
           ],
         },
-        "cross_account_roles": Object {
-          "Ref": "CrossAccountRoles",
-        },
         "default_timezone": Object {
           "Ref": "DefaultTimezone",
         },
-        "enable_SSM_maintenance_windows": Object {
+        "execution_role_name": Object {
           "Fn::FindInMap": Array [
             "mappings",
-            "TrueFalse",
-            Object {
-              "Ref": "EnableSSMMaintenanceWindows",
-            },
+            "SchedulerExecutionRole",
+            "Name",
           ],
         },
         "log_retention_days": Object {
           "Ref": "LogRetentionDays",
         },
+        "namespace": Object {
+          "Ref": "Namespace",
+        },
         "regions": Object {
           "Ref": "Regions",
+        },
+        "remote_account_ids": Object {
+          "Ref": "Principals",
         },
         "schedule_clusters": Object {
           "Fn::FindInMap": Array [
@@ -1285,15 +2608,6 @@ Object {
             "TrueFalse",
             Object {
               "Ref": "ScheduleRdsClusters",
-            },
-          ],
-        },
-        "schedule_lambda_account": Object {
-          "Fn::FindInMap": Array [
-            "mappings",
-            "TrueFalse",
-            Object {
-              "Ref": "ScheduleLambdaAccount",
             },
           ],
         },
@@ -1311,7 +2625,7 @@ Object {
             },
           ],
         },
-        "stack_version": "v1.4.0",
+        "stack_version": "v2.0.0",
         "started_tags": Object {
           "Ref": "StartedTags",
         },
@@ -1331,18 +2645,119 @@ Object {
             },
           ],
         },
-        "use_metrics": Object {
+        "use_aws_organizations": Object {
           "Fn::FindInMap": Array [
             "mappings",
             "TrueFalse",
             Object {
-              "Ref": "UseCloudWatchMetrics",
+              "Ref": "UsingAWSOrganizations",
             },
           ],
         },
       },
       "Type": "Custom::ServiceSetup",
       "UpdateReplacePolicy": "Delete",
+    },
+    "SchedulerEventBusResourcesschedulereventbusBB7012FB": Object {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": Object {
+        "Name": Object {
+          "Fn::Join": Array [
+            "",
+            Array [
+              Object {
+                "Ref": "Namespace",
+              },
+              "-",
+              Object {
+                "Fn::FindInMap": Array [
+                  "mappings",
+                  "SchedulerEventBusName",
+                  "Name",
+                ],
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Events::EventBus",
+    },
+    "SchedulerEventBusResourcesschedulereventbuspolicyF17AB2BC": Object {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": Object {
+        "Action": "events:PutEvents",
+        "Condition": Object {
+          "Key": "aws:PrincipalOrgID",
+          "Type": "StringEquals",
+          "Value": Object {
+            "Fn::Select": Array [
+              0,
+              Object {
+                "Ref": "Principals",
+              },
+            ],
+          },
+        },
+        "EventBusName": Object {
+          "Fn::GetAtt": Array [
+            "SchedulerEventBusResourcesschedulereventbusBB7012FB",
+            "Name",
+          ],
+        },
+        "Principal": "*",
+        "StatementId": Object {
+          "Fn::GetAtt": Array [
+            "SchedulerEventBusResourcesschedulereventbusBB7012FB",
+            "Name",
+          ],
+        },
+      },
+      "Type": "AWS::Events::EventBusPolicy",
+    },
+    "SchedulerEventBusResourcesschedulerssmparametercrossaccountevents21DB1768": Object {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": Object {
+        "Description": "Event rule to invoke Instance Scheduler lambda function to store spoke account id(s) in configuration.",
+        "EventBusName": Object {
+          "Fn::GetAtt": Array [
+            "SchedulerEventBusResourcesschedulereventbusBB7012FB",
+            "Name",
+          ],
+        },
+        "EventPattern": Object {
+          "detail": Object {
+            "name": Array [
+              "/instance-scheduler/do-not-delete-manually",
+            ],
+            "operation": Array [
+              "Create",
+              "Delete",
+            ],
+            "type": Array [
+              "String",
+            ],
+          },
+          "detail-type": Array [
+            "Parameter Store Change",
+          ],
+          "source": Array [
+            "aws.ssm",
+          ],
+        },
+        "State": "ENABLED",
+        "Targets": Array [
+          Object {
+            "Arn": Object {
+              "Fn::GetAtt": Array [
+                "Main",
+                "Arn",
+              ],
+            },
+            "Id": "Scheduler-Lambda-Function",
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
     },
     "SchedulerLogGroup": Object {
       "DeletionPolicy": "Delete",
@@ -1431,6 +2846,120 @@ Object {
                 ],
               },
             },
+            Object {
+              "Action": "ssm:StartAutomationExecution",
+              "Effect": "Allow",
+              "Resource": Array [
+                Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      Object {
+                        "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                      },
+                      Object {
+                        "Fn::FindInMap": Array [
+                          "mappings",
+                          "Ec2StartSSMDocument",
+                          "Name",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+                Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      Object {
+                        "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                      },
+                      Object {
+                        "Fn::FindInMap": Array [
+                          "mappings",
+                          "Ec2StopSSMDocument",
+                          "Name",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+                Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      Object {
+                        "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                      },
+                      Object {
+                        "Fn::FindInMap": Array [
+                          "mappings",
+                          "RDSInstancesStartSSMDocument",
+                          "Name",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+                Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      Object {
+                        "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                      },
+                      Object {
+                        "Fn::FindInMap": Array [
+                          "mappings",
+                          "RDSInstancesStopSSMDocument",
+                          "Name",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+                Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      Object {
+                        "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                      },
+                      Object {
+                        "Fn::FindInMap": Array [
+                          "mappings",
+                          "RDSTaggedClustersStartSSMDocument",
+                          "Name",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+                Object {
+                  "Fn::Join": Array [
+                    "",
+                    Array [
+                      Object {
+                        "Fn::Sub": "arn:\${AWS::Partition}:ssm:*:\${AWS::AccountId}:automation-definition/",
+                      },
+                      Object {
+                        "Fn::FindInMap": Array [
+                          "mappings",
+                          "RDSTaggedClustersStopSSMDocument",
+                          "Name",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
           ],
           "Version": "2012-10-17",
         },
@@ -1493,6 +3022,7 @@ Object {
                 "Service": Array [
                   "events.amazonaws.com",
                   "lambda.amazonaws.com",
+                  "ssm.amazonaws.com",
                 ],
               },
             },
@@ -1543,7 +3073,7 @@ Object {
               "Resource": Array [
                 Object {
                   "Fn::GetAtt": Array [
-                    "StateTable",
+                    "ConfigTable",
                     "Arn",
                   ],
                 },
@@ -1555,6 +3085,7 @@ Object {
             Object {
               "Action": Array [
                 "dynamodb:DeleteItem",
+                "dynamodb:UpdateItem",
                 "dynamodb:GetItem",
                 "dynamodb:PutItem",
                 "dynamodb:Query",
@@ -1571,7 +3102,7 @@ Object {
                 },
                 Object {
                   "Fn::GetAtt": Array [
-                    "MaintenanceWindowTable",
+                    "ScheduleStatesTable",
                     "Arn",
                   ],
                 },
@@ -1601,7 +3132,7 @@ Object {
     },
     "SchedulerRule": Object {
       "Properties": Object {
-        "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version v1.4.0",
+        "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version v2.0.0",
         "ScheduleExpression": Object {
           "Fn::FindInMap": Array [
             "mappings",
@@ -1633,44 +3164,6 @@ Object {
         ],
       },
       "Type": "AWS::Events::Rule",
-    },
-    "StateTable": Object {
-      "DeletionPolicy": "Delete",
-      "Properties": Object {
-        "AttributeDefinitions": Array [
-          Object {
-            "AttributeName": "service",
-            "AttributeType": "S",
-          },
-          Object {
-            "AttributeName": "account-region",
-            "AttributeType": "S",
-          },
-        ],
-        "BillingMode": "PAY_PER_REQUEST",
-        "KeySchema": Array [
-          Object {
-            "AttributeName": "service",
-            "KeyType": "HASH",
-          },
-          Object {
-            "AttributeName": "account-region",
-            "KeyType": "RANGE",
-          },
-        ],
-        "PointInTimeRecoverySpecification": Object {
-          "PointInTimeRecoveryEnabled": true,
-        },
-        "SSESpecification": Object {
-          "KMSMasterKeyId": Object {
-            "Ref": "InstanceSchedulerEncryptionKey",
-          },
-          "SSEEnabled": true,
-          "SSEType": "KMS",
-        },
-      },
-      "Type": "AWS::DynamoDB::Table",
-      "UpdateReplacePolicy": "Delete",
     },
     "instanceschedulerlambdaLambdaFunctionAwsEventsLambdaInvokePermission1F8E87DF9": Object {
       "Properties": Object {

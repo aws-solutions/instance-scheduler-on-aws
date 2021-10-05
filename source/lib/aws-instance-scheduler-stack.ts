@@ -22,12 +22,11 @@ import * as lambda from '@aws-cdk/aws-lambda';
 import * as s3 from '@aws-cdk/aws-s3';
 import * as sns from '@aws-cdk/aws-sns';
 import * as events from '@aws-cdk/aws-events';
-import { ArnPrincipal, Effect, PolicyStatement } from '@aws-cdk/aws-iam';
 import { LambdaToDynamoDBProps, LambdaToDynamoDB } from '@aws-solutions-constructs/aws-lambda-dynamodb';
 import * as EventlambdaConstruct from '@aws-solutions-constructs/aws-events-rule-lambda';
 import * as dynamodb from '@aws-cdk/aws-dynamodb';
-import { Aws, RemovalPolicy } from '@aws-cdk/core';
-
+import { InstanceSchedulerSSMDocuments, InstanceSchedulerSSMDocProps } from './ssm-documents-stack';
+import {SchedulerEventBusResources, SchedulerEventBusProps} from "./event-bus-stack";
 
 export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
   readonly description: string,
@@ -43,7 +42,7 @@ export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
 * AWS instance scheduler stack, utilizes two cdk constructs, aws-lambda-dynamodb and aws-events-rule-lambda.
 * The stack has three dynamoDB tables defined for storing the state, configuration and maintenance information.
 * The stack also includes one lambda, which is scheduled using a AWS CloudWatch Event Rule. 
-* The stack also includes a cloudwatch log group for the entire solution, encrycption key, encyrption key alias and SNS topic,
+* The stack also includes a cloudwatch log group for the entire solution, encryption key, encryption key alias and SNS topic,
 * and the necessary AWS IAM Policies and IAM Roles. For more information on the architecture, refer to the documentation at
 * https://aws.amazon.com/solutions/implementations/instance-scheduler/?did=sl_card&trk=sl_card
 */
@@ -76,23 +75,9 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     });
 
     const createRdsSnapshot = new cdk.CfnParameter(this, 'CreateRdsSnapshot', {
-      description: 'Create snapshot before stopping RDS instances (does not apply to Aurora Clusters).',
+      description: '(Not supported in v2.0) Create snapshot before stopping RDS instances (does not apply to Aurora Clusters).',
       type: "String",
-      allowedValues: ["Yes", "No"],
-      default: "No"
-    });
-
-    const memorySize = new cdk.CfnParameter(this, 'MemorySize', {
-      description: 'Size of the Lambda function running the scheduler, increase size when processing large numbers of instances.',
-      type: "Number",
-      allowedValues: ["128", "384", "512", "640", "768", "896", "1024", "1152", "1280", "1408", "1536"],
-      default: 128
-    });
-
-    const useCloudWatchMetrics = new cdk.CfnParameter(this, 'UseCloudWatchMetrics', {
-      description: 'Collect instance scheduling data using CloudWatch metrics.',
-      type: "String",
-      allowedValues: ["Yes", "No"],
+      allowedValues: ["No"],
       default: "No"
     });
 
@@ -100,18 +85,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       description: 'Retention days for scheduler logs.',
       type: "Number",
       allowedValues: ["1", "3", "5", "7", "14", "14", "30", "60", "90", "120", "150", "180", "365", "400", "545", "731", "1827", "3653"],
-      default: 30
+      default: "30"
     });
 
     const trace = new cdk.CfnParameter(this, 'Trace', {
-      description: 'Enable logging of detailed information in CloudWatch logs.',
-      type: 'String',
-      allowedValues: ["Yes", "No"],
-      default: "No"
-    });
-    
-    const enableSSMMaintenanceWindows = new cdk.CfnParameter(this, 'EnableSSMMaintenanceWindows', {
-      description: 'Enable the solution to load SSM Maintenance Windows, so that they can be used for EC2 instance Scheduling.',
+      description: "Allow 'debug' level logging in CloudWatch logs.",
       type: 'String',
       allowedValues: ["Yes", "No"],
       default: "No"
@@ -568,19 +546,33 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       description: 'List of regions in which instances are scheduled, leave blank for current region only.'
     })
 
-    const crossAccountRoles = new cdk.CfnParameter(this, 'CrossAccountRoles', {
+    const usingAWSOrganizations = new cdk.CfnParameter(this, 'UsingAWSOrganizations', {
+      type: 'String',
+      description: 'Is the hub account member of the AWS Organizations?',
+      allowedValues: ["Yes", "No"],
+      default: "No"
+    })
+
+    const principals = new cdk.CfnParameter(this, 'Principals', {
       type: 'CommaDelimitedList',
-      description: 'Comma separated list of ARN\'s for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.'
+      description: '(Required) If using AWS Organizations, provide Organization ID. Eg. o-xxxxyyy. Else, comma separated list of remote account ids. Eg.: 1111111111, 2222222222'
+    })
+
+    const namespace = new cdk.CfnParameter(this, "Namespace", {
+      type: "String",
+      description: "Provide unique identifier to differentiate between multiple solution deployments (No Spaces). Example: Dev"
     })
 
     const startedTags = new cdk.CfnParameter(this, 'StartedTags', {
       type: 'String',
-      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances'
+      description: 'Comma separated list of tag names and values on the format name=value,name=value,.. that are set on started instances',
+      default: "ScheduleMessage=Started on {year}/{month}/{day} at {hour}:{minute} {timezone}"
     })
 
     const stoppedTags = new cdk.CfnParameter(this, 'StoppedTags', {
       type: 'String',
-      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on stopped instances'
+      description: 'Comma separated list of tag names and values on the format name=value,name=value,.. that are set on stopped instances',
+      default: "ScheduleMessage=Stopped on {year}/{month}/{day} at {hour}:{minute} {timezone}"
     })
 
     const schedulerFrequency = new cdk.CfnParameter(this, 'SchedulerFrequency', {
@@ -598,14 +590,14 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       default: "5"
     })
 
-    const scheduleLambdaAccount = new cdk.CfnParameter(this, 'ScheduleLambdaAccount', {
-      type: "String",
-      allowedValues: ["Yes", "No"],
-      default: "Yes",
-      description: "Schedule instances in this account."
-    })
-
     //End CFN parameters for instance scheduler.
+
+    // CFN Conditions
+    const isMemberOfOrganization = new cdk.CfnCondition(this,
+      "IsMemberOfOrganization",
+      {
+        expression: cdk.Fn.conditionEquals(usingAWSOrganizations, 'Yes')
+      })
 
     //Start Mappings for instance scheduler. 
 
@@ -626,6 +618,14 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     mappings.setValue("Timeouts", "60", "cron(0 0/1 * * ? *)")
     mappings.setValue("Settings", "MetricsUrl", "https://metrics.awssolutionsbuilder.com/generic")
     mappings.setValue("Settings", "MetricsSolutionId", "S00030")
+    mappings.setValue("Ec2StartSSMDocument", "Name", "Scheduler-StartTaggedEC2Instances-" + props["solutionVersion"])
+    mappings.setValue("Ec2StopSSMDocument", "Name", "Scheduler-StopTaggedEC2Instances-" + props["solutionVersion"])
+    mappings.setValue("RDSInstancesStartSSMDocument", "Name", "Scheduler-StartTaggedRDSInstances-" + props["solutionVersion"])
+    mappings.setValue("RDSInstancesStopSSMDocument", "Name", "Scheduler-StopTaggedRDSInstances-" + props["solutionVersion"])
+    mappings.setValue("RDSTaggedClustersStartSSMDocument", "Name", "Scheduler-StartTaggedRDSClusters-" + props["solutionVersion"])
+    mappings.setValue("RDSTaggedClustersStopSSMDocument", "Name", "Scheduler-StopTaggedRDSClusters-" + props["solutionVersion"])
+    mappings.setValue("SchedulerExecutionRole", "Name", "Scheduler-AutomationExecutionRole")
+    mappings.setValue("SchedulerEventBusName", "Name", "scheduler-event-bus")
 
     const send = new cdk.CfnMapping(this, 'Send')
     send.setValue('AnonymousUsage', 'Data', 'Yes')
@@ -644,8 +644,8 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     * Instance Scheduler solutions log group reference.
     */
     const schedulerLogGroup = new logs.LogGroup(this, 'SchedulerLogGroup', {
-      logGroupName: Aws.STACK_NAME + '-logs',
-      removalPolicy: RemovalPolicy.DESTROY
+      logGroupName: cdk.Aws.STACK_NAME + '-logs',
+      removalPolicy: cdk.RemovalPolicy.DESTROY
     });
 
     const schedulerLogGroup_ref = schedulerLogGroup.node.defaultChild as logs.CfnLogGroup
@@ -662,7 +662,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     }
 
     //Start instance scheduler scheduler role reference and related references of principle, policy statement, and policy document.
-    const compositePrincipal = new iam.CompositePrincipal(new iam.ServicePrincipal('events.amazonaws.com'), new iam.ServicePrincipal('lambda.amazonaws.com'))
+    const compositePrincipal = new iam.CompositePrincipal(
+        new iam.ServicePrincipal('events.amazonaws.com'),
+        new iam.ServicePrincipal('lambda.amazonaws.com'),
+        new iam.ServicePrincipal('ssm.amazonaws.com')
+    )
 
     const schedulerRole = new iam.Role(this, "SchedulerRole", {
       assumedBy: compositePrincipal,
@@ -680,28 +684,28 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         statements: [
           new iam.PolicyStatement({
             actions: ["kms:*"],
-            effect: Effect.ALLOW,
+            effect: iam.Effect.ALLOW,
             resources: ['*'],
-            principals: [new ArnPrincipal("arn:" + this.partition + ":iam::" + this.account + ":root")],
+            principals: [new iam.ArnPrincipal("arn:" + this.partition + ":iam::" + this.account + ":root")],
             sid: 'default'
           }),
           new iam.PolicyStatement({
             sid: 'Allows use of key',
-            effect: Effect.ALLOW,
+            effect: iam.Effect.ALLOW,
             actions: [
               'kms:GenerateDataKey*',
               'kms:Decrypt'
             ],
             resources: ['*'],
-            principals: [new ArnPrincipal(schedulerRole.roleArn)]
+            principals: [new iam.ArnPrincipal(schedulerRole.roleArn)]
           })
         ]
       }),
-      removalPolicy: RemovalPolicy.DESTROY
+      removalPolicy: cdk.RemovalPolicy.DESTROY
     })
 
     const keyAlias = new kms.Alias(this, "InstanceSchedulerEncryptionKeyAlias", {
-      aliasName: `alias/${Aws.STACK_NAME}-instance-scheduler-encryption-key`,
+      aliasName: `alias/${cdk.Aws.STACK_NAME}-instance-scheduler-encryption-key`,
       targetKey: instanceSchedulerEncryptionKey
     })
     //End instance scheduler encryption key and encryption key alias.
@@ -713,49 +717,67 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       masterKey: instanceSchedulerEncryptionKey
     });
 
+    const ssmDocsProps: InstanceSchedulerSSMDocProps = {
+      ec2StartSSMDocName: mappings.findInMap("Ec2StartSSMDocument", "Name"),
+      ec2StopSSMDocName: mappings.findInMap("Ec2StopSSMDocument", "Name"),
+      rdsTaggedInstancesStartSSMDocName: mappings.findInMap("RDSInstancesStartSSMDocument", "Name"),
+      rdsTaggedInstancesStopSSMDocName: mappings.findInMap("RDSInstancesStopSSMDocument", "Name"),
+      rdsTaggedClustersStartSSMDocName: mappings.findInMap("RDSTaggedClustersStartSSMDocument", "Name"),
+      rdsTaggedClustersStopSSMDocName: mappings.findInMap("RDSTaggedClustersStopSSMDocument", "Name"),
+    }
+
+    // Instance Scheduler SSM Automation Documents
+    new InstanceSchedulerSSMDocuments(this, "InstanceSchedulerSSMDocuments", ssmDocsProps)
+
     //Start instance scheduler aws-lambda-dynamoDB construct reference. 
     const lambdaToDynamoDBProps: LambdaToDynamoDBProps = {
       lambdaFunctionProps: {
-        functionName: Aws.STACK_NAME + '-InstanceSchedulerMain',
+        functionName: cdk.Aws.STACK_NAME + '-InstanceSchedulerMain',
         description: 'EC2 and RDS instance scheduler, version ' + props["solutionVersion"],
         code: lambda.Code.fromBucket(solutionsBucket, props["solutionTradeMarkName"] + '/' + props["solutionVersion"] + '/instance-scheduler.zip'),
         runtime: lambda.Runtime.PYTHON_3_7,
         handler: 'main.lambda_handler',
         role: schedulerRole,
-        memorySize: memorySize.valueAsNumber,
-        timeout: cdk.Duration.seconds(300),
+        memorySize: 1024,
+        timeout: cdk.Duration.seconds(900),
         environment: {
           SCHEDULER_FREQUENCY: schedulerFrequency.valueAsString,
           TAG_NAME: tagName.valueAsString,
           LOG_GROUP: schedulerLogGroup.logGroupName,
           ACCOUNT: this.account,
           ISSUES_TOPIC_ARN: snsTopic.topicArn,
-          STACK_NAME: Aws.STACK_NAME,
-          BOTO_RETRY: '5,10,30,0.25',
-          ENV_BOTO_RETRY_LOGGING: "FALSE",
+          STACK_NAME: cdk.Aws.STACK_NAME,
           SEND_METRICS: mappings.findInMap('TrueFalse', send.findInMap('AnonymousUsage', 'Data')),
           SOLUTION_ID: mappings.findInMap('Settings', 'MetricsSolutionId'),
           TRACE: mappings.findInMap('TrueFalse', trace.valueAsString),
-          ENABLE_SSM_MAINTENANCE_WINDOWS: mappings.findInMap('TrueFalse', enableSSMMaintenanceWindows.valueAsString),
-          USER_AGENT: 'InstanceScheduler-' + Aws.STACK_NAME + '-' + props.solutionVersion,
           USER_AGENT_EXTRA: `AwsSolution/${props.solutionId}/${props.solutionVersion}`,
           METRICS_URL: mappings.findInMap('Settings', 'MetricsUrl'),
           STACK_ID: `${cdk.Aws.STACK_ID}`,
           UUID_KEY: send.findInMap('ParameterKey', 'UniqueId'),
-          START_EC2_BATCH_SIZE: '5'
+          EC2_START_SSM_DOC: mappings.findInMap("Ec2StartSSMDocument", "Name"),
+          EC2_STOP_SSM_DOC: mappings.findInMap("Ec2StopSSMDocument", "Name"),
+          RDS_INSTANCES_START_SSM_DOC: mappings.findInMap("RDSInstancesStartSSMDocument", "Name"),
+          RDS_INSTANCES_STOP_SSM_DOC: mappings.findInMap("RDSInstancesStopSSMDocument", "Name"),
+          RDS_CLUSTERS_START_SSM_DOC: mappings.findInMap("RDSTaggedClustersStartSSMDocument", "Name"),
+          RDS_CLUSTERS_STOP_SSM_DOC: mappings.findInMap("RDSTaggedClustersStopSSMDocument", "Name"),
+          SSM_ADMIN_ROLE_NAME: schedulerRole.roleArn,
+          SSM_EXECUTION_ROLE_NAME: mappings.findInMap("SchedulerExecutionRole", "Name"),
+          MAX_ALLOWED_ACCOUNTS_IN_SSM_API: '50',
+          SSM_MAX_CONCURRENCY: "100%",
+          SSM_MAX_ERRORS: "100%" 
         }
       },
       dynamoTableProps: {
-        partitionKey: {
-          name: 'service',
+        sortKey: {
+          name: 'name',
           type: dynamodb.AttributeType.STRING
         },
-        sortKey: {
-          name: 'account-region',
+        partitionKey: {
+          name: 'type',
           type: dynamodb.AttributeType.STRING
         },
         billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-        removalPolicy: RemovalPolicy.DESTROY,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
         pointInTimeRecovery: true
       },
       tablePermissions: "ReadWrite",
@@ -764,33 +786,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     const lambdaToDynamoDb = new LambdaToDynamoDB(this, 'instance-scheduler-lambda', lambdaToDynamoDBProps);
 
-    const cfnStateTable = lambdaToDynamoDb.dynamoTable.node.defaultChild as dynamodb.CfnTable
-    cfnStateTable.overrideLogicalId('StateTable')
-    cfnStateTable.addPropertyOverride("SSESpecification", {
-      "KMSMasterKeyId": { "Ref": "InstanceSchedulerEncryptionKey" },
-      "SSEEnabled": true,
-      "SSEType": 'KMS'
-    })
-
-    //End instance scheduler aws-lambda-dynamoDB construct reference. 
-
-    //Start instance scheduler configuration table dynamoDB Table reference.
-
-    const configTable = new dynamodb.Table(this, 'ConfigTable', {
-      sortKey: {
-        name: 'name',
-        type: dynamodb.AttributeType.STRING
-      },
-      partitionKey: {
-        name: 'type',
-        type: dynamodb.AttributeType.STRING
-      },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.DESTROY,
-      pointInTimeRecovery: true
-    })
-
-    const cfnConfigTable = configTable.node.defaultChild as dynamodb.CfnTable
+    const cfnConfigTable = lambdaToDynamoDb.dynamoTable.node.defaultChild as dynamodb.CfnTable
     cfnConfigTable.overrideLogicalId('ConfigTable')
     cfnConfigTable.addPropertyOverride("SSESpecification", {
       "KMSMasterKeyId": { "Ref": "InstanceSchedulerEncryptionKey" },
@@ -798,28 +794,48 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       "SSEType": 'KMS'
     })
 
-    //End instance scheduler configuration table dynamoDB Table reference.
+    //End instance scheduler aws-lambda-dynamoDB construct reference. 
+
+    // Support AWS Organizations - Cross account event bus
 
 
-    //Start instance scheduler maintenance window table dynamoDB Table reference.
+    const eventBusProps: SchedulerEventBusProps = {
+      organizationId: principals.valueAsList,
+      namespace: namespace.valueAsString,
+      lambdaFunctionArn: lambdaToDynamoDb.lambdaFunction.functionArn,
+      eventBusName: mappings.findInMap("SchedulerEventBusName", "Name"),
+      isMemberOfOrganizationsCondition: isMemberOfOrganization,
+    }
 
-    const maintenanceWindowTable = new dynamodb.Table(this, 'MaintenanceWindowTable', {
+    
+    const eventBusResource = new SchedulerEventBusResources(this, 'SchedulerEventBusResources', eventBusProps)
+    
+    const eventBusRuleLambdaPermission = new lambda.CfnPermission(this, "EventBusRuleLambdaPermission", {
+      functionName: lambdaToDynamoDb.lambdaFunction.functionName,
+      action: "lambda:InvokeFunction",
+      principal: "events.amazonaws.com",
+      sourceArn: eventBusResource.eventRuleCrossAccount.attrArn
+    })
+
+    eventBusRuleLambdaPermission.cfnOptions.condition = isMemberOfOrganization
+
+    const scheduleStatesTable = new dynamodb.Table(this, 'ScheduleStatesTable', {
       partitionKey: {
-        name: 'Name',
+        name: 'name',
         type: dynamodb.AttributeType.STRING
       },
       sortKey: {
-        name: "account-region",
+        name: "service",
         type: dynamodb.AttributeType.STRING
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
       pointInTimeRecovery: true
     })
 
-    const cfnMaintenanceWindowTable = maintenanceWindowTable.node.defaultChild as dynamodb.CfnTable
-    cfnMaintenanceWindowTable.overrideLogicalId('MaintenanceWindowTable')
-    cfnMaintenanceWindowTable.addPropertyOverride("SSESpecification", {
+    const cfnScheduleStatesTable = scheduleStatesTable.node.defaultChild as dynamodb.CfnTable
+    cfnScheduleStatesTable.overrideLogicalId('ScheduleStatesTable')
+    cfnScheduleStatesTable.addPropertyOverride("SSESpecification", {
       "KMSMasterKeyId": { "Ref": "InstanceSchedulerEncryptionKey" },
       "SSEEnabled": true,
       "SSEType": 'KMS'
@@ -828,35 +844,35 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     //Adding all the dynamo DB references to the lambda environment variables.
     lambdaToDynamoDb.lambdaFunction.addEnvironment('CONFIG_TABLE', cfnConfigTable.ref)
-    lambdaToDynamoDb.lambdaFunction.addEnvironment('MAINTENANCE_WINDOW_TABLE', cfnMaintenanceWindowTable.ref)
-    lambdaToDynamoDb.lambdaFunction.addEnvironment('STATE_TABLE', cfnStateTable.ref)
+    lambdaToDynamoDb.lambdaFunction.addEnvironment('SCHEDULE_STATES_TABLE', cfnScheduleStatesTable.ref)
 
     //Start instance scheduler database policy statement for lambda.
 
-    const dynamodbPolicy = new PolicyStatement({
+    const dynamodbPolicy = new iam.PolicyStatement({
       actions: [
         'dynamodb:DeleteItem',
+        'dynamodb:UpdateItem',
         'dynamodb:GetItem',
         'dynamodb:PutItem',
         'dynamodb:Query',
         'dynamodb:Scan',
         'dynamodb:BatchWriteItem'
       ],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: [
         cfnConfigTable.attrArn,
-        cfnMaintenanceWindowTable.attrArn
+        cfnScheduleStatesTable.attrArn
       ]
     })
 
     lambdaToDynamoDb.lambdaFunction.addToRolePolicy(dynamodbPolicy)
     //PolicyStatement for SSM Get and Put Parameters
-    const ssmParameterPolicyStatement = new PolicyStatement({
+    const ssmParameterPolicyStatement = new iam.PolicyStatement({
       actions: [
         "ssm:PutParameter",
         "ssm:GetParameter",
       ],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: [
         cdk.Fn.sub("arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Solutions/aws-instance-scheduler/UUID/*")
       ]
@@ -876,6 +892,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     const eventRule_cfn_ref = eventlambdaConstruct.eventsRule.node.defaultChild as events.CfnRule
     eventRule_cfn_ref.addPropertyOverride('State', mappings.findInMap('EnabledDisabled', schedulingActive.valueAsString));
+    
 
     //End instance scheduler aws-event-lambda construct reference.
 
@@ -891,19 +908,20 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         config_table: cfnConfigTable.ref,
         tagname: tagName,
         default_timezone: defaultTimezone,
-        use_metrics: mappings.findInMap('TrueFalse', useCloudWatchMetrics.valueAsString),
         scheduled_services: cdk.Fn.split(",", mappings.findInMap('Services', scheduledServices.valueAsString)),
         schedule_clusters: mappings.findInMap('TrueFalse', scheduleRdsClusters.valueAsString),
         create_rds_snapshot: mappings.findInMap('TrueFalse', createRdsSnapshot.valueAsString),
         regions: regions,
-        cross_account_roles: crossAccountRoles,
-        schedule_lambda_account: mappings.findInMap('TrueFalse', scheduleLambdaAccount.valueAsString),
+        remote_account_ids: principals,
+        aws_partition: cdk.Fn.sub("${AWS::Partition}"),
+        execution_role_name: mappings.findInMap("SchedulerExecutionRole", "Name"),
+        namespace: namespace.valueAsString,
         trace: mappings.findInMap('TrueFalse', trace.valueAsString),
-        enable_SSM_maintenance_windows: mappings.findInMap('TrueFalse', enableSSMMaintenanceWindows.valueAsString),
         log_retention_days: logRetention.valueAsNumber,
         started_tags: startedTags.valueAsString,
         stopped_tags: stoppedTags.valueAsString,
-        stack_version: props["solutionVersion"]
+        stack_version: props["solutionVersion"],
+        use_aws_organizations: mappings.findInMap('TrueFalse', usingAWSOrganizations.valueAsString)
       }
     })
 
@@ -937,7 +955,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     })
 
     //Instance scheduler ec2 policy statement, policy documents and role references.
-    const ec2PolicyStatementForLogs = new PolicyStatement({
+    const ec2PolicyStatementForLogs = new iam.PolicyStatement({
       actions: [
         'logs:CreateLogGroup',
         'logs:CreateLogStream',
@@ -947,45 +965,49 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         cdk.Fn.sub("arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*"),
         schedulerLogGroup.logGroupArn
       ],
-      effect: Effect.ALLOW
+      effect: iam.Effect.ALLOW
     })
 
-    const ec2PolicyStatementforMisc = new PolicyStatement({
+    const ec2PolicyStatementForMisc = new iam.PolicyStatement({
       actions: [
         'logs:DescribeLogStreams',
         'rds:DescribeDBClusters',
         'rds:DescribeDBInstances',
         'ec2:DescribeInstances',
+        'ec2:DescribeInstanceStatus',
         'ec2:DescribeRegions',
         'cloudwatch:PutMetricData',
-        'ssm:DescribeMaintenanceWindows',
         'tag:GetResources'],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: ['*']
     })
 
-    const ec2PolicyAssumeRoleStatement = new PolicyStatement({
+    const ec2PolicyAssumeRoleStatement = new iam.PolicyStatement({
       actions: ['sts:AssumeRole'],
-      resources: [cdk.Fn.sub("arn:${AWS::Partition}:iam::*:role/*EC2SchedulerCross*")],
-      effect: Effect.ALLOW
+      resources: [
+        cdk.Fn.sub("arn:${AWS::Partition}:iam::*:role/${Namespace}-${Name}-${AWS::Region}", {
+          Name: mappings.findInMap("SchedulerExecutionRole", "Name")
+        })
+      ],
+      effect: iam.Effect.ALLOW
     })
 
-    const ec2PolicySSMStatement = new PolicyStatement({
+    const ec2PolicySSMStatement = new iam.PolicyStatement({
       actions: [
         'ssm:GetParameter',
         'ssm:GetParameters'
       ],
       resources: [cdk.Fn.sub("arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:parameter/*")],
-      effect: Effect.ALLOW
+      effect: iam.Effect.ALLOW
     })
 
     const ec2Permissions = new iam.Policy(this, "Ec2Permissions", {
       statements: [
-        new PolicyStatement({
+        new iam.PolicyStatement({
           actions: [
             'ec2:ModifyInstanceAttribute',
           ],
-          effect: Effect.ALLOW,
+          effect: iam.Effect.ALLOW,
           resources: [
             cdk.Fn.sub("arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:instance/*")
           ]
@@ -1000,79 +1022,104 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       policyName: 'EC2DynamoDBPolicy',
       statements: [
         ec2PolicySSMStatement, 
-        ec2PolicyStatementforMisc, 
-        ec2PolicyStatementForLogs
+        ec2PolicyStatementForMisc,
+        ec2PolicyStatementForLogs,
+        new iam.PolicyStatement({
+          actions:[
+            'iam:PassRole'
+          ],
+          effect: iam.Effect.ALLOW,
+          resources:[
+            schedulerRole.roleArn
+          ]
+        })
       ]
     })
 
     //Instance scheduler, scheduling policy statement, policy documents and role references.
-    const schedulerPolicyStatement1 = new PolicyStatement({
+    const schedulerPolicyStatement1 = new iam.PolicyStatement({
       actions: [
         'rds:DeleteDBSnapshot',
         'rds:DescribeDBSnapshots',
         'rds:StopDBInstance'],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: [cdk.Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:snapshot:*")]
     })
 
-    const schedulerPolicyStatement2 = new PolicyStatement({
+    const schedulerPolicyStatement2 = new iam.PolicyStatement({
       actions: [
         'rds:AddTagsToResource',
         'rds:RemoveTagsFromResource',
         'rds:DescribeDBSnapshots',
         'rds:StartDBInstance',
         'rds:StopDBInstance'],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: [cdk.Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:db:*")]
     })
 
-    const schedulerPolicyStatement3 = new PolicyStatement({
+    const schedulerPolicyStatement3 = new iam.PolicyStatement({
       actions: [
         'ec2:StartInstances',
         'ec2:StopInstances',
         'ec2:CreateTags',
         'ec2:DeleteTags'],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: [cdk.Fn.sub("arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:instance/*")]
     })
 
-    const schedulerPolicyStatement4 = new PolicyStatement({
+    const schedulerPolicyStatement4 = new iam.PolicyStatement({
       actions: ['sns:Publish'],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: [snsTopic.topicArn]
     })
 
-    const schedulerPolicyStatement5 = new PolicyStatement({
+    const schedulerPolicyStatement5 = new iam.PolicyStatement({
       actions: ['lambda:InvokeFunction'],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: [cdk.Fn.sub("arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-InstanceSchedulerMain")]
     })
 
-    const schedulerPolicyStatement6 = new PolicyStatement({
+    const schedulerPolicyStatement6 = new iam.PolicyStatement({
       actions: [
         'kms:GenerateDataKey*',
         'kms:Decrypt'
       ],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: [instanceSchedulerEncryptionKey.keyArn]
     })
 
-    const schedulerPolicyStatement7 = new PolicyStatement({
+    const schedulerPolicyStatement7 = new iam.PolicyStatement({
       actions: [
         'rds:AddTagsToResource',
         'rds:RemoveTagsFromResource',
         'rds:StartDBCluster',
         'rds:StopDBCluster'
       ],
-      effect: Effect.ALLOW,
+      effect: iam.Effect.ALLOW,
       resources: [cdk.Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:cluster:*")]
     })
+
+    const ssmEc2PolicyStatement = new iam.PolicyStatement({
+      actions: [
+        "ssm:StartAutomationExecution"
+      ],
+      resources: [
+        cdk.Fn.sub("arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:automation-definition/")+ mappings.findInMap("Ec2StartSSMDocument","Name") + ":*",
+        cdk.Fn.sub("arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:automation-definition/")+ mappings.findInMap("Ec2StopSSMDocument","Name") + ":*",
+        cdk.Fn.sub("arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:automation-definition/")+ mappings.findInMap("RDSInstancesStartSSMDocument","Name") + ":*",
+        cdk.Fn.sub("arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:automation-definition/")+ mappings.findInMap("RDSInstancesStopSSMDocument","Name") + ":*",
+        cdk.Fn.sub("arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:automation-definition/")+ mappings.findInMap("RDSTaggedClustersStartSSMDocument","Name") + ":*",
+        cdk.Fn.sub("arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:automation-definition/")+ mappings.findInMap("RDSTaggedClustersStopSSMDocument","Name") + ":*",
+      ],
+      effect: iam.Effect.ALLOW
+    })
+    
 
     
     const schedulerPolicy = new iam.Policy(this, "SchedulerPolicy", {
       roles: [schedulerRole],
       policyName: 'SchedulerPolicy',
-      statements: [schedulerPolicyStatement2, schedulerPolicyStatement3, schedulerPolicyStatement4, schedulerPolicyStatement5, schedulerPolicyStatement6]
+      statements: [schedulerPolicyStatement2, schedulerPolicyStatement3, schedulerPolicyStatement4, schedulerPolicyStatement5, schedulerPolicyStatement6, ssmEc2PolicyStatement]
     })
 
     const schedulerRDSPolicy  = new iam.Policy(this, "SchedulerRDSPolicy", {
@@ -1108,6 +1155,8 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       }
     }
 
+
+
     //Cloud Formation cfn references for ensuring the resource names are similar to earlier releases, and additional metadata for the cfn nag rules.
     const instanceSchedulerEncryptionKey_cfn_ref = instanceSchedulerEncryptionKey.node.defaultChild as kms.CfnKey
     instanceSchedulerEncryptionKey_cfn_ref.overrideLogicalId('InstanceSchedulerEncryptionKey')
@@ -1123,6 +1172,10 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         "rules_to_suppress": [
           {
             "id": "W12",
+            "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+          },
+          {
+            "id": "W76",
             "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
           }
         ]
@@ -1154,71 +1207,82 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       "AWS::CloudFormation::Interface": {
         "ParameterGroups": [
           {
+            "Label": {"default": "Namespace Configuration"},
+            "Parameters": ["Namespace"]
+          },
+          {
+            "Label": {"default": "Account Structure"},
+            "Parameters": [
+              "UsingAWSOrganizations",
+              "Principals",
+              "Regions"
+            ]
+          },
+          {
             "Label": {
-              "default": "Scheduler (version " + props['solutionVersion'] + ")"
+              "default": "Schedule Configuration"
             },
             "Parameters": [
-              "TagName",
+              "SchedulingActive",
+              "DefaultTimezone",
+              "SchedulerFrequency",
+            ]
+          },
+          {
+            "Label": {
+              "default": "Managed Instances Configuration"
+            },
+            "Parameters": [
               "ScheduledServices",
               "ScheduleRdsClusters",
               "CreateRdsSnapshot",
-              "SchedulingActive",
-              "Regions",
-              "DefaultTimezone",
-              "CrossAccountRoles",
-              "ScheduleLambdaAccount",
-              "SchedulerFrequency",
-              "MemorySize"
+
             ]
           },
           {
             "Label": {
-              "default": "Options"
+              "default": "Tag Configuration"
             },
             "Parameters": [
-              "UseCloudWatchMetrics",
-              "Trace",
-              "EnableSSMMaintenanceWindows"
+              "TagName",
+              "StartedTags",
+              "StoppedTags"
             ]
           },
           {
             "Label": {
-              "default": "Other parameters"
+              "default": "Log Configuration"
             },
             "Parameters": [
               "LogRetentionDays",
-              "StartedTags",
-              "StoppedTags"
+              "Trace"
             ]
           }
         ],
         "ParameterLabels": {
+          "Namespace": {
+            "default": "Provide a unique namespace value.",
+          },
           "LogRetentionDays": {
             "default": "Log retention days"
           },
           "StartedTags": {
-            "default": "Started tags"
+            "default": "Apply tags after the instances are started."
           },
           "StoppedTags": {
-            "default": "Stopped tags"
+            "default": "Apply tags after the instances are stopped."
           },
           "SchedulingActive": {
-            "default": "Scheduling enabled"
+            "default": "Do you wish to enable scheduling events?"
           },
-          "CrossAccountRoles": {
-            "default": "Cross-account roles"
+          "UsingAWSOrganizations": {
+            "default": "Using AWS Organizations?"
           },
-          "ScheduleLambdaAccount": {
-            "default": "This account"
-          },
-          "UseCloudWatchMetrics": {
-            "default": "Enable CloudWatch Metrics"
+          "Principals": {
+            "default": "Provide Organization Id OR List of Remote Account Ids"
           },
           "Trace": {
-            "default": "Enable CloudWatch Logs"
-          },
-          "EnableSSMMaintenanceWindows": {
-            "default": "Enable SSM Maintenance windows"
+            "default": "Allow debug level Logs"
           },
           "TagName": {
             "default": "Instance Scheduler tag name"
@@ -1240,9 +1304,6 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
           },
           "Regions": {
             "default": "Region(s)"
-          },
-          "MemorySize": {
-            "default": "Memory size"
           }
         }
       }

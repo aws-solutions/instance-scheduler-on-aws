@@ -34,40 +34,21 @@ PERIOD_NAME = "{}-period-{:0>4d}"
 PROP_BEGIN_TIME = "BeginTime"
 PROP_DESCRIPTION = "Description"
 PROP_END_TIME = "EndTime"
-PROP_ENFORCED = "Enforced"
-PROP_HIBERNATE = "Hibernate"
-PROP_RETAIN_RUNNING = "RetainRunning"
-PROP_INSTANCE_TYPE = "InstanceType"
-PROP_METRICS = "Metrics"
 PROP_MONTH_DAYS = "MonthDays"
 PROP_MONTHS = "Months"
 PROP_NAME = "Name"
-PROP_OVERRIDE_STATUS = "OverrideStatus"
-PROP_OVERWRITE = "Overwrite"
 PROP_PERIODS = "Periods"
 PROP_STACK_NAME = "SchedulerStack"
 PROP_NO_STACK_PREFIX = "NoStackPrefix"
-PROP_STOP_NEW = "StopNewInstances"
 PROP_TIMEZONE = "Timezone"
-PROP_USE_MAINTENANCE_WINDOW = "UseMaintenanceWindow"
-PROP_SSM_MAINTENANCE_WINDOW = "SsmMaintenanceWindow"
 PROP_WEEKDAYS = "WeekDays"
 
 VALID_SCHEDULE_PROPERTIES = [
     PROP_DESCRIPTION,
-    PROP_ENFORCED,
-    PROP_RETAIN_RUNNING,
-    PROP_METRICS,
     PROP_NAME,
-    PROP_OVERRIDE_STATUS,
-    PROP_OVERWRITE,
     PROP_PERIODS,
-    PROP_STOP_NEW,
     PROP_TIMEZONE,
-    PROP_USE_MAINTENANCE_WINDOW,
-    PROP_SSM_MAINTENANCE_WINDOW,
     PROP_NO_STACK_PREFIX,
-    PROP_HIBERNATE,
     "ServiceToken",
     "Timeout"]
 
@@ -75,7 +56,6 @@ VALID_PERIOD_PROPERTIES = [
     PROP_BEGIN_TIME,
     PROP_DESCRIPTION,
     PROP_END_TIME,
-    PROP_INSTANCE_TYPE,
     PROP_MONTH_DAYS,
     PROP_MONTHS,
     PROP_WEEKDAYS]
@@ -157,11 +137,10 @@ class ScheduleResourceHandler(CustomResource):
             create_period_args[configuration.DESCRIPTION] = "{}, {}".format(description_config,
                                                                             create_period_args[configuration.DESCRIPTION])
         period = self._admin.create_period(**create_period_args)
-        instance_type = period.get(PROP_INSTANCE_TYPE, None)
 
         self._logger.info(INF_PERIOD_CREATED, safe_json(period, 3))
 
-        return period_name, instance_type
+        return period_name
 
     def _delete_periods(self):
         i = 0
@@ -186,26 +165,12 @@ class ScheduleResourceHandler(CustomResource):
 
         for pr in ps:
 
-            # fix for typo in older release, fix parameter if old version with typo is used for compatibility
-            if pr == "UseMaintenaceWindow":
-                pr = PROP_USE_MAINTENANCE_WINDOW
 
             if pr not in VALID_SCHEDULE_PROPERTIES:
                 raise ValueError(ERR_INVALID_SCHEDULE_PROPERTY.format(pr, ", ".join(VALID_SCHEDULE_PROPERTIES)))
 
-        self._set_if_specified(ps, PROP_METRICS, create_schedule_args, dest_name=configuration.METRICS)
-        self._set_if_specified(ps, PROP_OVERWRITE, create_schedule_args, dest_name=configuration.OVERWRITE)
-        self._set_if_specified(ps, PROP_OVERRIDE_STATUS, create_schedule_args, dest_name=configuration.OVERRIDE_STATUS)
-        self._set_if_specified(ps, PROP_USE_MAINTENANCE_WINDOW, create_schedule_args,
-                               dest_name=configuration.USE_MAINTENANCE_WINDOW)
-        self._set_if_specified(ps, PROP_ENFORCED, create_schedule_args, dest_name=configuration.ENFORCED, default=False)
-        self._set_if_specified(ps, PROP_HIBERNATE, create_schedule_args, dest_name=configuration.HIBERNATE, default=False)
-        self._set_if_specified(ps, PROP_RETAIN_RUNNING, create_schedule_args, dest_name=configuration.RETAINED_RUNNING,
-                               default=False)
-        self._set_if_specified(ps, PROP_STOP_NEW, create_schedule_args, dest_name=configuration.STOP_NEW_INSTANCES, default=True)
         self._set_if_specified(ps, PROP_TIMEZONE, create_schedule_args, dest_name=configuration.TIMEZONE, default="UTC")
         self._set_if_specified(ps, PROP_DESCRIPTION, create_schedule_args, dest_name=configuration.DESCRIPTION)
-        self._set_if_specified(ps, PROP_SSM_MAINTENANCE_WINDOW, create_schedule_args, dest_name=configuration.SSM_MAINTENANCE_WINDOW)
 
         create_schedule_args[configuration.SCHEDULE_CONFIG_STACK] = self.stack_id
 
@@ -213,9 +178,7 @@ class ScheduleResourceHandler(CustomResource):
         try:
             self.number_of_periods = 0
             for period in ps.get(PROP_PERIODS, []):
-                period_name, instance_type = self._create_period(period)
-                if instance_type is not None:
-                    period_name = "{}{}{}".format(period_name, configuration.INSTANCE_TYPE_SEP, instance_type)
+                period_name = self._create_period(period)
                 periods.append(period_name)
 
             create_schedule_args[configuration.PERIODS] = periods

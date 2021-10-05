@@ -18,14 +18,12 @@ from configuration.scheduler_config_builder import SchedulerConfigBuilder
 
 # environment parameter for configuration table
 ENV_CONFIG = "CONFIG_TABLE"
-ENV_STATE = "STATE_TABLE"
 ENV_ACCOUNT = "ACCOUNT"
 ENV_STACK = "STACK_NAME"
 ENV_TAG_NAME = "TAG_NAME"
 ENV_SCHEDULE_FREQUENCY = "SCHEDULER_FREQUENCY"
 ENV_TRACE = "TRACE"
-ENV_ENABLE_SSM_MAINTENANCE_WINDOWS = "ENABLE_SSM_MAINTENANCE_WINDOWS"
-ENV_USER_AGENT = "USER_AGENT"
+
 ENV_SCHEDULER_RULE = "SCHEDULER_RULE"
 
 # name of months
@@ -48,11 +46,14 @@ TIME_FORMAT_STRING = "%H:%M"
 # trace flag
 TRACE = "trace"
 
-# enable SSM maintenance windows
-ENABLE_SSM_MAINTENANCE_WINDOWS = "enable_SSM_maintenance_windows"
+#namespace 
+NAMEPSACE = "namespace"
 
-# metrics flag
-METRICS = "use_metrics"
+#execution role name
+EXECUTION_ROLE_NAME = "execution_role_name"
+
+#AWS Partition
+AWS_PARTITION = "aws_partition"
 
 # regions
 REGIONS = "regions"
@@ -73,10 +74,6 @@ MONTHDAYS = "monthdays"
 MONTHS = "months"
 # name of a period or schedule
 NAME = "name"
-# name of the overwrite setting, legacy use
-OVERWRITE = "overwrite"
-# name of the overrride setting to set starte to constantly running or stopped
-OVERRIDE_STATUS = "override_status"
 # running periods section
 PERIODS = "periods"
 # running period configuration
@@ -89,37 +86,24 @@ SCHEDULED_SERVICES = "scheduled_services"
 SCHEDULE_CLUSTERS = "schedule_clusters"
 # create snapshot before stopping RDS Instances
 CREATE_RDS_SNAPSHOT = "create_rds_snapshot"
+# create snapshot before stopping RDS Instances
+USE_AWS_ORGANIZATIONS = "use_aws_organizations"
 # stop new instances
 STOP_NEW_INSTANCES = "stop_new_instances"
-# use maintenance windows
-USE_MAINTENANCE_WINDOW = "use_maintenance_window"
-# ssm maiantenance windows to use for EC2
-SSM_MAINTENANCE_WINDOW = "ssm_maintenance_window"
 # name of timezone setting for a schedule
 TIMEZONE = "timezone"
 # name of the tagname setting
 TAGNAME = "tagname"
 # days in a week the instance is running
 WEEKDAYS = "weekdays"
-# cross_account_roles_arn_list
-CROSS_ACCOUNT_ROLES = "cross_account_roles"
-# process instances in account in which lambda function is installed
-SCHEDULE_LAMBDA_ACCOUNT = "schedule_lambda_account"
-# enforce schedule state
-ENFORCED = "enforced"
-# use hibernation for stopped instances
-HIBERNATE = "hibernate"
-# retain running instances at end of period if they were already running at beginning of period
-RETAINED_RUNNING = "retain_running"
-# started and stopped tags, these are set to started and stoped instances
+# remote account ids 
+REMOTE_ACCOUNT_IDS = "remote_account_ids"
+#organization id
+ORGANIZATION_ID = "organization_id"
 STARTED_TAGS = "started_tags"
 STOPPED_TAGS = "stopped_tags"
 # stack id for "child" stacks to create schedules in the configuration of a scheduler stack
 SCHEDULE_CONFIG_STACK = "configured_in_stack"
-
-OVERRIDE_STATUS_STOPPED = "stopped"
-OVERRIDE_STATUS_RUNNING = "running"
-OVERRIDE_STATUS_VALUES = [OVERRIDE_STATUS_STOPPED, OVERRIDE_STATUS_RUNNING]
 
 # used to separate period name from instance type
 INSTANCE_TYPE_SEP = "@"

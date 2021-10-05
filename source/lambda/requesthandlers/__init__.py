@@ -12,3 +12,5 @@
 ######################################################################################################################
 
 
+SSM_EXECUTION_ROLE_NAME = "SSM_EXECUTION_ROLE_NAME"
+SSM_ADMIN_ROLE_NAME = "SSM_ADMIN_ROLE_NAME"

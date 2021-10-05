@@ -22,27 +22,11 @@ import util
 from requesthandlers.admin_cli_request_handler import AdminCliRequestHandler
 from requesthandlers.cloudwatch_event_handler import CloudWatchEventHandler
 from requesthandlers.schedule_resource_handler import ScheduleResourceHandler
-from requesthandlers.scheduler_request_handler import SchedulerRequestHandler
 from requesthandlers.scheduler_setup_handler import SchedulerSetupHandler
+from requesthandlers.eventbus_request_handler import EventBusRequestHandler
 from util.logger import Logger
-from version import VERSION
 
 LOG_STREAM = "InstanceScheduler-{:0>4d}{:0>2d}{:0>2d}"
-
-
-# load models for services that have not have their latest models deployed to Lambda
-def load_models():
-    cdw = os.getcwd()
-    models = os.path.join(cdw, "models")
-    aws_data_path = os.getenv("AWS_DATA_PATH", None)
-    if aws_data_path is not None:
-        aws_data_path = ":".join([aws_data_path, models])
-    else:
-        aws_data_path = models
-    os.environ["AWS_DATA_PATH"] = aws_data_path
-
-
-load_models()
 
 
 def lambda_handler(event, context):
@@ -53,15 +37,15 @@ def lambda_handler(event, context):
         with Logger(logstream=log_stream, buffersize=20, context=context,
                     debug=util.as_bool(os.getenv(configuration.ENV_TRACE, False))) as logger:
 
-            logger.info("InstanceScheduler, version {}".format(VERSION))
+            logger.info("InstanceScheduler, main handler")
 
             logger.debug("Event is {}", util.safe_json(event, indent=3))
 
-            for handler_type in [SchedulerRequestHandler,
-                                 SchedulerSetupHandler,
+            for handler_type in [SchedulerSetupHandler,
                                  ScheduleResourceHandler,
                                  AdminCliRequestHandler,
-                                 CloudWatchEventHandler]:
+                                 CloudWatchEventHandler,
+                                 EventBusRequestHandler]:
 
                 if handler_type.is_handling_request(event):
                     start = time()

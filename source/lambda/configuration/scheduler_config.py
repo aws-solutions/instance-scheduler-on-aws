@@ -13,6 +13,7 @@
 import copy
 import os
 from datetime import datetime
+import pytz
 
 import configuration
 
@@ -24,13 +25,9 @@ INF_SCHEDULE_DISPLAY = "Configuration:\n" \
                        "Tagname = \"{}\"\n" \
                        "Default timezone = \"{}\"\n" \
                        "Trace = \"{}\"\n" \
-                       "Enable SSM Maintenance Windows = \"{}\"\n" \
-                       "Use metrics = \"{}\"\n" \
                        "Regions = \"{}\"\n" \
                        "Started tags = \"{}\"\n" \
-                       "Stopped tags = \"{}\"\n" \
-                       "Process Lambda account = \"{}\"\n" \
-                       "Cross account roles = \"{}\""
+                       "Stopped tags = \"{}\"\n" 
 
 TAG_VAL_STR = "{{{}}}"
 
@@ -48,10 +45,11 @@ class SchedulerConfig:
                  default_timezone,
                  schedules,
                  trace,
-                 enable_SSM_maintenance_windows,
-                 use_metrics,
-                 cross_account_roles,
-                 schedule_lambda_account,
+                 namespace,
+                 aws_partition,
+                 execution_role_name,
+                 remote_account_ids,
+                 organization_id,
                  create_rds_snapshot,
                  started_tags=None,
                  stopped_tags=None):
@@ -64,10 +62,8 @@ class SchedulerConfig:
         :param default_timezone: default timezone for schedules
         :param schedules: instance running schedules
         :param trace: set to true for detailed logging
-        :param enable_SSM_maintenance_windows: set to true for enable solution to retrieve SSM Maintenance Windows.
-        :param use_metrics: global flag to enable metrics collection
-        :param cross_account_roles: cross account roles for cross account scheduling
-        :param schedule_lambda_account: set to true to schedule instances in account in which scheduler is installed
+        :param remote_account_ids: remote account ids for cross account scheduling
+        :param organization_id: organization id
         :param create_rds_snapshot create snapshot before stopping non-cluster rds instances
         :param started_tags: start tags in string format
         :param stopped_tags: stop tags in string format
@@ -76,17 +72,18 @@ class SchedulerConfig:
         self.schedules = schedules
         self.default_timezone = default_timezone
         self.trace = trace
-        self.enable_SSM_maintenance_windows = enable_SSM_maintenance_windows
-        self.use_metrics = use_metrics
+        self.namespace = namespace
+        self.aws_partition = aws_partition
+        self.execution_role_name = execution_role_name
         self.regions = regions
-        self.cross_account_roles = cross_account_roles
-        self.schedule_lambda_account = schedule_lambda_account
+        self.remote_account_ids = remote_account_ids
+        self.organization_id = organization_id
         self.scheduled_services = scheduled_services
         self.schedule_clusters = schedule_clusters
         self.create_rds_snapshot = create_rds_snapshot
         self._service_settings = None
-        self.started_tags = [] if started_tags in ["" or None] else self.tag_list(self.build_tags_from_template(started_tags))
-        self.stopped_tags = [] if stopped_tags in ["" or None] else self.tag_list(self.build_tags_from_template(stopped_tags))
+        self.started_tags = [] if started_tags in ["" or None] else self.tag_list(self.build_tags_from_template(tags_str=started_tags, timezone=default_timezone))
+        self.stopped_tags = [] if stopped_tags in ["" or None] else self.tag_list(self.build_tags_from_template(tags_str=stopped_tags, timezone=default_timezone))
 
     def get_schedule(self, name):
         """
@@ -97,7 +94,7 @@ class SchedulerConfig:
         return self.schedules[name] if name in self.schedules else None
 
     @classmethod
-    def build_tags_from_template(cls, tags_str, tag_variables=None):
+    def build_tags_from_template(cls, tags_str, tag_variables=None, timezone="UTC"):
 
         lastkey = None
         tags = {}
@@ -111,7 +108,7 @@ class SchedulerConfig:
 
         tag_vars = {} if tag_variables is None else copy.copy(tag_variables)
 
-        dt = datetime.utcnow()
+        dt = datetime.now(pytz.timezone(timezone))
         tag_vars.update({
             configuration.TAG_VAL_SCHEDULER: os.getenv(configuration.ENV_STACK, ""),
             configuration.TAG_VAL_YEAR: "{:0>4d}".format(dt.year),
@@ -119,7 +116,7 @@ class SchedulerConfig:
             configuration.TAG_VAL_DAY: "{:0>2d}".format(dt.day),
             configuration.TAG_VAL_HOUR: "{:0>2d}".format(dt.hour),
             configuration.TAG_VAL_MINUTE: "{:0>2d}".format(dt.minute),
-            configuration.TAG_VAL_TIMEZONE: "UTC"
+            configuration.TAG_VAL_TIMEZONE: timezone
         })
 
         for tag in tags:
@@ -142,12 +139,7 @@ class SchedulerConfig:
                                         self.tag_name,
                                         self.default_timezone,
                                         str(self.trace),
-                                        str(self.enable_SSM_maintenance_windows),
-                                        str(self.use_metrics),
                                         ", ".join(self.regions),
                                         str(self.started_tags),
-                                        str(self.stopped_tags),
-                                        str(self.schedule_lambda_account),
-                                        ", ".join(self.cross_account_roles))
-
+                                        str(self.stopped_tags))
         return s

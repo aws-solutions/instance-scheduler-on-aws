@@ -1,0 +1,77 @@
+description: |
+  ### Document Name - Scheduler-StartTaggedEC2Instances
+  ## What does this document do?
+  This document finds the tagged EC2 instances and start them.
+
+  ## Input Parameters
+  * TagKey: (Required) Tag Key to filter list of EC2 Instances
+  * TagValue: (Required) Tag Value to filter list of EC2 Instances
+  * ResourceTagMapList: (Required) The tags to add to the resources.
+  * AutomationAssumeRole: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+schemaVersion: '0.3'
+assumeRole: "{{ AutomationAssumeRole }}"
+parameters:
+  TagKey:
+    type: String
+    default: tag:Schedule
+    description: (Required) The tag name (key) to filter list of EC2 Instances
+  TagValue:
+    type: StringList
+    description: (Required) The schedule name (tag value) to filter list of EC2 Instances
+  ResourceTagMapList:
+    type: MapList
+    description: (Required) The tags to add to the resources.
+    displayType: textarea
+    default:
+      - Key: 'StateChanged'
+        Value: 'Resource started by Instance Scheduler'
+  AutomationAssumeRole:
+    type: String
+    description: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+    default: ''
+outputs:
+  - getInstanceIds.instanceIds
+mainSteps:
+  - name: getInstanceIds
+    description: Describe EC2 instances with tag filter
+    action: aws:executeAwsApi
+    onFailure: Abort
+    inputs:
+      Service: ec2
+      Api: DescribeInstances
+      Filters:
+        - Name: "{{ TagKey }}"
+          Values: "{{ TagValue }}"
+    outputs:
+      - Name: instanceIds
+        Selector: $.Reservations..Instances..InstanceId
+        Type: StringList
+      - Name: singleInstanceId
+        Selector: $.Reservations[0].Instances[0].InstanceId
+        Type: String
+  - name: checkInstanceListIsNotEmpty
+    action: aws:branch
+    inputs:
+      Choices:
+        - NextStep: startInstances
+          Variable: "{{ getInstanceIds.singleInstanceId }}"
+          StartsWith: "i-"
+    isEnd: true
+  - name: startInstances
+    description: Start EC2 instances
+    action: aws:changeInstanceState
+    maxAttempts: 3
+    timeoutSeconds: 3600
+    onFailure: Abort
+    inputs:
+      InstanceIds: "{{ getInstanceIds.instanceIds }}"
+      DesiredState: running
+  - name: createResourceTags
+    action: aws:createTags
+    maxAttempts: 3
+    onFailure: Abort
+    inputs:
+      ResourceType: EC2
+      ResourceIds: "{{ getInstanceIds.instanceIds }}"
+      Tags: "{{ ResourceTagMapList }}"
+    isEnd: true
