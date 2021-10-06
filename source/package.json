@@ -39,6 +39,7 @@
     "@aws-solutions-constructs/aws-lambda-dynamodb": "1.121.0",
     "@aws-solutions-constructs/core": "1.121.0",
     "cdk": "^1.121.0",
-    "js-yaml": "^3.14.1"
+    "js-yaml": "^3.14.1",
+    "set-value": "^4.0.1"
   }
 }
