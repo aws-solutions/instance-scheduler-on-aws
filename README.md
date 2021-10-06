@@ -107,7 +107,6 @@ aws-instance-scheduler consists of:
       |- __init__.py
       |- start_secondary_ssm_automation_aurora_cluster.py - microservice executed in the ssm runbook for scheduling RDS Aurora clusters.
       |- start_secondary_ssm_automation_rds_instance.py -  microservice executed in the ssm runbook for scheduling RDS instances.
-    |- AWS-StopRdsInstance.yaml - 
     |- Scheduler-StartTaggedEC2Instances.yaml - custom ssm automation runbook to start tagged ec2 instances.
     |- Scheduler-StopTaggedEC2Instances.yaml - custom ssm automation runbook to stop tagged ec2 instances.
     |- Scheduler-StartTaggedRDSInstances.yaml - custom ssm automation runbook to start tagged rds instances.
