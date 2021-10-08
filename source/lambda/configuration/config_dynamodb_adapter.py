@@ -11,11 +11,10 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
-import boto3
 from boto3.dynamodb.conditions import Key
+from util.dynamodb_utils import DynamoDBUtils
 
 import configuration
-
 
 class ConfigDynamodbAdapter:
     """
@@ -32,13 +31,12 @@ class ConfigDynamodbAdapter:
         :return:
         """
         if self._config is None:
-            self._config = self._get_config()
+            self._config = self._get_solution_config()
         return self._config
 
-    def _get_config(self):
+    def _get_solution_config(self):
 
-        dynamodb = boto3.resource("dynamodb")
-        dynamodb_table = dynamodb.Table(self._tablename)
+        dynamodb_table = DynamoDBUtils.get_dynamodb_table_resource_ref(self._tablename)
 
         resp = dynamodb_table.get_item(Key={"name": "scheduler", "type": "config"}, ConsistentRead=True)
         config = resp.get("Item", {})

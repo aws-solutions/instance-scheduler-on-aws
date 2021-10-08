@@ -31,7 +31,7 @@ function getTestStack(): cdk.Stack {
     solutionProvider: 'AWS Solution Development',
     solutionBucket: "solutions",
     solutionName: 'aws-instance-scheduler',
-    solutionVersion: 'v1.4.0'
+    solutionVersion: 'v2.0.0'
   })
 
   const instanceSchedulerStackMetadata =
@@ -40,7 +40,7 @@ function getTestStack(): cdk.Stack {
       "ParameterGroups": [
         {
           "Label": {
-            "default": "Scheduler (version v1.4.0)"
+            "default": "Scheduler (version v2.0.0)"
           },
           "Parameters": [
             "TagName",

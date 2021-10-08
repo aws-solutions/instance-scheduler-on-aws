@@ -14,12 +14,10 @@
 
 from datetime import datetime, timedelta
 
-import configuration
 import pytz
 
 DEBUG_ACTIVE_PERIOD_IN_SCHEDULE = "Active period{} in schedule \"{}\": {}"
 DEBUG_NO_RUNNING_PERIODS = "No running periods at this time found in schedule \"{}\" for this time, desired state is {}"
-DEBUG_OVERRIDE_STATUS = "Schedule override_status value is {}, desired state is {}"
 DEBUG_SCHEDULE = "Schedule is {}"
 DEBUG_SET_DESIRED_INSTANCE_TYPE = "Current type of instance is {}, desired type is {}, desired state is set to {} to " \
                                   "restart instance with the desired type"
@@ -42,44 +40,20 @@ class InstanceSchedule:
     def __init__(self, name,
                  periods=None,
                  timezone=None,
-                 override_status=None,
                  description=None,
-                 use_metrics=None,
-                 stop_new_instances=None,
-                 schedule_dt=None,
-                 use_maintenance_window=False,
-                 ssm_maintenance_window=None,
-                 enforced=False,
-                 hibernate=False,
-                 retain_running=False):
+                 schedule_dt=None):
         """
         Initializes a schedule instance
         :param name: Name of a schedule
         :param periods: Periods in which instances are running
         :param timezone: Timezone of the schedule (default = UTC)
-        :param override_status: Set to have instances always started or stopped
         :param description: Description of the schedule
-        :param use_metrics: Set to true to collect metrics for the schedule
-        :param stop_new_instances: Set to True to stop instances that are added to the schema if they are not in a running period
         :param schedule_dt: datetime to use for scheduling
-        :param use_maintenance_window: Set to True to use the maintenance window as an additional schedule in
-        which instances are running
-        :param ssm_maintenance_window: name of ssm mainatenance window in which to start ec2 instances
-        :param enforced: start/stop state of the schema on instances
-        :param: hibernate: hibernate instances when stopping
         """
         self.name = name
         self.periods = periods
         self.timezone = timezone
-        self.override_status = override_status
         self.description = description
-        self.stop_new_instances = stop_new_instances
-        self.use_maintenance_window = use_maintenance_window
-        self.ssm_maintenance_window = ssm_maintenance_window
-        self.use_metrics = use_metrics
-        self.enforced = enforced
-        self.hibernate = hibernate
-        self.retain_running = retain_running
         self.schedule_dt = schedule_dt if schedule_dt is not None else datetime.now(pytz.timezone(self.timezone))
         self._logger = None
 
@@ -96,24 +70,8 @@ class InstanceSchedule:
         attributes = []
         if self.description:
             attributes.append(" ({})".format(self.description))
-        if self.override_status is not None:
-            attributes.append("always {} through override_status".format("running" if self.override_status else "stopped"))
         if self.timezone:
             attributes.append("timezone is {}".format(str(self.timezone)))
-        if self.stop_new_instances is not None:
-            attributes.append("new instanced are {} stopped".format("" if self.stop_new_instances else "not "))
-        if self.use_maintenance_window is not None:
-            attributes.append("maintenance windows are {} used to start instances".format("" if self.use_maintenance_window else "not "))
-        if self.ssm_maintenance_window is not None and self.use_maintenance_window:
-            attributes.append("SSM maintenance window is {} used to start EC2 instances".format(self.ssm_maintenance_window))
-        if self.enforced is not None:
-            attributes.append("schedule state is {} enforced to start or stop instances".format("" if self.enforced else "not "))
-        if self.hibernate is not None:
-            attributes.append("stopped ec2 instances are is {} hibernated when stopped".format("" if self.hibernate else "not "))
-        if self.retain_running is not None:
-            attributes.append(
-                "instances are {} stopped if at the and of a period if they were already running at the start of the period".format(
-                    "not" if self.retain_running else ""))
 
         if self.periods and len(self.periods) > 0:
             pl = []
@@ -151,8 +109,8 @@ class InstanceSchedule:
                 if p2["period"].begintime is None:
                     return p1
                 return p1 if p1["period"].begintime > p2["period"].begintime else p2
-
-            # test if we need to change the type of the instance
+            
+                        # test if we need to change the type of the instance
             def requires_adjust_instance_size(desired_instance_type, checked_instance):
                 return checked_instance.allow_resize and desired_instance_type is not None and checked_instance.is_running and \
                        desired_instance_type != checked_instance.instancetype
@@ -178,7 +136,7 @@ class InstanceSchedule:
                                                                    ",".join('"' + per["period"].name + '"' for per in periods)))
             if multiple_active_periods:
                 self._log_debug(DEBUG_USED_PERIOD.format(current_running_period["period"].name))
-
+            
             desired_state = InstanceSchedule.STATE_RUNNING
             desired_type = current_running_period["instancetype"] if inst.allow_resize else None
 
@@ -201,18 +159,8 @@ class InstanceSchedule:
             self._log_debug(DEBUG_NO_RUNNING_PERIODS, self.name, desired_state)
             return desired_state, None, None
 
-        # actions if there is an override value set for the schema
-        def handle_override_status():
-            desired_state = InstanceSchedule.STATE_RUNNING if self.override_status == configuration.OVERRIDE_STATUS_RUNNING \
-                else InstanceSchedule.STATE_STOPPED
-            self._log_debug(DEBUG_OVERRIDE_STATUS, self.override_status, desired_state)
-            return desired_state, None, "override_status"
 
         self._logger = logger
-
-        # always on or off
-        if self.override_status is not None:
-            return handle_override_status()
 
         # test if time is withing any period of the schedule
         localized_time = get_check_time(dt)

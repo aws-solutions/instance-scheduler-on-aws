@@ -10,8 +10,6 @@
 #  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    #
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
-from schedulers.ec2_service import Ec2Service
-from schedulers.rds_service import RdsService
 
 INST_ALLOW_RESIZE = "allow_resize"
 INST_RESIZED = "resized"
@@ -50,13 +48,18 @@ PARAM_CONFIG = "configuration"
 PARAM_CLUSTERS = "clusters"
 
 
-# Services handled by the scheduler, the class that handles the logic for scheduling instances for each know service
-# must be registered here
-
-SCHEDULER_TYPES = {
-    "ec2": Ec2Service,
-    "rds": RdsService
-}
+#RDS RunBooks key=value pairs
+RDS_INSTANCES_START_SSM_DOC = "RDS_INSTANCES_START_SSM_DOC"
+RDS_INSTANCES_STOP_SSM_DOC = "RDS_INSTANCES_STOP_SSM_DOC"
+RDS_CLUSTERS_START_SSM_DOC = "RDS_CLUSTERS_START_SSM_DOC"
+RDS_CLUSTERS_STOP_SSM_DOC = "RDS_CLUSTERS_STOP_SSM_DOC"
+#EC2 Runbooks
+EC2_START_SSM_DOC = "EC2_START_SSM_DOC"
+EC2_STOP_SSM_DOC = "EC2_STOP_SSM_DOC"
+#SSM_API
+MAX_ALLOWED_ACCOUNTS_IN_SSM_API = "MAX_ALLOWED_ACCOUNTS_IN_SSM_API"
+SSM_MAX_CONCURRENCY="SSM_MAX_CONCURRENCY"
+SSM_MAX_ERRORS="SSM_MAX_ERRORS"
 
 
 def account_from_role(role_str):

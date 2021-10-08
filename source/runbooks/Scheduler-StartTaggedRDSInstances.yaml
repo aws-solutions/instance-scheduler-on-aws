@@ -1,0 +1,177 @@
+description: |
+  ### Document Name - Scheduler-StartTaggedRDSInstances
+  ## What does this document do?
+  This document finds the tagged RDS instances and start them.
+
+  ## Input Parameters
+  * TagKey: (Required) Tag Key to filter list of RDS DB Instances
+  * TagValue: (Required) Tag Value to filter list of RDS DB Instances
+  * SecondaryAutomationName: The secondary automation name invoked by this automation
+  * ResourceTagMapList: The tags to add to the resources.
+  * SolutionId: AWS Solution ID
+  * SolutionVersion: AWS Solution version
+  * AutomationAssumeRole: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+schemaVersion: '0.3'
+assumeRole: '{{ AutomationAssumeRole }}'
+parameters:
+  TagKey:
+    type: String
+    default: Schedule
+    description: The tag name (key) to filter list of RDS DB Instances
+  TagValue:
+    type: StringList
+    description: The schedule name (tag value) to filter list of RDS DB Instances
+  SecondaryAutomationName:
+    type: String
+    default: AWS-StartRdsInstance
+    description: The secondary automation name
+  ResourceTagMapList:
+    type: MapList
+    description: (Required) The tags to add to the resources.
+    displayType: textarea
+    default:
+      - 'StateChanged': 'Resource started by Instance Scheduler'
+  SolutionId:
+    type: String
+    description: SO0030
+    default: SO0030
+  SolutionVersion:
+    type: String
+    description: Solution version number
+    default: v2.x
+  AutomationAssumeRole:
+    type: String
+    description: (Required) The ARN of the role that allows Automation to perform the actions on your behalf.
+    default: ''
+outputs:
+  - getTaggedRDSInstanceIds.rdsDbInstanceArns
+mainSteps:
+  - name: getTaggedRDSInstanceIds
+    description: Get tagged RDS DB instances
+    action: aws:executeAwsApi
+    onFailure: Abort
+    inputs:
+      Service: resourcegroupstaggingapi
+      Api: GetResources
+      TagFilters:
+        - Key: '{{ TagKey }}'
+          Values: '{{ TagValue }}'
+      ResourceTypeFilters:
+        - rds:db
+    outputs:
+      - Name: rdsDbInstanceArns
+        Selector: $.ResourceTagMappingList..ResourceARN
+        Type: StringList
+      - Name: singleARN
+        Selector: $.ResourceTagMappingList[0].ResourceARN
+        Type: String
+  - name: checkDBArnIsNotEmpty
+    action: aws:branch
+    inputs:
+      Choices:
+        - NextStep: startRdsInstances
+          Variable: "{{ getTaggedRDSInstanceIds.singleARN }}"
+          StartsWith: "arn:"
+    isEnd: true
+  - name: startRdsInstances
+    action: 'aws:executeScript'
+    inputs:
+      InputPayload:
+        RdsResourceArns: '{{ getTaggedRDSInstanceIds.rdsDbInstanceArns }}'
+        Region: '{{ global:REGION }}'
+        SecondaryAutomationName: '{{ SecondaryAutomationName }}'
+        SolutionId: '{{ SolutionId }}'
+        SolutionVersion: '{{ SolutionVersion }}'
+        ExecutionRoleArn: '{{ AutomationAssumeRole }}'
+      Runtime: python3.7
+      Handler: start_rds_secondary_ssm_automation
+      Script: |-
+        import boto3
+        import logging
+        from botocore.config import Config
+
+
+        def start_rds_secondary_ssm_automation(event, context) -> list:
+            """
+            start new SSM automation document to start or stop RDS instances.
+            Parameters:
+            event (dict): event from SSM automation
+                example:
+                    {
+                        "RdsResourceArns": [
+                            "arn:aws:rds:us-east-1:account:db:database-name-1",
+                            "arn:aws:rds:us-east-1:account:db:database-name-2"
+                            ],
+                        "Region": "us-east-1",
+                        "SecondaryAutomationName": "secondary-automation-name",
+                        "SolutionId": "SO0030",
+                        "SolutionVersion": "v2.0.0",
+                        "ExecutionRoleArn": "arn:aws:iam::account:role/role-name"
+                    }
+            context (dict): context object
+
+            Returns:
+            list : list of secondary execution ids
+
+           """
+            logging.debug(context)
+            execution_ids = []
+            # handle empty arn list
+            if not event.get('RdsResourceArns'):
+                return execution_ids
+
+            ssm_client = get_client(event)
+            resource_list = split_arn_list(event.get('RdsResourceArns'))
+
+            for rds_instance_id in resource_list:
+                execution_id = ssm_client.start_automation_execution(
+                    # Launch SSM Doc via Automation
+                    DocumentName=event.get('SecondaryAutomationName'),
+                    Parameters={
+                        "InstanceId": [
+                            rds_instance_id
+                        ],
+                        "AutomationAssumeRole": [
+                            event.get('ExecutionRoleArn')
+                        ]
+                    }
+                )['AutomationExecutionId']
+                execution_ids.append(execution_id)
+
+            return execution_ids
+
+
+        def get_client(event):
+            """Create Boto3 client for SSM service"""
+            boto_config = Config(
+                user_agent_extra=f'AwsSolution/{event.get("SolutionId")}/'
+                                 f'{event.get("SolutionVersion")}',
+                retries={
+                    'mode': 'standard'
+                }
+            )
+
+            return boto3.client('ssm',
+                                region_name=event.get('Region'),
+                                config=boto_config)
+
+
+        def split_arn_list(arn_list):
+            separator = ':db:'
+            resource_ids = []
+            for arn in arn_list:
+                resource_id = arn.split(separator)[1]
+                resource_ids.append(resource_id)
+            return resource_ids
+  - name: createResourceTags
+    action: aws:executeAutomation
+    maxAttempts: 3
+    timeoutSeconds: 3600
+    onFailure: Abort
+    inputs:
+      DocumentName: AWS-SetRequiredTags
+      RuntimeParameters:
+        RequiredTags: "{{ ResourceTagMapList }}"
+        ResourceARNs: '{{ getTaggedRDSInstanceIds.rdsDbInstanceArns }}'
+        AutomationAssumeRole: '{{ AutomationAssumeRole }}'
+    isEnd: true

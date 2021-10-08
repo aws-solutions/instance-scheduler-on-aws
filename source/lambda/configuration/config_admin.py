@@ -15,44 +15,39 @@ import json
 import os
 import re
 import pytz
+import configuration
 from datetime import datetime, timedelta
 
-import boto3
-from boto3.dynamodb.conditions import Key
 
-import configuration
-from boto_retry import add_retry_methods_to_resource
+from util.named_tuple_builder import as_namedtuple
+from boto3.dynamodb.conditions import Key
+from util.dynamodb_utils import DynamoDBUtils
 from configuration.config_dynamodb_adapter import ConfigDynamodbAdapter
 from configuration.instance_schedule import InstanceSchedule
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
 from configuration.setbuilders.month_setbuilder import MonthSetBuilder
 from configuration.setbuilders.monthday_setbuilder import MonthdaySetBuilder
 from configuration.setbuilders.weekday_setbuilder import WeekdaySetBuilder
-from util.named_tuple_builder import as_namedtuple
 
 ERR_PERIOD_BEGIN_LATER_THAN_END = "error: period begintime {} can not be later than endtime {}"
 ERR_SCHEDULE_INVALID_OVERRIDE = "{} is not a valid value for {}, possible values are {}"
 ERR_SCHEDULE_OVERWRITE_OVERRIDE_EXCLUSIVE = "{} option is mutually exclusive with {} option"
 ERR_CREATE_PERIOD_EXISTS = "error: period {} already exists"
 ERR_CREATE_SCHEDULE_EXISTS = "error: schedule {} already exists"
-ERR_DEL_PERIOD_EMPTY = "error: period name parameter can not be empty"
+ERR_PERIOD_EMPTY = "error: period name parameter can not be empty"
 ERR_DEL_PERIOD_IN_USE = "error: period {} can not be deleted because it is still used in schedule(s) {}"
-ERR_DEL_PERIOD_NOT_FOUND = "not found: period {} does not exist"
+ERR_PERIOD_NOT_FOUND = "not found: period {} does not exist"
 ERR_DEL_SCHEDULE_NAME_EMPTY = "error: schedule name parameter can not be empty"
-ERR_DEL_SCHEDULE_NOT_FOUND = "not found: schedule {} does not exist"
-ERR_GET_EMPTY_PERIOD_NAME = "error: period name parameter can not be empty"
-ERR_GET_PERIOD_NOT_FOUND = "not found: period {} does not exist"
+ERR_SCHEDULE_NOT_FOUND = "not found: schedule {} does not exist"
 ERR_GET_SCHEDULE_NAME_EMPTY = "error: error schedule name parameter can not be empty"
-ERR_GET_SCHEDULE_NOT_FOUND = "not found: schedule {} does not exist"
 ERR_GET_USAGE_INVALID_END_DATE = "error: invalid enddate {}, must be a valid date in format yyyymmdd {}"
 ERR_GET_USAGE_INVALID_START_DATE = "error: invalid startdate {}, must be a valid date in format yyyymmdd {}"
 ERR_GET_USAGE_SCHEDULE_NAME_EMPTY = "error: error schedule name parameter can not be empty"
-ERR_GET_USAGE_SCHEDULE_NOT_FOUND = "not found: schedule {} does not exist"
 ERR_GET_USAGE_START_MUST_BE_LESS_OR_EQUAL_STOP = "stop_date must be equal or later than start_date"
 ERR_NAME_PARAM_MISSING = "error: name parameter is missing"
 ERR_NO_PERIODS = "error: at least one period condition must be specified"
 ERR_PERIOD_INVALID_MONTHDAYS = "error: {} is not a valid month days specification"
-ERR_PERIOD_INVALID_MONTHS = "error: {} is not a valid months specification"
+ERR_PERIOD_INVALID_MONTHS = "error: {} is not a valid months specification {}"
 ERR_PERIOD_INVALID_TIME = "error: {} {} is not a valid time"
 ERR_PERIOD_INVALID_WEEKDAYS = "error: {} is not a valid weekdays specification {}"
 ERR_PERIOD_UNKNOWN_PARAMETER = "error: {} is not a valid parameter, valid parameters are {}"
@@ -64,10 +59,7 @@ ERR_SCHEDULE_PERIOD_DOES_NOT_EXISTS = "error: not found: period {} does not exis
 ERR_SCHEDULE_UNKNOWN_PARAMETER = "error: {} is not a valid parameter, valid parameters are {}"
 ERR_UPDATE_INVALID_BOOL_PARAM = "error: {} for parameter {} is not a valid boolean value"
 ERR_UPDATE_INVALID_TZ_PARAMETER = "error: {} is not a valid time zone for parameter {}"
-ERR_UPDATE_PERIOD_NAME_EMPTY = "error: period name parameter can not be empty"
-ERR_UPDATE_PERIOD_NOT_FOUND = "not found: period {} does not exist"
 ERR_UPDATE_SCHEDULE_NAME_EMPTY = "error: schedule name parameter can not be empty"
-ERR_UPDATE_SCHEDULE_NOT_FOUND = "not found: schedule {} does not exist"
 ERR_UPDATE_TAGNAME_EMPTY = "error: tagname parameter must be specified"
 ERR_UPDATE_UNKNOWN_PARAMETER = "error: {} is not a valid parameter"
 ERR_UPDATE_UNKNOWN_SERVICE = "{} is not a supported service"
@@ -108,8 +100,7 @@ class ConfigAdmin:
         :param context: Lambda context
         """
         self._table_name = self.table_name
-        self._table = boto3.resource("dynamodb").Table(self._table_name)
-        add_retry_methods_to_resource(self._table, ["scan", "get_item", "put_item", "delete_item"], context=context)
+        self._table = DynamoDBUtils.get_dynamodb_table_resource_ref(self._table_name)
         self._configuration = None
         self._logger = logger
         self._context = context
@@ -138,7 +129,7 @@ class ConfigAdmin:
         Gets the configuration as json
         :return:
         """
-        resp = self._table.get_item_with_rerties(Key={"name": "scheduler", "type": "config"}, ConsistentRead=True)
+        resp = self._table.get_item(Key={"name": "scheduler", "type": "config"}, ConsistentRead=True)
         item = resp.get("Item", {})
         return self._for_output(item)
 
@@ -148,14 +139,15 @@ class ConfigAdmin:
         :param settings: settings values
         :return: updated values
         """
-        valid_attributes = [configuration.METRICS,
-                            configuration.CROSS_ACCOUNT_ROLES,
+        valid_attributes = [configuration.REMOTE_ACCOUNT_IDS,
+                            configuration.ORGANIZATION_ID,
                             configuration.DEFAULT_TIMEZONE,
                             configuration.REGIONS,
-                            configuration.SCHEDULE_LAMBDA_ACCOUNT,
                             configuration.TAGNAME,
                             configuration.TRACE,
-                            configuration.ENABLE_SSM_MAINTENANCE_WINDOWS,
+                            configuration.NAMEPSACE,
+                            configuration.EXECUTION_ROLE_NAME,
+                            configuration.AWS_PARTITION,
                             ConfigAdmin.TYPE_ATTR,
                             configuration.SCHEDULED_SERVICES,
                             configuration.SCHEDULE_CLUSTERS,
@@ -183,7 +175,7 @@ class ConfigAdmin:
                 continue
 
             # make sure these fields are set as sets
-            if attr in [configuration.REGIONS, configuration.CROSS_ACCOUNT_ROLES, configuration.SCHEDULED_SERVICES]:
+            if attr in [configuration.REGIONS, configuration.REMOTE_ACCOUNT_IDS, configuration.SCHEDULED_SERVICES]:
                 temp = self._ensure_set(settings[attr])
                 if len(settings[attr]) > 0:
                     checked_settings[attr] = temp
@@ -191,10 +183,7 @@ class ConfigAdmin:
                 continue
 
             # make sure these fields are valid booleans
-            if attr in [configuration.METRICS,
-                        configuration.TRACE,
-                        configuration.ENABLE_SSM_MAINTENANCE_WINDOWS,
-                        configuration.SCHEDULE_LAMBDA_ACCOUNT,
+            if attr in [configuration.TRACE,
                         configuration.CREATE_RDS_SNAPSHOT,
                         configuration.SCHEDULE_CLUSTERS]:
                 bool_value = self._ensure_bool(settings[attr])
@@ -225,7 +214,7 @@ class ConfigAdmin:
         checked_settings[ConfigAdmin.TYPE_ATTR] = "config"
         checked_settings[configuration.NAME] = "scheduler"
 
-        self._table.put_item_with_retries(Item=checked_settings)
+        self._table.put_item(Item=checked_settings)
 
         return ConfigAdmin._for_output(checked_settings)
 
@@ -247,11 +236,11 @@ class ConfigAdmin:
         :return:
         """
         if name is None or len(name) == 0:
-            raise ValueError(ERR_GET_EMPTY_PERIOD_NAME)
+            raise ValueError(ERR_PERIOD_EMPTY)
         period = self._get_period(name)
         if period is None:
             if exception_if_not_exists:
-                raise ValueError(ERR_GET_PERIOD_NOT_FOUND.format(name))
+                raise ValueError(ERR_PERIOD_NOT_FOUND.format(name))
             return None
         return {"period": ConfigAdmin._for_output(period)}
 
@@ -265,7 +254,7 @@ class ConfigAdmin:
         name = period[configuration.NAME]
         if self._get_period(name) is not None:
             raise ValueError(ERR_CREATE_PERIOD_EXISTS.format(name))
-        self._table.put_item_with_retries(Item=period)
+        self._table.put_item(Item=period)
         return {"period": ConfigAdmin._for_output(period)}
 
     def update_period(self, **kwargs):
@@ -277,10 +266,10 @@ class ConfigAdmin:
         period = self._validate_period(**kwargs)
         name = period[configuration.NAME]
         if name is None or len(name) == 0:
-            raise ValueError(ERR_UPDATE_PERIOD_NAME_EMPTY)
+            raise ValueError(ERR_PERIOD_EMPTY)
         if self._get_period(name) is None:
-            raise ValueError(ERR_UPDATE_PERIOD_NOT_FOUND.format(name))
-        self._table.put_item_with_retries(Item=period)
+            raise ValueError(ERR_PERIOD_NOT_FOUND.format(name))
+        self._table.put_item(Item=period)
         return {"period": ConfigAdmin._for_output(period)}
 
     def delete_period(self, name, exception_if_not_exists=False):
@@ -291,7 +280,7 @@ class ConfigAdmin:
         :return:
         """
         if name is None or len(name) == 0:
-            raise ValueError(ERR_DEL_PERIOD_EMPTY)
+            raise ValueError(ERR_PERIOD_EMPTY)
 
         # test if period is used in any schedule
         schedules_using_period = []
@@ -305,11 +294,11 @@ class ConfigAdmin:
             raise ValueError(ERR_DEL_PERIOD_IN_USE.format(name, ", ".join(schedules_using_period)))
 
         if self._get_period(name) is not None:
-            self._table.delete_item_with_retries(Key={"name": name, "type": "period"})
+            self._table.delete_item(Key={"name": name, "type": "period"})
             return {"period": name}
         else:
             if exception_if_not_exists:
-                raise ValueError(ERR_DEL_PERIOD_NOT_FOUND.format(name))
+                raise ValueError(ERR_PERIOD_NOT_FOUND.format(name))
             return None
 
     def list_schedules(self):
@@ -332,7 +321,7 @@ class ConfigAdmin:
         schedule = self._get_schedule(name)
         if schedule is None:
             if exception_if_not_exists:
-                raise ValueError(ERR_GET_SCHEDULE_NOT_FOUND.format(name))
+                raise ValueError(ERR_SCHEDULE_NOT_FOUND.format(name))
             return None
         return {"schedule": ConfigAdmin._for_output(schedule)}
 
@@ -346,7 +335,7 @@ class ConfigAdmin:
         name = schedule[configuration.NAME]
         if self._get_schedule(name) is not None:
             raise ValueError(ERR_CREATE_SCHEDULE_EXISTS.format(name))
-        self._table.put_item_with_retries(Item=schedule)
+        self._table.put_item(Item=schedule)
         return {"schedule": ConfigAdmin._for_output(schedule)}
 
     def update_schedule(self, **kwargs):
@@ -360,8 +349,8 @@ class ConfigAdmin:
         if name is None or len(name) == 0:
             raise ValueError(ERR_UPDATE_SCHEDULE_NAME_EMPTY)
         if self._get_schedule(name) is None:
-            raise ValueError(ERR_UPDATE_SCHEDULE_NOT_FOUND.format(name))
-        self._table.put_item_with_retries(Item=schedule)
+            raise ValueError(ERR_SCHEDULE_NOT_FOUND.format(name))
+        self._table.put_item(Item=schedule)
         return {"schedule": ConfigAdmin._for_output(schedule)}
 
     def delete_schedule(self, name, exception_if_not_exists=True):
@@ -375,9 +364,9 @@ class ConfigAdmin:
             raise ValueError(ERR_DEL_SCHEDULE_NAME_EMPTY)
         if self._get_schedule(name) is None:
             if exception_if_not_exists:
-                raise ValueError(ERR_DEL_SCHEDULE_NOT_FOUND.format(name))
+                raise ValueError(ERR_SCHEDULE_NOT_FOUND.format(name))
             return None
-        self._table.delete_item_with_retries(Key={"name": name, "type": "schedule"})
+        self._table.delete_item(Key={"name": name, "type": "schedule"})
         return {"schedule": name}
 
     def get_schedule_usage(self, name, startdate=None, enddate=None):
@@ -394,7 +383,7 @@ class ConfigAdmin:
         
         schedule = self.configuration.get_schedule(name)
         if schedule is None:
-            raise ValueError(ERR_GET_USAGE_SCHEDULE_NOT_FOUND.format(name))
+            raise ValueError(ERR_SCHEDULE_NOT_FOUND.format(name))
 
         if startdate:
             if not isinstance(startdate, datetime):
@@ -526,8 +515,8 @@ class ConfigAdmin:
                         MonthSetBuilder().build(temp)
                         result[attr] = temp
                         continue
-                    except:
-                        raise ValueError(ERR_PERIOD_INVALID_MONTHS.format(str(period[attr])))
+                    except Exception as ex:
+                        raise ValueError(ERR_PERIOD_INVALID_MONTHS.format(str(period[attr]), ex))
 
                 # validate weekdays
                 if attr == configuration.WEEKDAYS:
@@ -546,8 +535,8 @@ class ConfigAdmin:
                         MonthdaySetBuilder(year=2016, month=12).build(temp)
                         result[attr] = temp
                         continue
-                    except:
-                        raise ValueError(ERR_PERIOD_INVALID_MONTHDAYS.format(str(period[attr])))
+                    except Exception as ex:
+                        raise ValueError(ERR_PERIOD_INVALID_MONTHDAYS.format(str(period[attr]), ex))
 
         if configuration.NAME not in result:
             raise ValueError(ERR_NAME_PARAM_MISSING)
@@ -576,15 +565,7 @@ class ConfigAdmin:
                             configuration.PERIODS,
                             configuration.NAME,
                             configuration.DESCRIPTION,
-                            configuration.OVERWRITE,
-                            configuration.METRICS,
                             configuration.STOP_NEW_INSTANCES,
-                            configuration.USE_MAINTENANCE_WINDOW,
-                            configuration.SSM_MAINTENANCE_WINDOW,
-                            configuration.RETAINED_RUNNING,
-                            configuration.ENFORCED,
-                            configuration.HIBERNATE,
-                            configuration.OVERRIDE_STATUS,
                             configuration.SCHEDULE_CONFIG_STACK]
 
         for attr in schedule:
@@ -606,46 +587,7 @@ class ConfigAdmin:
                     result[attr] = temp
                 continue
 
-            if attr in [configuration.NAME, configuration.SSM_MAINTENANCE_WINDOW]:
-                result[attr] = schedule[attr]
-                continue
-
-            # make sure these fields are valid booleans
-            if attr in [configuration.METRICS,
-                        configuration.STOP_NEW_INSTANCES,
-                        configuration.USE_MAINTENANCE_WINDOW,
-                        configuration.RETAINED_RUNNING,
-                        configuration.HIBERNATE,
-                        configuration.ENFORCED]:
-                bool_value = self._ensure_bool(schedule[attr])
-                if bool_value is None:
-                    raise ValueError(ERR_SCHEDULE_INVALID_BOOLEAN.format(schedule[attr], attr))
-                result[attr] = bool_value
-                continue
-
-            # overwrite status, now deprecated, use PROP_OVERRIDE_STATUS instead
-            if attr == configuration.OVERWRITE:
-
-                if configuration.OVERRIDE_STATUS in schedule:
-                    raise ValueError(
-                        ERR_SCHEDULE_OVERWRITE_OVERRIDE_EXCLUSIVE.format(configuration.OVERWRITE, configuration.OVERRIDE_STATUS))
-
-                bool_value = self._ensure_bool(schedule[attr])
-                if bool_value is None:
-                    raise ValueError(ERR_SCHEDULE_INVALID_BOOLEAN.format(schedule[attr], attr))
-                result[
-                    configuration.OVERRIDE_STATUS] = configuration.OVERRIDE_STATUS_RUNNING if bool_value \
-                    else configuration.OVERRIDE_STATUS_STOPPED
-                continue
-
-            if attr == configuration.OVERRIDE_STATUS:
-
-                if configuration.OVERWRITE in schedule:
-                    raise ValueError(
-                        ERR_SCHEDULE_OVERWRITE_OVERRIDE_EXCLUSIVE.format(configuration.OVERWRITE, configuration.OVERRIDE_STATUS))
-                if schedule[attr] not in configuration.OVERRIDE_STATUS_VALUES:
-                    raise ValueError(
-                        ERR_SCHEDULE_INVALID_OVERRIDE.format(schedule[attr], attr, ",".join(configuration.OVERRIDE_STATUS_VALUES)))
+            if attr in [configuration.NAME]:
                 result[attr] = schedule[attr]
                 continue
 
@@ -666,10 +608,6 @@ class ConfigAdmin:
         if configuration.NAME not in result:
             raise ValueError(ERR_SCHEDULE_NAME_MISSING)
 
-        # if there is no overwrite there must be at least one period
-        if configuration.OVERRIDE_STATUS not in schedule:
-            if configuration.PERIODS not in schedule or len(schedule[configuration.PERIODS]) == 0:
-                raise ValueError(ERR_SCHEDULE_NO_PERIOD)
 
         # validate if periods are in configuration
         if configuration.PERIODS in result:
@@ -694,7 +632,7 @@ class ConfigAdmin:
         }
 
         while True:
-            resp = self._table.scan_with_retries(**args)
+            resp = self._table.scan(**args)
             result += resp.get("Items", [])
             if "LastEvaluatedKey" in resp:
                 args["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
@@ -710,11 +648,11 @@ class ConfigAdmin:
         return self._items_of_type("period")
 
     def _get_schedule(self, schedule_name):
-        resp = self._table.get_item_with_retries(Key={"name": schedule_name, "type": "schedule"}, ConsistentRead=True)
+        resp = self._table.get_item(Key={"name": schedule_name, "type": "schedule"}, ConsistentRead=True)
         return resp.get("Item", None)
 
     def _get_period(self, period_name):
-        resp = self._table.get_item_with_retries(Key={"name": period_name, "type": "period"}, ConsistentRead=True)
+        resp = self._table.get_item(Key={"name": period_name, "type": "period"}, ConsistentRead=True)
         return resp.get("Item", None)
 
     def calculate_schedule_usage_for_period(self, schedule_name, start_dt, stop_dt=None, logger=None):

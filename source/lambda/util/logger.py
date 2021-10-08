@@ -13,9 +13,8 @@
 
 import os
 import time
-from datetime import datetime
-
-import boto_retry
+import boto3
+from util import get_config
 
 LOG_FORMAT = "{:7s} : {}"
 
@@ -107,7 +106,7 @@ class Logger:
     @property
     def sns(self):
         if self._sns is None:
-            self._sns = boto_retry.get_client_with_retries("sns", ["publish"], context=self._context)
+            self._sns = boto3.client("sns", config=get_config())
         return self._sns
 
     @debug_enabled.setter
@@ -129,7 +128,7 @@ class Logger:
         sns_arn = os.getenv(ENV_ISSUES_TOPIC_ARN, None)
         if sns_arn is not None:
             message = "Loggroup: {}\nLogstream {}\n{} : {}".format(self._loggroup, self._logstream, level, msg)
-            self.sns.publish_with_retries(TopicArn=sns_arn, Message=message)
+            self.sns.publish(TopicArn=sns_arn, Message=message)
 
     def info(self, msg, *args):
         """
@@ -180,8 +179,7 @@ class Logger:
     @property
     def client(self):
         if self._client is None:
-            methods = ["describe_log_streams", "create_log_stream"]
-            self._client = boto_retry.get_client_with_retries("logs", methods, context=self._context)
+            self._client = boto3.client('logs', config=get_config())
         return self._client
 
     def flush(self):
@@ -194,13 +192,13 @@ class Logger:
             if self._log_sequence_token:
                 return self._log_sequence_token
 
-            resp = self.client.describe_log_streams_with_retries(logGroupName=self._loggroup, logStreamNamePrefix=self._logstream)
+            resp = self.client.describe_log_streams(logGroupName=self._loggroup, logStreamNamePrefix=self._logstream)
             if "logStreams" in resp and len(resp["logStreams"]) > 0:
                 token = resp["logStreams"][0].get("uploadSequenceToken")
                 return token
             try:
-                self.client.create_log_stream_with_retries(logGroupName=self._loggroup, logStreamName=self._logstream)
-                resp = self.client.describe_log_streams_with_retries(logGroupName=self._loggroup,
+                self.client.create_log_stream(logGroupName=self._loggroup, logStreamName=self._logstream)
+                resp = self.client.describe_log_streams(logGroupName=self._loggroup,
                                                                      logStreamNamePrefix=self._logstream)
             except Exception as e:
                 if type(e).__name__ != "ResourceAlreadyExistsException":

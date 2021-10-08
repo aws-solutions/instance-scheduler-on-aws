@@ -31,7 +31,7 @@ function getTestStack(): cdk.Stack {
     solutionProvider: 'AWS Solution Development',
     solutionBucket: "solutions",
     solutionName: 'aws-instance-scheduler',
-    solutionVersion: 'v1.4.0'
+    solutionVersion: 'v2.0.0'
   })
 
   const instanceSchedulerRemoteStackMetadata =

@@ -11,18 +11,18 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
+import re
+import os
 import json
+import boto3
+import configuration
+import requesthandlers.setup_demo_data as demo_data
 from copy import copy
 from datetime import datetime
 from hashlib import sha256
-
-import boto3
-
-import configuration
-import requesthandlers.setup_demo_data as demo_data
-from boto_retry import get_client_with_retries
 from configuration.config_admin import ConfigAdmin
 from util.custom_resource import CustomResource
+from util import get_config
 from util.logger import Logger
 from util.metrics import allow_send_metrics, send_metrics_data
 
@@ -77,28 +77,37 @@ class SchedulerSetupHandler(CustomResource):
         return self.resource_properties.get(configuration.DEFAULT_TIMEZONE, configuration.DEFAULT_TZ)
 
     @property
-    def use_metrics(self):
-        """
-        Returns global metrics switch
-        :return: metrics switch
-        """
-        return self.resource_properties.get(configuration.METRICS, "False")
-
-    @property
     def trace(self):
         """
         Returns global trace flag
         :return: trace flag
         """
         return self.resource_properties.get(configuration.TRACE, "True")
-    
+
+        
     @property
-    def enable_SSM_maintenance_windows(self):
+    def namespace(self):
         """
-        Returns global enable SSM Maintenance Windows flag
-        :return: ssm_enable_SSM_maintenance_windows flag
+        Returns global namepsace
+        :return: namespace string
         """
-        return self.resource_properties.get(configuration.ENABLE_SSM_MAINTENANCE_WINDOWS, "False")
+        return self.resource_properties.get(configuration.NAMEPSACE, None)
+
+    @property
+    def aws_partition(self):
+        """
+        Returns aws partition
+        :return: aws partition string
+        """
+        return self.resource_properties.get(configuration.AWS_PARTITION, None)
+
+    @property
+    def execution_role_name(self):
+        """
+        Returns execution_role_name
+        :return: execution_role_name string
+        """
+        return self.resource_properties.get(configuration.EXECUTION_ROLE_NAME, None)
 
     @property
     def regions(self):
@@ -107,7 +116,7 @@ class SchedulerSetupHandler(CustomResource):
         :return: regions
         """
         result = set(self.resource_properties.get(configuration.REGIONS))
-        if result is None or result == set() or len([i for i in result if i.strip() != ""]) == 0:
+        if result == set() or len([i for i in result if i.strip() != ""]) == 0:
             result = [boto3.Session().region_name]
         return result
 
@@ -128,13 +137,25 @@ class SchedulerSetupHandler(CustomResource):
         return self.resource_properties.get(configuration.STOPPED_TAGS, None)
 
     @property
-    def cross_account_roles(self):
+    def remote_account_ids(self):
         """
-        Returns cross-account roles
-        :return: cross account roles
+        Returns remote account ids
+        :return: remote account ids
         """
-        result = set(self.resource_properties.get(configuration.CROSS_ACCOUNT_ROLES))
-        if result is None or result == set() or len([i for i in result if i.strip() != ""]) == 0:
+        result = set(self.resource_properties.get(configuration.REMOTE_ACCOUNT_IDS))
+        if result == set() or len([i for i in result if i.strip() != ""]) == 0:
+            return None
+
+        return result
+    
+    @property
+    def old_remote_account_ids(self):
+        """
+        Returns remote account ids from the previous event of create/update
+        :return: remote account ids
+        """
+        result = set(self.old_resource_properties.get(configuration.REMOTE_ACCOUNT_IDS))
+        if result == set() or len([i for i in result if i.strip() != ""]) == 0:
             return None
 
         return result
@@ -146,7 +167,7 @@ class SchedulerSetupHandler(CustomResource):
         :return: services to schedule
         """
         result = set(self.resource_properties.get(configuration.SCHEDULED_SERVICES))
-        if result is None or result == set() or len([i for i in result if i.strip() != ""]) == 0:
+        if result == set() or len([i for i in result if i.strip() != ""]) == 0:
             return None
 
         return result
@@ -165,15 +186,15 @@ class SchedulerSetupHandler(CustomResource):
         Returns global create RDS Snapshots flag
         :return: create_rds_snapshot flag
         """
-        return self.resource_properties.get(configuration.CREATE_RDS_SNAPSHOT, "True")
+        return self.resource_properties.get(configuration.CREATE_RDS_SNAPSHOT, "False")
 
     @property
-    def schedule_lambda_account(self):
+    def use_aws_organizations(self):
         """
-        Returns flag for processing lambda account switch
-        :return: lambda account process switch
+        Returns use_aws_organizations flag
+        :return: use_aws_organizations flag
         """
-        return self.resource_properties.get(configuration.SCHEDULE_LAMBDA_ACCOUNT, "True")
+        return self.resource_properties.get(configuration.USE_AWS_ORGANIZATIONS, "False")
 
     def handle_request(self):
         """
@@ -187,20 +208,47 @@ class SchedulerSetupHandler(CustomResource):
         finally:
             self._logger.flush()
 
-    def _update_settings(self):
+    def is_valid_org_id(self, org_id):
+        """
+        Verifies if the ou_id param is a valid ou_id format. https://docs.aws.amazon.com/organizations/latest/APIReference/API_Organization.html
+        :return: boolean
+        """
+        try:
+            return re.fullmatch("^o-[a-z0-9]{10,32}$", org_id)
+        except Exception as error:
+            raise error
+
+    def _update_settings(self, prev_org_remote_account_ids={os.getenv(configuration.ENV_ACCOUNT)}):
         try:
             admin = ConfigAdmin(logger=self._logger, context=self.context)
+            try: 
+                org_id = list(self.remote_account_ids)[0]
+            except Exception as error:
+                self._logger.info(f"org id is not valid or empty {error}")
+                org_id = ""
+
+            if self.is_valid_org_id(org_id) and self.use_aws_organizations == "True":
+                self.organization_id = org_id
+                remote_account_ids = prev_org_remote_account_ids
+            elif self.is_valid_org_id(org_id) and self.use_aws_organizations == "False":
+                self.organization_id = org_id
+                remote_account_ids = {}
+            else:
+                self.organization_id = ""
+                remote_account_ids = self.remote_account_ids
+
             settings = admin.update_config(default_timezone=self.default_timezone,
                                            scheduled_services=self.scheduled_services,
                                            schedule_clusters=self.schedule_clusters,
                                            create_rds_snapshot = self.create_rds_snapshot,
                                            tagname=self.tagname,
                                            regions=self.regions,
-                                           cross_account_roles=self.cross_account_roles,
-                                           schedule_lambda_account=self.schedule_lambda_account.lower() == "true",
-                                           use_metrics=self.use_metrics.lower() == "true",
+                                           remote_account_ids=remote_account_ids,
+                                           organization_id=self.organization_id,
                                            trace=self.trace.lower() == "true",
-                                           enable_SSM_maintenance_windows=self.enable_SSM_maintenance_windows.lower() == "true",
+                                           namespace=self.namespace,
+                                           execution_role_name=self.execution_role_name,
+                                           aws_partition=self.aws_partition,
                                            started_tags=self.started_tags,
                                            stopped_tags=self.stopped_tags)
 
@@ -217,25 +265,20 @@ class SchedulerSetupHandler(CustomResource):
         Aligns retention period for default Lambda log streams with settings
         :return:
         """
-
-        if self.context is None:
-            return True
-
-        loggroup = self.context.log_group_name
-        log_client = get_client_with_retries("logs", ["delete_retention_policy", "put_retention_policy"], context=self.context)
-        retention_days = self.arguments.get("log_retention_days", 30)
         try:
+            loggroup = self.context.log_group_name
+            log_client = boto3.client("logs", config=get_config())
+            retention_days = self.arguments.get("log_retention_days", 30)
             if retention_days is None:
                 self._logger.info(INFO_DELETE_LOG_RETENTION_POLICY, loggroup)
-                log_client.delete_retention_policy_with_retries(loggroup)
-                return True
+                log_client.delete_retention_policy(loggroup)
             else:
                 self._logger.info(INFO_SET_LOG_RETENTION_POLICY, loggroup, retention_days)
-                log_client.put_retention_policy_with_retries(logGroupName=loggroup, retentionInDays=int(retention_days))
-                return True
+                log_client.put_retention_policy(logGroupName=loggroup, retentionInDays=int(retention_days))
         except Exception as ex:
             self._logger.warning(ERR_SETTING_RETENTION_LAMBDA_LOGGROUP, self.context.log_group_name, str(ex))
-            return True
+        
+        return True
 
     def _create_sample_schemas(self):
 
@@ -249,9 +292,6 @@ class SchedulerSetupHandler(CustomResource):
 
             admin.create_schedule(**demo_data.SCHEDULE_SEATTLE_OFFICE_HOURS)
             admin.create_schedule(**demo_data.SCHEDULE_UK_OFFICE_HOURS)
-            admin.create_schedule(**demo_data.SCHEDULE_STOPPED)
-            admin.create_schedule(**demo_data.SCHEDULE_RUNNING)
-            admin.create_schedule(**demo_data.SCHEDULE_SCALING)
 
         except Exception as ex:
             self._logger.error("Error creating sample schedules and periods {}".format(ex))
@@ -291,7 +331,23 @@ class SchedulerSetupHandler(CustomResource):
         return self._update_settings() and self.set_lambda_logs_retention_period()
 
     def _update_request(self):
-        return self._update_settings() and self.set_lambda_logs_retention_period()
+        try:
+            org_id = list(self.remote_account_ids)[0]
+        except Exception as error:
+            self._logger.info(f"org id is not valid or empty {error}")
+            org_id = ""
+        try:
+            prev_org_id = list(self.old_remote_account_ids)[0]
+        except Exception as error:
+            self._logger.info(f"org id from old custom resource request parameters is not valid or empty {error}")
+            prev_org_id = ""
+        if self.is_valid_org_id(org_id) and self.is_valid_org_id(prev_org_id) and org_id == prev_org_id:
+            config = configuration.get_scheduler_configuration(self._logger)
+            prev_remote_account_id = config.remote_account_ids
+        else:
+            solution_account = os.getenv(configuration.ENV_ACCOUNT)
+            prev_remote_account_id = {solution_account}
+        return self._update_settings(prev_remote_account_id) and self.set_lambda_logs_retention_period()
 
     # handles Delete request from CloudFormation
     def _delete_request(self):

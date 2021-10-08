@@ -13,7 +13,7 @@
 #
 
 # Important: CDK global version number
-cdk_version=1.96.0
+export cdk_version=1.121.0
 
 # Check to see if the required parameters have been provided:
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
@@ -110,16 +110,13 @@ echo "Copy the python lambda files from source/lambda directory to staging lambd
 cp -pr $source_dir/lambda $staging_dist_dir/
 cp -pr $source_dir/cli $staging_dist_dir/
 
-echo "Update the version information in version.py"
+echo "cd $staging_dist_dir/lambda"
 cd $staging_dist_dir/lambda
-mv version.py version.py.org
-sed "s/%version%/$DIST_VERSION/g" version.py.org > version.py
-
 echo "Install all the python dependencies in the staging directory before packaging"
 pip install -U -r $source_dir/lambda/requirements.txt -t $staging_dist_dir/lambda/
 
 echo "Build lambda distribution packaging"
-zip -q --recurse-paths ./instance-scheduler.zip version.txt main.py version.py configuration/* requesthandlers/* chardet/* urllib3/* idna/* requests/* schedulers/* util/* boto_retry/* models/* pytz/* certifi/*
+zip -q --recurse-paths ./instance-scheduler.zip main.py configuration/* requesthandlers/* chardet/* urllib3/* idna/* requests/* schedulers/* util/* pytz/* certifi/*
 echo "Copy lambda distribution to $build_dist_dir"
 cp -pr ./instance-scheduler.zip $build_dist_dir/
 
@@ -139,3 +136,7 @@ zip -q --recurse-paths ./scheduler-cli.zip scheduler_cli/* setup.py instance-sch
 
 echo "Copy the scheduler cli package to $build_dist_dir"
 cp -pr ./scheduler-cli.zip $build_dist_dir/ 
+
+echo "Remove staging dir"
+echo "rm -rf $staging_dist_dir"
+rm -rf $staging_dist_dir

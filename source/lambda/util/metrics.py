@@ -20,9 +20,7 @@ import requests
 
 import util
 from util import safe_json
-from version import VERSION
 import boto3
-#from botocore.exceptions import ClientError
 import botocore
 
 INF_METRICS_DATA = "Sending anonymous metrics data: {}"
@@ -57,8 +55,8 @@ def send_metrics_data(metrics, logger):
             logger.warning(WARN_SOLUTION_ID_NOT_SET)
             return
 
-        stackId = os.getenv(util.STACK_ID, None)[-36:]
-        uuid_key = os.getenv(util.UUID_KEY) + str(stackId)
+        stack_id = os.getenv(util.STACK_ID, None)[-36:]
+        uuid_key = os.getenv(util.UUID_KEY) + str(stack_id)
         user_agent_extra_string = os.getenv(util.USER_AGENT_EXTRA)
         try:
             if user_agent_extra_string is not None:
@@ -95,7 +93,7 @@ def send_metrics_data(metrics, logger):
             "UUID": uuid_parameter,
             "Data": metrics,
             "Solution": solution_id,
-            "Version" : VERSION
+            "Version" : user_agent_extra_string
         }
 
         data_json = safe_json(data_dict, indent=3)
