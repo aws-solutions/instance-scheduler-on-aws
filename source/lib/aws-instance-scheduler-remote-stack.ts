@@ -104,7 +104,8 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                             ],
                             effect: Effect.ALLOW,
                             resources: [
-                                cdk.Fn.sub("arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:instance/*")
+                                cdk.Fn.sub("arn:${AWS::Partition}:ec2:*:${AWS::AccountId}:instance/*"),
+                                cdk.Fn.sub("arn:${AWS::Partition}:license-manager:*:${AWS::AccountId}:license-configuration/*")
                             ]
                         }),
                         new PolicyStatement({
