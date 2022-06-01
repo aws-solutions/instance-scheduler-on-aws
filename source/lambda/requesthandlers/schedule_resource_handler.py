@@ -156,8 +156,9 @@ class ScheduleResourceHandler(CustomResource):
         if description_config is not None:
             create_period_args[configuration.DESCRIPTION] = "{}, {}".format(description_config,
                                                                             create_period_args[configuration.DESCRIPTION])
-        period = self._admin.create_period(**create_period_args)
         instance_type = period.get(PROP_INSTANCE_TYPE, None)
+        
+        period = self._admin.create_period(**create_period_args)
 
         self._logger.info(INF_PERIOD_CREATED, safe_json(period, 3))
 
