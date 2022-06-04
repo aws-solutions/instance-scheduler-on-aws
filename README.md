@@ -82,15 +82,15 @@ AWS Solutions use two buckets: a bucket for global access to templates, which is
 From the *deployment* folder in your cloned repo, run build-s3-dist.sh, passing the root name of your bucket (ex. mybucket), name of the solution i.e. aws-instance-scheduler and the version you are building (ex. v1.4.0). We recommend using a similar version based on the version downloaded from GitHub (ex. GitHub: v1.4.0, your build: v1.4.0.mybuild)
 
 ```
+cd ./deployment
 chmod +x build-s3-dist.sh
-build-s3-dist.sh <bucketname> aws-instance-scheduler <version>
+./build-s3-dist.sh <bucketname> aws-instance-scheduler <version>
 ```
 
 **Run Unit Tests**
 
 ```
-cd ./deployment
-chmod +x ./run-unit-tests.sh
+chmod +x run-unit-tests.sh
 ./run-unit-tests.sh
 ```
 
