@@ -299,4 +299,9 @@ def build_parser():
 def main():
     parser = build_parser()
     p = parser.parse_args(sys.argv[1:])
-    sys.exit(p.func(p, p.command))
+    try:
+        sys.exit(p.func(p, p.command))
+    except AttributeError as AE:
+        parser.print_help()
+        sys.exit(0)
+
