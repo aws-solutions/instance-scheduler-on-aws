@@ -14,19 +14,20 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
-import * as cdk from '@aws-cdk/core';
-import * as kms from '@aws-cdk/aws-kms';
-import * as iam from '@aws-cdk/aws-iam';
-import * as logs from '@aws-cdk/aws-logs';
-import * as lambda from '@aws-cdk/aws-lambda';
-import * as s3 from '@aws-cdk/aws-s3';
-import * as sns from '@aws-cdk/aws-sns';
-import * as events from '@aws-cdk/aws-events';
-import { ArnPrincipal, Effect, PolicyStatement } from '@aws-cdk/aws-iam';
-import { LambdaToDynamoDBProps, LambdaToDynamoDB } from '@aws-solutions-constructs/aws-lambda-dynamodb';
-import * as EventlambdaConstruct from '@aws-solutions-constructs/aws-events-rule-lambda';
-import * as dynamodb from '@aws-cdk/aws-dynamodb';
-import { Aws, RemovalPolicy } from '@aws-cdk/core';
+ import * as cdk from 'aws-cdk-lib';
+ import { Construct } from 'constructs';
+ import * as kms from 'aws-cdk-lib/aws-kms';
+ import * as iam from 'aws-cdk-lib/aws-iam';
+ import * as logs from 'aws-cdk-lib/aws-logs';
+ import * as lambda from 'aws-cdk-lib/aws-lambda';
+ import * as s3 from 'aws-cdk-lib/aws-s3';
+ import * as sns from 'aws-cdk-lib/aws-sns';
+ import * as events from 'aws-cdk-lib/aws-events';
+ import { ArnPrincipal, Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
+ import { LambdaToDynamoDBProps, LambdaToDynamoDB } from '@aws-solutions-constructs/aws-lambda-dynamodb';
+ import * as EventlambdaConstruct from '@aws-solutions-constructs/aws-eventbridge-lambda';
+ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+ import { Aws, RemovalPolicy } from 'aws-cdk-lib';
 
 
 export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
@@ -49,7 +50,7 @@ export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
 */
 export class AwsInstanceSchedulerStack extends cdk.Stack {
 
-  constructor(scope: cdk.Construct, id: string, props: AwsInstanceSchedulerStackProps) {
+  constructor(scope: Construct, id: string, props: AwsInstanceSchedulerStackProps) {
     super(scope, id, props);
 
     //Start CFN Parameters for instance scheduler.
@@ -866,7 +867,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
 
     //Start instance scheduler aws-event-lambda construct reference.
-    let eventlambdaConstruct = new EventlambdaConstruct.EventsRuleToLambda(this, 'EventlambdaConstruct', {
+    let eventbridgeToLambdaConstruct = new EventlambdaConstruct.EventbridgeToLambda(this, 'EventbridgeToLambdaConstruct', {
       eventRuleProps: {
         description: 'Instance Scheduler - Rule to trigger instance for scheduler function version ' + props["solutionVersion"],
         schedule: events.Schedule.expression(mappings.findInMap('Timeouts', schedulerFrequency.valueAsString))
@@ -874,7 +875,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       existingLambdaObj: lambdaToDynamoDb.lambdaFunction
     })
 
-    const eventRule_cfn_ref = eventlambdaConstruct.eventsRule.node.defaultChild as events.CfnRule
+    const eventRule_cfn_ref = eventbridgeToLambdaConstruct.eventsRule.node.defaultChild as events.CfnRule
     eventRule_cfn_ref.addPropertyOverride('State', mappings.findInMap('EnabledDisabled', schedulingActive.valueAsString));
 
     //End instance scheduler aws-event-lambda construct reference.
@@ -1142,7 +1143,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     lambdaFunction.overrideLogicalId('Main')
 
-    const rule_cfn_ref = eventlambdaConstruct.eventsRule.node.defaultChild as events.CfnRule
+    const rule_cfn_ref = eventbridgeToLambdaConstruct.eventsRule.node.defaultChild as events.CfnRule
     rule_cfn_ref.overrideLogicalId('SchedulerRule')
 
     customServiceCfn.overrideLogicalId('SchedulerConfigHelper')

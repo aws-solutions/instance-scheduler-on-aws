@@ -14,10 +14,10 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
-import { SynthUtils } from '@aws-cdk/assert';
-import * as cdk from '@aws-cdk/core';
+import { SynthUtils } from 'aws-cdk-lib/assertions';
+import * as cdk from 'aws-cdk-lib';
 import instanceSchedulerStack = require('../lib/aws-instance-scheduler-stack');
-import '@aws-cdk/assert/jest';
+import 'aws-cdk-lib/assertions/jest';
 
 
 function getTestStack(): cdk.Stack {
