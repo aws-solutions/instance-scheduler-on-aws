@@ -74,9 +74,6 @@ class Ec2Service:
     EC2_STOPPING_STATES = {EC2_STATE_SHUTTING_DOWN, EC2_STATE_STOPPING, EC2_STATE_STOPPED}
     EC2_STARTING_STATES = {EC2_STATE_PENDING, EC2_STATE_RUNNING}
 
-    dynamodb = boto3.resource('dynamodb')
-    maintenance_table = dynamodb.Table(os.environ['MAINTENANCE_WINDOW_TABLE'])
-
     def __init__(self):
         self.service_name = "ec2"
         self.allow_resize = True
@@ -84,6 +81,8 @@ class Ec2Service:
         self._ssm_maintenance_windows = None
         self._session = None
         self._logger = None
+        self._dynamodb = boto3.resource('dynamodb')
+        self._maintenance_table = self._dynamodb.Table(os.environ['MAINTENANCE_WINDOW_TABLE'])
 
     def _init_scheduler(self, args):
         self._session = args.get(schedulers.PARAM_SESSION)
@@ -158,7 +157,7 @@ class Ec2Service:
             scan_kwargs = {
                 'FilterExpression': Key('account-region').eq(accountRegionString),
             }
-            maintenance_windows = self.maintenance_table.scan(**scan_kwargs)
+            maintenance_windows = self._maintenance_table.scan(**scan_kwargs)
         except Exception as error:
             self._logger.error("Caught Exception while getting maintenance windows from Dynamodb: {}".format(error))
         window_list = maintenance_windows.get('Items', [])
@@ -170,7 +169,7 @@ class Ec2Service:
                     'FilterExpression': Key('account-region').eq(accountRegionString),
                     'ExclusiveStartKey': last_evaluated_key
                 }
-                maintenance_windows = self.maintenance_table.scan(**scan_kwargs)
+                maintenance_windows = self._maintenance_table.scan(**scan_kwargs)
             except Exception as error:
                 self._logger.error("Caught Exception while getting maintenance windows from Dynamodb: {}".format(error))
             last_evaluated_key = maintenance_windows.get('LastEvaluatedKey', None)
@@ -241,7 +240,7 @@ class Ec2Service:
 
             ttl = execution_time + timedelta(hours=int(duration))
             epoch_time_to_live = int(datetime(ttl.year, ttl.month, ttl.day, ttl.hour, ttl.minute).timestamp())
-            self.maintenance_table.put_item(
+            self._maintenance_table.put_item(
                 Item={
                     'Name': window['Name'],
                     'NextExecutionTime': window['NextExecutionTime'],
@@ -266,7 +265,7 @@ class Ec2Service:
                 break
         if not window_found:
             try:  # if window from db is not found in the SSM response delete the entry from db
-                self.maintenance_table.delete_item(Key={'Name': window_db['Name'], 'account-region': window_db['account-region']})
+                self._maintenance_table.delete_item(Key={'Name': window_db['Name'], 'account-region': window_db['account-region']})
             except Exception as error:
                 self._logger.error\
                     ("Caught Exception while deleting maintenance windows from Dynamodb: {}".format(error))

@@ -11,45 +11,12 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
-import json
 
-from util.custom_encoder import CustomEncoder
-import botocore.config
-import os
+import boto3
+import util
 
-ENV_METRICS_URL = "METRICS_URL"
-# Solution ID
-ENV_SOLUTION_ID = "SOLUTION_ID"
-# Send metrics flag
-ENV_SEND_METRICS = "SEND_METRICS"
-# STACK_ID
-STACK_ID = "STACK_ID"
-# UUID_KEY
-UUID_KEY = "UUID_KEY"
-USER_AGENT_EXTRA = "USER_AGENT_EXTRA"
+class DynamoDBUtils:
 
-
-def get_config():
-    # TODO move the user agent string to lambda environment and make it configurable from deployment.
-    user_agent_extra_string = os.getenv("USER_AGENT_EXTRA", "AwsSolution/SO0030/v1.5.0")
-    solution_config = {"user_agent_extra": user_agent_extra_string, "retries": {'max_attempts': 5, 'mode': 'standard'}}
-    return botocore.config.Config(**solution_config) 
-
-
-def safe_json(d, indent=0):
-    """
-    Returns a json document, using a custom encoder that converts all data types not supported by json
-    :param d: input dictionary
-    :param indent: indent level for output document
-    :return: json document for input dictionary
-    """
-    return json.dumps(d, cls=CustomEncoder, indent=indent)
-
-
-def as_bool(b):
-    s = str(b).lower()
-    if s == "true":
-        return True
-    if s == "false":
-        return False
-    return None
+    @staticmethod
+    def get_dynamodb_table_resource_ref(table_name):
+        return boto3.resource("dynamodb", config=util.get_config()).Table(table_name)

@@ -21,7 +21,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 import configuration
-from boto_retry import add_retry_methods_to_resource
+from util.dynamodb_utils import DynamoDBUtils
 from configuration.config_dynamodb_adapter import ConfigDynamodbAdapter
 from configuration.instance_schedule import InstanceSchedule
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
@@ -108,8 +108,7 @@ class ConfigAdmin:
         :param context: Lambda context
         """
         self._table_name = self.table_name
-        self._table = boto3.resource("dynamodb").Table(self._table_name)
-        add_retry_methods_to_resource(self._table, ["scan", "get_item", "put_item", "delete_item"], context=context)
+        self._table = DynamoDBUtils.get_dynamodb_table_resource_ref(self._table_name)
         self._configuration = None
         self._logger = logger
         self._context = context

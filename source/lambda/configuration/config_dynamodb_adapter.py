@@ -12,6 +12,7 @@
 ######################################################################################################################
 
 import boto3
+from util.dynamodb_utils import DynamoDBUtils
 from boto3.dynamodb.conditions import Key
 
 import configuration
@@ -37,8 +38,7 @@ class ConfigDynamodbAdapter:
 
     def _get_config(self):
 
-        dynamodb = boto3.resource("dynamodb")
-        dynamodb_table = dynamodb.Table(self._tablename)
+        dynamodb_table = DynamoDBUtils.get_dynamodb_table_resource_ref(self._tablename)
 
         resp = dynamodb_table.get_item(Key={"name": "scheduler", "type": "config"}, ConsistentRead=True)
         config = resp.get("Item", {})

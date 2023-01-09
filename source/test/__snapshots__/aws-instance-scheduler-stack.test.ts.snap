@@ -955,41 +955,6 @@ Object {
               "Resource": "*",
               "Sid": "Allows use of key",
             },
-            Object {
-              "Action": Array [
-                "kms:Create*",
-                "kms:Describe*",
-                "kms:Enable*",
-                "kms:List*",
-                "kms:Put*",
-                "kms:Update*",
-                "kms:Revoke*",
-                "kms:Disable*",
-                "kms:Get*",
-                "kms:Delete*",
-                "kms:ScheduleKeyDeletion",
-                "kms:CancelKeyDeletion",
-                "kms:GenerateDataKey",
-                "kms:TagResource",
-                "kms:UntagResource",
-              ],
-              "Effect": "Allow",
-              "Principal": Object {
-                "AWS": Object {
-                  "Fn::Join": Array [
-                    "",
-                    Array [
-                      "arn:",
-                      Object {
-                        "Ref": "AWS::Partition",
-                      },
-                      ":iam::111111111111:root",
-                    ],
-                  ],
-                },
-              },
-              "Resource": "*",
-            },
           ],
           "Version": "2012-10-17",
         },
@@ -1344,6 +1309,25 @@ Object {
       "Type": "Custom::ServiceSetup",
       "UpdateReplacePolicy": "Delete",
     },
+    "SchedulerEventRuleAllowEventRulestackinstanceschedulerlambdaLambdaFunction84B79C6A71C84E7F": Object {
+      "Properties": Object {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": Object {
+          "Fn::GetAtt": Array [
+            "Main",
+            "Arn",
+          ],
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": Object {
+          "Fn::GetAtt": Array [
+            "SchedulerRule",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
+    },
     "SchedulerLogGroup": Object {
       "DeletionPolicy": "Delete",
       "Metadata": Object {
@@ -1490,10 +1474,14 @@ Object {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": Object {
-                "Service": Array [
-                  "events.amazonaws.com",
-                  "lambda.amazonaws.com",
-                ],
+                "Service": "events.amazonaws.com",
+              },
+            },
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
+                "Service": "lambda.amazonaws.com",
               },
             },
           ],
@@ -1538,6 +1526,7 @@ Object {
                 "dynamodb:PutItem",
                 "dynamodb:UpdateItem",
                 "dynamodb:DeleteItem",
+                "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
               "Resource": Array [
@@ -1584,7 +1573,7 @@ Object {
               ],
               "Effect": "Allow",
               "Resource": Object {
-                "Fn::Sub": "arn:\${AWS::Partition}:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/Solutions/aws-instance-scheduler/UUID/*",
+                "Fn::Sub": "arn:\${AWS::Partition}:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/Solutions/instance-scheduler/UUID/*",
               },
             },
           ],
@@ -1671,25 +1660,6 @@ Object {
       },
       "Type": "AWS::DynamoDB::Table",
       "UpdateReplacePolicy": "Delete",
-    },
-    "instanceschedulerlambdaLambdaFunctionAwsEventsLambdaInvokePermission1F8E87DF9": Object {
-      "Properties": Object {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": Object {
-          "Fn::GetAtt": Array [
-            "Main",
-            "Arn",
-          ],
-        },
-        "Principal": "events.amazonaws.com",
-        "SourceArn": Object {
-          "Fn::GetAtt": Array [
-            "SchedulerRule",
-            "Arn",
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
     },
     "instanceschedulerlambdaLambdaFunctionServiceRoleEBF44CD1": Object {
       "Properties": Object {

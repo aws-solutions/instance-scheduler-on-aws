@@ -15,7 +15,9 @@ import time
 from decimal import Decimal
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
+from util.dynamodb_utils import DynamoDBUtils
 
 from boto_retry import add_retry_methods_to_resource
 from configuration.instance_schedule import InstanceSchedule
@@ -66,8 +68,7 @@ class InstanceStates:
         :return:
         """
         if self._state_table is None:
-            dynamodb = boto3.resource("dynamodb")
-            self._state_table = dynamodb.Table(self._table_name)
+            self._state_table = DynamoDBUtils.get_dynamodb_table_resource_ref(self._table_name)
             add_retry_methods_to_resource(self._state_table, ["get_item", "put_item"], context=self._context)
         return self._state_table
 

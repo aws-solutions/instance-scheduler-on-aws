@@ -71,6 +71,12 @@ Object {
                     },
                   ],
                 },
+              },
+            },
+            Object {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": Object {
                 "Service": "lambda.amazonaws.com",
               },
             },
