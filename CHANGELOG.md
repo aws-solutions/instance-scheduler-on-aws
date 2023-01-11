@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.2] - 2023-01-11
 ### Fixed
-- Updated the version of certifi to 2022-12-07 to resolve vulnerability https://security.snyk.io/vuln/SNYK-PYTHON-CERTIFI-3164749
+- Upgrade certifi to mitigate [CVE-2022-23491](https://nvd.nist.gov/vuln/detail/CVE-2022-23491).
 - Updated issues in bandit scan.
 - Updated the CDK version 2.x
 
