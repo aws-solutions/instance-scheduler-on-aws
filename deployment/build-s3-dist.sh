@@ -13,7 +13,7 @@
 #
 
 # Important: CDK global version number
-cdk_version=1.96.0
+cdk_version=2.59.0
 
 # Check to see if the required parameters have been provided:
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
@@ -116,7 +116,7 @@ mv version.py version.py.org
 sed "s/%version%/$DIST_VERSION/g" version.py.org > version.py
 
 echo "Install all the python dependencies in the staging directory before packaging"
-pip install -U -r $source_dir/lambda/requirements.txt -t $staging_dist_dir/lambda/
+pip3 install -U -r $source_dir/lambda/requirements.txt -t $staging_dist_dir/lambda/
 
 echo "Build lambda distribution packaging"
 zip -q --recurse-paths ./instance-scheduler.zip version.txt main.py version.py configuration/* requesthandlers/* chardet/* urllib3/* idna/* requests/* schedulers/* util/* boto_retry/* models/* pytz/* certifi/*

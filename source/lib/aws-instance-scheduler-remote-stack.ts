@@ -14,9 +14,10 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
-import * as cdk from '@aws-cdk/core';
-import * as iam from '@aws-cdk/aws-iam';
-import { ArnPrincipal, CompositePrincipal, Effect, PolicyStatement } from "@aws-cdk/aws-iam";
+import * as cdk from 'aws-cdk-lib';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import { ArnPrincipal, CompositePrincipal, Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { Construct } from "constructs";
 
 export interface AwsInstanceSchedulerRemoteStackProps extends cdk.StackProps {
     readonly description: string,
@@ -30,7 +31,7 @@ export interface AwsInstanceSchedulerRemoteStackProps extends cdk.StackProps {
 
 export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
 
-    constructor(scope: cdk.Construct, id: string, props: AwsInstanceSchedulerRemoteStackProps) {
+    constructor(scope: Construct, id: string, props: AwsInstanceSchedulerRemoteStackProps) {
         super(scope, id, props);
 
         //CFN Parameters
