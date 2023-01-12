@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /*****************************************************************************
  *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.   *
  *                                                                            *
@@ -15,7 +14,7 @@
  *****************************************************************************/
 
 import { SynthUtils } from '@aws-cdk/assert';
-import * as cdk from '@aws-cdk/core';
+import * as cdk from 'aws-cdk-lib';
 import instanceSchedulerStack = require('../lib/aws-instance-scheduler-remote-stack');
 import '@aws-cdk/assert/jest';
 

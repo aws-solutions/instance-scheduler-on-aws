@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2023-01-11
+### Fixed
+- Upgrade certifi to mitigate [CVE-2022-23491](https://nvd.nist.gov/vuln/detail/CVE-2022-23491).
+- Updated issues in bandit scan.
+- Updated the CDK version 2.x
+
 ## [1.4.1] - 2022-05-12
 ### Fixed
 - Replaced the DescribeLogStreams API call used for getting the next sequence token with PutLogEvents API call to reduce the lambda execution time [#307](https://github.com/awslabs/aws-instance-scheduler/issues/307)
