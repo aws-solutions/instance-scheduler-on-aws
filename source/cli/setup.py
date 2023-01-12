@@ -23,8 +23,8 @@ setup(
     description="AWS Instance Scheduler CLI",
     install_requires=[
         "argparse",
-        "requests>=2.18.4",
-        "jmespath>=0.9.3",
-        "boto3>=1.4.7"]
+        "requests>=2.28.1",
+        "jmespath>=1.0.1",
+        "boto3>=1.26.48"]
 )
 
