@@ -1,76 +1,82 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
-Object {
+{
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "",
-  "Metadata": Object {
-    "AWS::CloudFormation::Interface": Object {
-      "ParameterGroups": Array [
-        Object {
-          "Label": Object {
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
             "default": "Account",
           },
-          "Parameters": Array [
+          "Parameters": [
             "InstanceSchedulerAccount",
           ],
         },
       ],
-      "ParameterLabels": Object {
-        "InstanceSchedulerAccount": Object {
+      "ParameterLabels": {
+        "InstanceSchedulerAccount": {
           "default": "Primary account",
         },
       },
     },
   },
-  "Outputs": Object {
-    "CrossAccountRole": Object {
+  "Outputs": {
+    "CrossAccountRole": {
       "Description": "Arn for cross account role for Instance scheduler, add this arn to the list of crossaccount roles (CrossAccountRoles) parameter of the Instance Scheduler template.",
-      "Value": Object {
-        "Fn::GetAtt": Array [
+      "Value": {
+        "Fn::GetAtt": [
           "EC2SchedulerCrossAccountRole",
           "Arn",
         ],
       },
     },
   },
-  "Parameters": Object {
-    "InstanceSchedulerAccount": Object {
+  "Parameters": {
+    "InstanceSchedulerAccount": {
       "AllowedPattern": "(^[0-9]{12}$)",
       "ConstraintDescription": "Account number is a 12 digit number",
       "Description": "Account number of Instance Scheduler account to give access to manage EC2 and RDS  Instances in this account.",
       "Type": "String",
     },
   },
-  "Resources": Object {
-    "EC2SchedulerCrossAccountRole": Object {
-      "Metadata": Object {
-        "cfn_nag": Object {
-          "rules_to_suppress": Array [
-            Object {
+  "Resources": {
+    "EC2SchedulerCrossAccountRole": {
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
               "id": "W11",
               "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
             },
           ],
         },
       },
-      "Properties": Object {
-        "AssumeRolePolicyDocument": Object {
-          "Statement": Array [
-            Object {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
-              "Principal": Object {
-                "AWS": Object {
-                  "Fn::Sub": Array [
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": [
                     "arn:\${AWS::Partition}:iam::\${accountId}:root",
-                    Object {
-                      "accountId": Object {
+                    {
+                      "accountId": {
                         "Ref": "InstanceSchedulerAccount",
                       },
                     },
                   ],
                 },
+              },
+            },
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
                 "Service": "lambda.amazonaws.com",
               },
             },
@@ -78,23 +84,23 @@ Object {
           "Version": "2012-10-17",
         },
         "Path": "/",
-        "Policies": Array [
-          Object {
-            "PolicyDocument": Object {
-              "Statement": Array [
-                Object {
-                  "Action": Array [
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
                     "rds:DeleteDBSnapshot",
                     "rds:DescribeDBSnapshots",
                     "rds:StopDBInstance",
                   ],
                   "Effect": "Allow",
-                  "Resource": Object {
+                  "Resource": {
                     "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:snapshot:*",
                   },
                 },
-                Object {
-                  "Action": Array [
+                {
+                  "Action": [
                     "rds:AddTagsToResource",
                     "rds:RemoveTagsFromResource",
                     "rds:DescribeDBSnapshots",
@@ -102,36 +108,36 @@ Object {
                     "rds:StopDBInstance",
                   ],
                   "Effect": "Allow",
-                  "Resource": Object {
+                  "Resource": {
                     "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:db:*",
                   },
                 },
-                Object {
-                  "Action": Array [
+                {
+                  "Action": [
                     "rds:AddTagsToResource",
                     "rds:RemoveTagsFromResource",
                     "rds:StartDBCluster",
                     "rds:StopDBCluster",
                   ],
                   "Effect": "Allow",
-                  "Resource": Object {
+                  "Resource": {
                     "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:cluster:*",
                   },
                 },
-                Object {
-                  "Action": Array [
+                {
+                  "Action": [
                     "ec2:StartInstances",
                     "ec2:StopInstances",
                     "ec2:CreateTags",
                     "ec2:DeleteTags",
                   ],
                   "Effect": "Allow",
-                  "Resource": Object {
+                  "Resource": {
                     "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
                   },
                 },
-                Object {
-                  "Action": Array [
+                {
+                  "Action": [
                     "rds:DescribeDBClusters",
                     "rds:DescribeDBInstances",
                     "ec2:DescribeInstances",
@@ -152,14 +158,14 @@ Object {
       },
       "Type": "AWS::IAM::Role",
     },
-    "Ec2ModifyInstanceAttrPolicy4B693ACF": Object {
-      "Properties": Object {
-        "PolicyDocument": Object {
-          "Statement": Array [
-            Object {
+    "Ec2ModifyInstanceAttrPolicy4B693ACF": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
               "Action": "ec2:ModifyInstanceAttribute",
               "Effect": "Allow",
-              "Resource": Object {
+              "Resource": {
                 "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
               },
             },
@@ -167,8 +173,8 @@ Object {
           "Version": "2012-10-17",
         },
         "PolicyName": "Ec2ModifyInstanceAttrPolicy4B693ACF",
-        "Roles": Array [
-          Object {
+        "Roles": [
+          {
             "Ref": "EC2SchedulerCrossAccountRole",
           },
         ],

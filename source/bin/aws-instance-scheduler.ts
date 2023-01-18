@@ -14,7 +14,7 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
-import * as cdk from '@aws-cdk/core';
+import * as cdk from 'aws-cdk-lib';
 import { AwsInstanceSchedulerStack } from '../lib/aws-instance-scheduler-stack';
 import { AwsInstanceSchedulerRemoteStack } from '../lib/aws-instance-scheduler-remote-stack';
 
@@ -28,6 +28,9 @@ const SOLUTION_PROVIDER = 'AWS Solution Development';
 const app = new cdk.App();
 
 new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
+    synthesizer: new cdk.DefaultStackSynthesizer({
+        generateBootstrapVersionRule: false
+    }),
     description: `(${SOLUTION_ID}) - The AWS CloudFormation template for deployment of the ${SOLUTION_NAME}, version: ${SOLUTION_VERSION}`,
     solutionId: SOLUTION_ID,
     solutionTradeMarkName: SOLUTION_TMN,
@@ -37,6 +40,9 @@ new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
     solutionVersion: SOLUTION_VERSION
 });
 new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
+    synthesizer: new cdk.DefaultStackSynthesizer({
+        generateBootstrapVersionRule: false
+    }),
     description:  `(${SOLUTION_ID}S) - The AWS CloudFormation template for ${SOLUTION_NAME} cross account role, version: ${SOLUTION_VERSION}`,
     solutionId: SOLUTION_ID,
     solutionTradeMarkName: SOLUTION_TMN,
