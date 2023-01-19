@@ -14,7 +14,7 @@
 import os
 
 import configuration
-from boto_retry import get_client_with_retries
+from boto_retry import get_client
 
 
 class SchedulerMetrics:
@@ -46,7 +46,7 @@ class SchedulerMetrics:
     @property
     def metrics_client(self):
         if self._metrics_client is None:
-            self._metrics_client = get_client_with_retries("cloudwatch", ["put_metric_data"], context=self._context)
+            self._metrics_client = get_client("cloudwatch")
         return self._metrics_client
 
     def add_schedule_metrics(self, service, schedule, instance):
@@ -90,4 +90,4 @@ class SchedulerMetrics:
                     metric_data.append(
                         build_metric(service, name, SchedulerMetrics.RUNNING_INSTANCES, self._metrics_running[service]))
 
-            self.metrics_client.put_metric_data_with_retries(Namespace=self._namespace, MetricData=metric_data)
+            self.metrics_client.put_metric_data(Namespace=self._namespace, MetricData=metric_data)

@@ -116,7 +116,7 @@ mv version.py version.py.org
 sed "s/%version%/$DIST_VERSION/g" version.py.org > version.py
 
 echo "Install all the python dependencies in the staging directory before packaging"
-pip install -U -r $source_dir/lambda/requirements.txt -t $staging_dist_dir/lambda/
+pip3 install -U -r $source_dir/lambda/requirements.txt -t $staging_dist_dir/lambda/
 
 echo "Build lambda distribution packaging"
 zip -q --recurse-paths ./instance-scheduler.zip version.txt main.py version.py configuration/* requesthandlers/* chardet/* urllib3/* idna/* requests/* schedulers/* util/* boto_retry/* models/* pytz/* certifi/*

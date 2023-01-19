@@ -17,7 +17,7 @@ from copy import copy
 from datetime import datetime
 
 import configuration
-from boto_retry import get_client_with_retries
+from boto_retry import get_client
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
 from schedulers import SCHEDULER_TYPES
 from schedulers.instance_scheduler import InstanceScheduler
@@ -73,7 +73,7 @@ class CloudWatchEventHandler:
         :return: lambda client
         """
         if self._lambda_client is None:
-            self._lambda_client = get_client_with_retries("lambda", ["invoke"], context=self._context)
+            self._lambda_client = get_client("lambda")
         return self._lambda_client
 
     @property
@@ -287,7 +287,7 @@ class CloudWatchEventHandler:
             }))
 
         # start the lambda function
-        resp = self.lambda_client.invoke_with_retries(FunctionName=self._context.function_name,
+        resp = self.lambda_client.invoke(FunctionName=self._context.function_name,
                                                       InvocationType="Event", LogType="None", Payload=payload)
         if resp["StatusCode"] != 202:
             self._logger.error(ERR_STARTING_LAMBDA, self._context.function_name, self._context.function_version, config)

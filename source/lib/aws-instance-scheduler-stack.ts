@@ -860,7 +860,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       ],
       effect: Effect.ALLOW,
       resources: [
-        cdk.Fn.sub("arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Solutions/instance-scheduler/UUID/*")
+        cdk.Fn.sub("arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Solutions/aws-instance-scheduler/UUID/*")
       ]
     })
     lambdaToDynamoDb.lambdaFunction.addToRolePolicy(ssmParameterPolicyStatement)

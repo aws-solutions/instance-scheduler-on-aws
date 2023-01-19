@@ -21,7 +21,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 
 import configuration
-from boto_retry import add_retry_methods_to_resource
+from util.dynamodb_utils import DynamoDBUtils
 from configuration.config_dynamodb_adapter import ConfigDynamodbAdapter
 from configuration.instance_schedule import InstanceSchedule
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
@@ -108,8 +108,7 @@ class ConfigAdmin:
         :param context: Lambda context
         """
         self._table_name = self.table_name
-        self._table = boto3.resource("dynamodb").Table(self._table_name)
-        add_retry_methods_to_resource(self._table, ["scan", "get_item", "put_item", "delete_item"], context=context)
+        self._table = DynamoDBUtils.get_dynamodb_table_resource_ref(self._table_name)
         self._configuration = None
         self._logger = logger
         self._context = context
@@ -225,7 +224,7 @@ class ConfigAdmin:
         checked_settings[ConfigAdmin.TYPE_ATTR] = "config"
         checked_settings[configuration.NAME] = "scheduler"
 
-        self._table.put_item_with_retries(Item=checked_settings)
+        self._table.put_item(Item=checked_settings)
 
         return ConfigAdmin._for_output(checked_settings)
 
@@ -265,7 +264,7 @@ class ConfigAdmin:
         name = period[configuration.NAME]
         if self._get_period(name) is not None:
             raise ValueError(ERR_CREATE_PERIOD_EXISTS.format(name))
-        self._table.put_item_with_retries(Item=period)
+        self._table.put_item(Item=period)
         return {"period": ConfigAdmin._for_output(period)}
 
     def update_period(self, **kwargs):
@@ -280,7 +279,7 @@ class ConfigAdmin:
             raise ValueError(ERR_UPDATE_PERIOD_NAME_EMPTY)
         if self._get_period(name) is None:
             raise ValueError(ERR_UPDATE_PERIOD_NOT_FOUND.format(name))
-        self._table.put_item_with_retries(Item=period)
+        self._table.put_item(Item=period)
         return {"period": ConfigAdmin._for_output(period)}
 
     def delete_period(self, name, exception_if_not_exists=False):
@@ -305,7 +304,7 @@ class ConfigAdmin:
             raise ValueError(ERR_DEL_PERIOD_IN_USE.format(name, ", ".join(schedules_using_period)))
 
         if self._get_period(name) is not None:
-            self._table.delete_item_with_retries(Key={"name": name, "type": "period"})
+            self._table.delete_item(Key={"name": name, "type": "period"})
             return {"period": name}
         else:
             if exception_if_not_exists:
@@ -346,7 +345,7 @@ class ConfigAdmin:
         name = schedule[configuration.NAME]
         if self._get_schedule(name) is not None:
             raise ValueError(ERR_CREATE_SCHEDULE_EXISTS.format(name))
-        self._table.put_item_with_retries(Item=schedule)
+        self._table.put_item(Item=schedule)
         return {"schedule": ConfigAdmin._for_output(schedule)}
 
     def update_schedule(self, **kwargs):
@@ -361,7 +360,7 @@ class ConfigAdmin:
             raise ValueError(ERR_UPDATE_SCHEDULE_NAME_EMPTY)
         if self._get_schedule(name) is None:
             raise ValueError(ERR_UPDATE_SCHEDULE_NOT_FOUND.format(name))
-        self._table.put_item_with_retries(Item=schedule)
+        self._table.put_item(Item=schedule)
         return {"schedule": ConfigAdmin._for_output(schedule)}
 
     def delete_schedule(self, name, exception_if_not_exists=True):
@@ -377,7 +376,7 @@ class ConfigAdmin:
             if exception_if_not_exists:
                 raise ValueError(ERR_DEL_SCHEDULE_NOT_FOUND.format(name))
             return None
-        self._table.delete_item_with_retries(Key={"name": name, "type": "schedule"})
+        self._table.delete_item(Key={"name": name, "type": "schedule"})
         return {"schedule": name}
 
     def get_schedule_usage(self, name, startdate=None, enddate=None):
@@ -694,7 +693,7 @@ class ConfigAdmin:
         }
 
         while True:
-            resp = self._table.scan_with_retries(**args)
+            resp = self._table.scan(**args)
             result += resp.get("Items", [])
             if "LastEvaluatedKey" in resp:
                 args["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
@@ -710,11 +709,11 @@ class ConfigAdmin:
         return self._items_of_type("period")
 
     def _get_schedule(self, schedule_name):
-        resp = self._table.get_item_with_retries(Key={"name": schedule_name, "type": "schedule"}, ConsistentRead=True)
+        resp = self._table.get_item(Key={"name": schedule_name, "type": "schedule"}, ConsistentRead=True)
         return resp.get("Item", None)
 
     def _get_period(self, period_name):
-        resp = self._table.get_item_with_retries(Key={"name": period_name, "type": "period"}, ConsistentRead=True)
+        resp = self._table.get_item(Key={"name": period_name, "type": "period"}, ConsistentRead=True)
         return resp.get("Item", None)
 
     def calculate_schedule_usage_for_period(self, schedule_name, start_dt, stop_dt=None, logger=None):
