@@ -1032,7 +1032,6 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         "Environment": {
           "Variables": {
             "ACCOUNT": "111111111111",
-            "BOTO_RETRY": "5,10,30,0.25",
             "CONFIG_TABLE": {
               "Ref": "ConfigTable",
             },
@@ -1048,7 +1047,6 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
                 },
               ],
             },
-            "ENV_BOTO_RETRY_LOGGING": "FALSE",
             "ISSUES_TOPIC_ARN": {
               "Ref": "InstanceSchedulerSnsTopic",
             },
@@ -1573,7 +1571,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
               ],
               "Effect": "Allow",
               "Resource": {
-                "Fn::Sub": "arn:\${AWS::Partition}:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/Solutions/instance-scheduler/UUID/*",
+                "Fn::Sub": "arn:\${AWS::Partition}:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/Solutions/aws-instance-scheduler/UUID/*",
               },
             },
           ],

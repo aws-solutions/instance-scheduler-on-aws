@@ -92,7 +92,7 @@ class SchedulerConfigBuilder:
     @property
     def ssm(self):
         if self._ssm is None:
-            self._ssm = boto_retry.get_client("ssm")
+            self._ssm = boto_retry.get_client_with_standard_retry("ssm")
         return self._ssm
 
     def build(self, config, dt=None):

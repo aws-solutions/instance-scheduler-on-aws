@@ -15,14 +15,13 @@ import os
 import boto3
 import botocore.config
 
-def get_client(service_name, region=None, session=None):
+def get_client_with_standard_retry(service_name, region=None, session=None):
     """
     Creates a bot3 client for the specified service name and region. The return client will have additional method for the
     specified methods that are wrapped with the logic of the specified wait strategy or the default strategy for that service.
     The method names must be valid for the boto3 service client. The name of the added functions is the name of the original
     function plus the (default) value of method_suffix parameter
     :param service_name: Name of the service
-    :param context: Lambda execution context
     :param region: Region for the client
     :param session: Boto3 session, if None a new session will be created
     :return: Client for the service with additional method that use retry logic

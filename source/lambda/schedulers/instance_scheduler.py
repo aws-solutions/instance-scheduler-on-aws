@@ -21,7 +21,7 @@ import boto3
 import configuration
 import pytz
 import schedulers
-from boto_retry import get_client
+from boto_retry import get_client_with_standard_retry
 from configuration.instance_schedule import InstanceSchedule
 from .instance_states import InstanceStates
 from util.metrics import send_metrics_data, allow_send_metrics
@@ -116,7 +116,7 @@ class InstanceScheduler:
     @property
     def _sts(self):
         if self._sts_client is None:
-            self._sts_client = get_client("sts")
+            self._sts_client = get_client_with_standard_retry("sts")
         return self._sts_client
 
     @property

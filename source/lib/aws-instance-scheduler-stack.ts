@@ -733,8 +733,6 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
           ACCOUNT: this.account,
           ISSUES_TOPIC_ARN: snsTopic.topicArn,
           STACK_NAME: Aws.STACK_NAME,
-          BOTO_RETRY: '5,10,30,0.25',
-          ENV_BOTO_RETRY_LOGGING: "FALSE",
           SEND_METRICS: mappings.findInMap('TrueFalse', send.findInMap('AnonymousUsage', 'Data')),
           SOLUTION_ID: mappings.findInMap('Settings', 'MetricsSolutionId'),
           TRACE: mappings.findInMap('TrueFalse', trace.valueAsString),

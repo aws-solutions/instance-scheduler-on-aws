@@ -18,7 +18,7 @@ import schedulers
 import re
 import copy
 
-from boto_retry import get_client
+from boto_retry import get_client_with_standard_retry
 from configuration.instance_schedule import InstanceSchedule
 from configuration.running_period import RunningPeriod
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
@@ -94,7 +94,7 @@ class RdsService:
     def rds_resource_tags(self):
 
         if self._instance_tags is None:
-            tag_client = get_client("resourcegroupstaggingapi",
+            tag_client = get_client_with_standard_retry("resourcegroupstaggingapi",
                                                  session=self._session,
                                                  region=self._region)
 
@@ -181,7 +181,7 @@ class RdsService:
 
         self._init_scheduler(kwargs)
 
-        client = get_client("rds", session=self._session, region=self._region)
+        client = get_client_with_standard_retry("rds", session=self._session, region=self._region)
 
         describe_arguments = {}
         resource_name = fn_describe_name.split("_")[-1]
@@ -399,7 +399,7 @@ class RdsService:
 
         self._init_scheduler(kwargs)
 
-        client = get_client("rds", session=self._session, region=self._region)
+        client = get_client_with_standard_retry("rds", session=self._session, region=self._region)
 
         stopped_instances = kwargs["stopped_instances"]
 
@@ -423,7 +423,7 @@ class RdsService:
     def start_instances(self, kwargs):
         self._init_scheduler(kwargs)
 
-        client = get_client("rds", session=self._session, region=self._region)
+        client = get_client_with_standard_retry("rds", session=self._session, region=self._region)
 
         started_instances = kwargs["started_instances"]
         for rds_resource in started_instances:

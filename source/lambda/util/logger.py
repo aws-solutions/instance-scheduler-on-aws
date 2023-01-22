@@ -107,7 +107,7 @@ class Logger:
     @property
     def sns(self):
         if self._sns is None:
-            self._sns = boto_retry.get_client("sns")
+            self._sns = boto_retry.get_client_with_standard_retry("sns")
         return self._sns
 
     @debug_enabled.setter
@@ -181,7 +181,7 @@ class Logger:
     def client(self):
         if self._client is None:
             methods = ["create_log_stream"]
-            self._client = boto_retry.get_client("logs")
+            self._client = boto_retry.get_client_with_standard_retry("logs")
         return self._client
 
     def flush(self):

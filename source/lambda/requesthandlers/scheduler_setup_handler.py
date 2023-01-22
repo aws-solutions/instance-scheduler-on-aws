@@ -20,7 +20,7 @@ import boto3
 
 import configuration
 import requesthandlers.setup_demo_data as demo_data
-from boto_retry import get_client
+from boto_retry import get_client_with_standard_retry
 from configuration.config_admin import ConfigAdmin
 from util.custom_resource import CustomResource
 from util.logger import Logger
@@ -222,7 +222,7 @@ class SchedulerSetupHandler(CustomResource):
             return True
 
         loggroup = self.context.log_group_name
-        log_client = get_client("logs")
+        log_client = get_client_with_standard_retry("logs")
         retention_days = self.arguments.get("log_retention_days", 30)
         try:
             if retention_days is None:

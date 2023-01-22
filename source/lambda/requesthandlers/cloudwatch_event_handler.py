@@ -17,7 +17,7 @@ from copy import copy
 from datetime import datetime
 
 import configuration
-from boto_retry import get_client
+from boto_retry import get_client_with_standard_retry
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
 from schedulers import SCHEDULER_TYPES
 from schedulers.instance_scheduler import InstanceScheduler
@@ -73,7 +73,7 @@ class CloudWatchEventHandler:
         :return: lambda client
         """
         if self._lambda_client is None:
-            self._lambda_client = get_client("lambda")
+            self._lambda_client = get_client_with_standard_retry("lambda")
         return self._lambda_client
 
     @property

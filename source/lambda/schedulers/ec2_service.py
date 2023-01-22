@@ -22,7 +22,8 @@ from botocore.exceptions import ClientError
 import configuration
 import schedulers
 import time
-from boto_retry import get_client
+from util.dynamodb_utils import DynamoDBUtils
+from boto_retry import get_client_with_standard_retry
 from configuration import SchedulerConfigBuilder
 from configuration.instance_schedule import InstanceSchedule
 from configuration.running_period import RunningPeriod
@@ -74,8 +75,7 @@ class Ec2Service:
     EC2_STOPPING_STATES = {EC2_STATE_SHUTTING_DOWN, EC2_STATE_STOPPING, EC2_STATE_STOPPED}
     EC2_STARTING_STATES = {EC2_STATE_PENDING, EC2_STATE_RUNNING}
 
-    dynamodb = boto3.resource('dynamodb')
-    maintenance_table = dynamodb.Table(os.environ['MAINTENANCE_WINDOW_TABLE'])
+    maintenance_table = DynamoDBUtils.get_dynamodb_table_resource_ref(os.environ['MAINTENANCE_WINDOW_TABLE'])
 
     def __init__(self):
         self.service_name = "ec2"
@@ -111,7 +111,7 @@ class Ec2Service:
         Returns:
             list of ssm windows
         """
-        ssm_client = get_client("ssm", session=session, region=region)
+        ssm_client = get_client_with_standard_retry("ssm", session=session, region=region)
         resp_maintenance_windows = {}
         try:
             resp_maintenance_windows = ssm_client.describe_maintenance_windows(
@@ -327,7 +327,7 @@ class Ec2Service:
             self._ssm_maintenance_windows = self.ssm_maintenance_windows(self._session, context, account, region)
             self._logger.debug("finish loading the ssm maintenance windows")
 
-        client = get_client("ec2", session=self._session, region=region)
+        client = get_client_with_standard_retry("ec2", session=self._session, region=region)
 
         def is_in_schedulable_state(ec2_inst):
             state = ec2_inst["state"] & 0xFF
@@ -504,7 +504,7 @@ class Ec2Service:
         instance = kwargs[schedulers.PARAM_INSTANCE]
         instance_type = kwargs[schedulers.PARAM_DESIRED_TYPE]
 
-        client = get_client("ec2", session=self._session, region=self._region)
+        client = get_client_with_standard_retry("ec2", session=self._session, region=self._region)
 
         self._logger.info(INF_SETTING_SIZE, instance.id, instance_type)
 
@@ -537,7 +537,7 @@ class Ec2Service:
                            t["Key"] not in stop_tags_key_names]
 
         methods = ["stop_instances", "create_tags", "delete_tags", "describe_instances"]
-        client = get_client("ec2", session=self._session, region=self._region)
+        client = get_client_with_standard_retry("ec2", session=self._session, region=self._region)
 
         for instance_batch in list(self.instance_batches(stopped_instances, STOP_BATCH_SIZE)):
 
@@ -631,7 +631,7 @@ class Ec2Service:
         start_tags_key_names = [t["Key"] for t in start_tags]
         stop_tags_keys = [{"Key": t["Key"]} for t in kwargs[schedulers.PARAM_CONFIG].stopped_tags if
                           t["Key"] not in start_tags_key_names]
-        client = get_client("ec2", session=self._session, region=self._region)
+        client = get_client_with_standard_retry("ec2", session=self._session, region=self._region)
 
         if os.environ['START_EC2_BATCH_SIZE'] is not None:
             try:
