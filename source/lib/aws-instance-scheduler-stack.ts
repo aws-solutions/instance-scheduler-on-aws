@@ -906,7 +906,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     })
 
     const customServiceCfn = customService.node.defaultChild as cdk.CfnCustomResource
-    customServiceCfn.addDependsOn(schedulerLogGroup_ref)
+    customServiceCfn.addDependency(schedulerLogGroup_ref)
 
     //Instance scheduler Cloudformation Output references.
     new cdk.CfnOutput(this, 'AccountId', {
@@ -1083,10 +1083,10 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     //Adding the EC2 and scheduling policy dependencies to the lambda. 
     const lambdaFunction = lambdaToDynamoDb.lambdaFunction.node.defaultChild as lambda.CfnFunction
-    lambdaFunction.addDependsOn(ec2DynamoDBPolicy.node.defaultChild as iam.CfnPolicy)
-    lambdaFunction.addDependsOn(ec2Permissions.node.defaultChild as iam.CfnPolicy)
-    lambdaFunction.addDependsOn(schedulerPolicy.node.defaultChild as iam.CfnPolicy)
-    lambdaFunction.addDependsOn(schedulerRDSPolicy.node.defaultChild as iam.CfnPolicy)
+    lambdaFunction.addDependency(ec2DynamoDBPolicy.node.defaultChild as iam.CfnPolicy)
+    lambdaFunction.addDependency(ec2Permissions.node.defaultChild as iam.CfnPolicy)
+    lambdaFunction.addDependency(schedulerPolicy.node.defaultChild as iam.CfnPolicy)
+    lambdaFunction.addDependency(schedulerRDSPolicy.node.defaultChild as iam.CfnPolicy)
     lambdaFunction.cfnOptions.metadata = {
       "cfn_nag": {
         "rules_to_suppress": [
