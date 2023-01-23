@@ -18,7 +18,7 @@ import schedulers
 import re
 import copy
 
-from boto_retry import get_client_with_retries
+from boto_retry import get_client_with_standard_retry
 from configuration.instance_schedule import InstanceSchedule
 from configuration.running_period import RunningPeriod
 from configuration.scheduler_config_builder import SchedulerConfigBuilder
@@ -94,10 +94,8 @@ class RdsService:
     def rds_resource_tags(self):
 
         if self._instance_tags is None:
-            tag_client = get_client_with_retries("resourcegroupstaggingapi",
-                                                 methods=["get_resources"],
+            tag_client = get_client_with_standard_retry("resourcegroupstaggingapi",
                                                  session=self._session,
-                                                 context=self._context,
                                                  region=self._region)
 
             args = {
@@ -110,7 +108,7 @@ class RdsService:
 
             while True:
 
-                resp = tag_client.get_resources_with_retries(**args)
+                resp = tag_client.get_resources(**args)
 
                 for resource in resp.get("ResourceTagMappingList", []):
                     self._instance_tags[resource["ResourceARN"]] = {tag["Key"]: tag["Value"]
@@ -183,8 +181,7 @@ class RdsService:
 
         self._init_scheduler(kwargs)
 
-        client = get_client_with_retries("rds", [fn_describe_name], context=self._context, session=self._session,
-                                         region=self._region)
+        client = get_client_with_standard_retry("rds", session=self._session, region=self._region)
 
         describe_arguments = {}
         resource_name = fn_describe_name.split("_")[-1]
@@ -195,7 +192,7 @@ class RdsService:
 
         while True:
             self._logger.debug("Making {} call with parameters {}", fn_describe_name, describe_arguments)
-            fn = getattr(client, fn_describe_name + "_with_retries")
+            fn = getattr(client, fn_describe_name)
             rds_resp = fn(**describe_arguments)
             for resource in rds_resp["DB" + resource_name]:
                 number_of_resources += 1
@@ -328,7 +325,7 @@ class RdsService:
         def does_snapshot_exist(name):
 
             try:
-                resp = client.describe_db_snapshots_with_retries(DBSnapshotIdentifier=name, SnapshotType="manual")
+                resp = client.describe_db_snapshots(DBSnapshotIdentifier=name, SnapshotType="manual")
                 snapshot = resp.get("DBSnapshots", None)
                 return snapshot is not None
             except Exception as ex:
@@ -347,13 +344,13 @@ class RdsService:
 
             try:
                 if does_snapshot_exist(snapshot_name):
-                    client.delete_db_snapshot_with_retries(DBSnapshotIdentifier=snapshot_name)
+                    client.delete_db_snapshot(DBSnapshotIdentifier=snapshot_name)
                     self._logger.info(INF_DELETE_SNAPSHOT, snapshot_name)
             except Exception as ex:
                 self._logger.error(ERR_DELETING_SNAPSHOT, snapshot_name)
 
         try:
-            client.stop_db_instance_with_retries(**args)
+            client.stop_db_instance(**args)
             self._logger.info(INF_STOPPED_RESOURCE, "instance", inst.id)
         except Exception as ex:
             self._logger.error(ERR_STOPPING_INSTANCE, "instance", inst.instance_str, str(ex))
@@ -371,10 +368,10 @@ class RdsService:
             if start_tags_keys is not None and len(start_tags_keys):
                 self._logger.info(INF_REMOVE_KEYS, "start",
                                   ",".join(["\"{}\"".format(k) for k in start_tags_keys]), rds_resource.arn)
-                client.remove_tags_from_resource_with_retries(ResourceName=rds_resource.arn, TagKeys=start_tags_keys)
+                client.remove_tags_from_resource(ResourceName=rds_resource.arn, TagKeys=start_tags_keys)
             if len(stop_tags) > 0:
                 self._logger.info(INF_ADD_TAGS, "stop", str(stop_tags), rds_resource.arn)
-                client.add_tags_to_resource_with_retries(ResourceName=rds_resource.arn, Tags=stop_tags)
+                client.add_tags_to_resource(ResourceName=rds_resource.arn, Tags=stop_tags)
         except Exception as ex:
             self._logger.warning(WARN_TAGGING_STOPPED, rds_resource.id, str(ex))
 
@@ -390,10 +387,10 @@ class RdsService:
             if stop_tags_keys is not None and len(stop_tags_keys):
                 self._logger.info(INF_REMOVE_KEYS, "stop",
                                   ",".join(["\"{}\"".format(k) for k in stop_tags_keys]), rds_resource.arn)
-                client.remove_tags_from_resource_with_retries(ResourceName=rds_resource.arn, TagKeys=stop_tags_keys)
+                client.remove_tags_from_resource(ResourceName=rds_resource.arn, TagKeys=stop_tags_keys)
             if start_tags is not None and len(start_tags) > 0:
                 self._logger.info(INF_ADD_TAGS, "start", str(start_tags), rds_resource.arn)
-                client.add_tags_to_resource_with_retries(ResourceName=rds_resource.arn, Tags=start_tags)
+                client.add_tags_to_resource(ResourceName=rds_resource.arn, Tags=start_tags)
         except Exception as ex:
             self._logger.warning(WARN_TAGGING_STARTED, rds_resource.id, str(ex))
 
@@ -402,14 +399,7 @@ class RdsService:
 
         self._init_scheduler(kwargs)
 
-        methods = ["stop_db_instance",
-                   "stop_db_cluster",
-                   "describe_db_snapshots",
-                   "delete_db_snapshot",
-                   "add_tags_to_resource",
-                   "remove_tags_from_resource"]
-
-        client = get_client_with_retries("rds", methods, context=self._context, session=self._session, region=self._region)
+        client = get_client_with_standard_retry("rds", session=self._session, region=self._region)
 
         stopped_instances = kwargs["stopped_instances"]
 
@@ -417,7 +407,7 @@ class RdsService:
             try:
 
                 if rds_resource.is_cluster:
-                    client.stop_db_cluster_with_retries(DBClusterIdentifier=rds_resource.id)
+                    client.stop_db_cluster(DBClusterIdentifier=rds_resource.id)
                     self._logger.info(INF_STOPPED_RESOURCE, "cluster", rds_resource.id)
                 else:
                     self._stop_instance(client, rds_resource)
@@ -433,21 +423,16 @@ class RdsService:
     def start_instances(self, kwargs):
         self._init_scheduler(kwargs)
 
-        methods = ["start_db_instance",
-                   "start_db_cluster",
-                   "add_tags_to_resource",
-                   "remove_tags_from_resource"]
-
-        client = get_client_with_retries("rds", methods, context=self._context, session=self._session, region=self._region)
+        client = get_client_with_standard_retry("rds", session=self._session, region=self._region)
 
         started_instances = kwargs["started_instances"]
         for rds_resource in started_instances:
 
             try:
                 if rds_resource.is_cluster:
-                    client.start_db_cluster_with_retries(DBClusterIdentifier=rds_resource.id)
+                    client.start_db_cluster(DBClusterIdentifier=rds_resource.id)
                 else:
-                    client.start_db_instance_with_retries(DBInstanceIdentifier=rds_resource.id)
+                    client.start_db_instance(DBInstanceIdentifier=rds_resource.id)
 
                 self._tag_started_instances(client, rds_resource)
 

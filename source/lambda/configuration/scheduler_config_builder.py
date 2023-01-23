@@ -92,7 +92,7 @@ class SchedulerConfigBuilder:
     @property
     def ssm(self):
         if self._ssm is None:
-            self._ssm = boto_retry.get_client_with_retries("ssm", methods=["get_parameters"])
+            self._ssm = boto_retry.get_client_with_standard_retry("ssm")
         return self._ssm
 
     def build(self, config, dt=None):
@@ -145,7 +145,7 @@ class SchedulerConfigBuilder:
             if regex.match(REGEX_SSM_PARAM, role):
                 names = regex.findall(REGEX_SSM_PARAM, role)
                 if len(names) > 0:
-                    resp = self.ssm.get_parameters_with_retries(Names=list(set(names)))
+                    resp = self.ssm.get_parameters(Names=list(set(names)))
                     for p in resp.get("Parameters", []):
                         if p["Type"] == "StringList":
                             cross_account_roles += p["Value"].split(",")

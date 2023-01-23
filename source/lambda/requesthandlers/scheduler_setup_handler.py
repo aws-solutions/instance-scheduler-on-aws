@@ -20,7 +20,7 @@ import boto3
 
 import configuration
 import requesthandlers.setup_demo_data as demo_data
-from boto_retry import get_client_with_retries
+from boto_retry import get_client_with_standard_retry
 from configuration.config_admin import ConfigAdmin
 from util.custom_resource import CustomResource
 from util.logger import Logger
@@ -222,16 +222,16 @@ class SchedulerSetupHandler(CustomResource):
             return True
 
         loggroup = self.context.log_group_name
-        log_client = get_client_with_retries("logs", ["delete_retention_policy", "put_retention_policy"], context=self.context)
+        log_client = get_client_with_standard_retry("logs")
         retention_days = self.arguments.get("log_retention_days", 30)
         try:
             if retention_days is None:
                 self._logger.info(INFO_DELETE_LOG_RETENTION_POLICY, loggroup)
-                log_client.delete_retention_policy_with_retries(loggroup)
+                log_client.delete_retention_policy(loggroup)
                 return True
             else:
                 self._logger.info(INFO_SET_LOG_RETENTION_POLICY, loggroup, retention_days)
-                log_client.put_retention_policy_with_retries(logGroupName=loggroup, retentionInDays=int(retention_days))
+                log_client.put_retention_policy(logGroupName=loggroup, retentionInDays=int(retention_days))
                 return True
         except Exception as ex:
             self._logger.warning(ERR_SETTING_RETENTION_LAMBDA_LOGGROUP, self.context.log_group_name, str(ex))
@@ -240,7 +240,7 @@ class SchedulerSetupHandler(CustomResource):
     def _create_sample_schemas(self):
 
         try:
-            admin = ConfigAdmin(logger=self._logger, context=self.context)
+            admin: ConfigAdmin = ConfigAdmin(logger=self._logger, context=self.context)
 
             admin.create_period(**demo_data.PERIOD_WORKING_DAYS)
             admin.create_period(**demo_data.PERIOD_WEEKENDS)

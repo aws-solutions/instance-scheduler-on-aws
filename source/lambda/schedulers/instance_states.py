@@ -16,8 +16,7 @@ from decimal import Decimal
 
 import boto3
 from botocore.exceptions import ClientError
-
-from boto_retry import add_retry_methods_to_resource
+from util.dynamodb_utils import DynamoDBUtils
 from configuration.instance_schedule import InstanceSchedule
 
 INF_CLEANING = "Cleaning up instance registry."
@@ -66,9 +65,7 @@ class InstanceStates:
         :return:
         """
         if self._state_table is None:
-            dynamodb = boto3.resource("dynamodb")
-            self._state_table = dynamodb.Table(self._table_name)
-            add_retry_methods_to_resource(self._state_table, ["get_item", "put_item"], context=self._context)
+            self._state_table = DynamoDBUtils.get_dynamodb_table_resource_ref(self._table_name)
         return self._state_table
 
     def load(self, account, region):
@@ -84,7 +81,7 @@ class InstanceStates:
 
         # get single row from dynamoDB
         try:
-            resp = self.state_table.get_item_with_retries(Key={
+            resp = self.state_table.get_item(Key={
                 InstanceStates.INSTANCE_TABLE_NAME: self._service,
                 InstanceStates.INSTANCE_TABLE_ACCOUNT_REGION: self._current_account_region
             }, ConsistentRead=True)
@@ -164,7 +161,7 @@ class InstanceStates:
             if len(self._instances_to_purge) > 0:
                 data[InstanceStates.INSTANCE_TABLE_PURGE] = self._instances_to_purge
 
-            self.state_table.put_item_with_retries(Item=data)
+            self.state_table.put_item(Item=data)
             self._dirty = False
 
 

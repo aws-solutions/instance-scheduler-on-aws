@@ -733,8 +733,6 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
           ACCOUNT: this.account,
           ISSUES_TOPIC_ARN: snsTopic.topicArn,
           STACK_NAME: Aws.STACK_NAME,
-          BOTO_RETRY: '5,10,30,0.25',
-          ENV_BOTO_RETRY_LOGGING: "FALSE",
           SEND_METRICS: mappings.findInMap('TrueFalse', send.findInMap('AnonymousUsage', 'Data')),
           SOLUTION_ID: mappings.findInMap('Settings', 'MetricsSolutionId'),
           TRACE: mappings.findInMap('TrueFalse', trace.valueAsString),
@@ -860,7 +858,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       ],
       effect: Effect.ALLOW,
       resources: [
-        cdk.Fn.sub("arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Solutions/instance-scheduler/UUID/*")
+        cdk.Fn.sub("arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Solutions/aws-instance-scheduler/UUID/*")
       ]
     })
     lambdaToDynamoDb.lambdaFunction.addToRolePolicy(ssmParameterPolicyStatement)
@@ -908,7 +906,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     })
 
     const customServiceCfn = customService.node.defaultChild as cdk.CfnCustomResource
-    customServiceCfn.addDependsOn(schedulerLogGroup_ref)
+    customServiceCfn.addDependency(schedulerLogGroup_ref)
 
     //Instance scheduler Cloudformation Output references.
     new cdk.CfnOutput(this, 'AccountId', {
@@ -1085,10 +1083,10 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     //Adding the EC2 and scheduling policy dependencies to the lambda. 
     const lambdaFunction = lambdaToDynamoDb.lambdaFunction.node.defaultChild as lambda.CfnFunction
-    lambdaFunction.addDependsOn(ec2DynamoDBPolicy.node.defaultChild as iam.CfnPolicy)
-    lambdaFunction.addDependsOn(ec2Permissions.node.defaultChild as iam.CfnPolicy)
-    lambdaFunction.addDependsOn(schedulerPolicy.node.defaultChild as iam.CfnPolicy)
-    lambdaFunction.addDependsOn(schedulerRDSPolicy.node.defaultChild as iam.CfnPolicy)
+    lambdaFunction.addDependency(ec2DynamoDBPolicy.node.defaultChild as iam.CfnPolicy)
+    lambdaFunction.addDependency(ec2Permissions.node.defaultChild as iam.CfnPolicy)
+    lambdaFunction.addDependency(schedulerPolicy.node.defaultChild as iam.CfnPolicy)
+    lambdaFunction.addDependency(schedulerRDSPolicy.node.defaultChild as iam.CfnPolicy)
     lambdaFunction.cfnOptions.metadata = {
       "cfn_nag": {
         "rules_to_suppress": [

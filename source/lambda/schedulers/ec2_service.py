@@ -22,7 +22,8 @@ from botocore.exceptions import ClientError
 import configuration
 import schedulers
 import time
-from boto_retry import get_client_with_retries
+from util.dynamodb_utils import DynamoDBUtils
+from boto_retry import get_client_with_standard_retry
 from configuration import SchedulerConfigBuilder
 from configuration.instance_schedule import InstanceSchedule
 from configuration.running_period import RunningPeriod
@@ -74,8 +75,7 @@ class Ec2Service:
     EC2_STOPPING_STATES = {EC2_STATE_SHUTTING_DOWN, EC2_STATE_STOPPING, EC2_STATE_STOPPED}
     EC2_STARTING_STATES = {EC2_STATE_PENDING, EC2_STATE_RUNNING}
 
-    dynamodb = boto3.resource('dynamodb')
-    maintenance_table = dynamodb.Table(os.environ['MAINTENANCE_WINDOW_TABLE'])
+    maintenance_table = DynamoDBUtils.get_dynamodb_table_resource_ref(os.environ['MAINTENANCE_WINDOW_TABLE'])
 
     def __init__(self):
         self.service_name = "ec2"
@@ -104,15 +104,14 @@ class Ec2Service:
         if len(instance_buffer) > 0:
             yield instance_buffer
 
-    def get_ssm_windows_service(self, session, context, account, region):
+    def get_ssm_windows_service(self, session, region):
         """
         This function gets all the ssm windows which are enabled from SSM service.
 
         Returns:
             list of ssm windows
         """
-        ssm_client = get_client_with_retries("ssm", ["describe_maintenance_windows"], context=context, session=session,
-                                         region=region)
+        ssm_client = get_client_with_standard_retry("ssm", session=session, region=region)
         resp_maintenance_windows = {}
         try:
             resp_maintenance_windows = ssm_client.describe_maintenance_windows(
@@ -276,7 +275,7 @@ class Ec2Service:
         This function gets the list of the SSM maintenance windows
         """
         new_ssm_windows_list = []
-        ssm_windows_service = self.get_ssm_windows_service(session, context, account, region)
+        ssm_windows_service = self.get_ssm_windows_service(session, region)
         ssm_windows_db = self.get_ssm_windows_db(account, region)
         for window_service in ssm_windows_service:
             new_maintenance_window = self.process_ssm_window(window_service, ssm_windows_db, account, region)
@@ -328,8 +327,7 @@ class Ec2Service:
             self._ssm_maintenance_windows = self.ssm_maintenance_windows(self._session, context, account, region)
             self._logger.debug("finish loading the ssm maintenance windows")
 
-        client = get_client_with_retries("ec2", ["describe_instances"], context=context, session=self._session,
-                                         region=region)
+        client = get_client_with_standard_retry("ec2", session=self._session, region=region)
 
         def is_in_schedulable_state(ec2_inst):
             state = ec2_inst["state"] & 0xFF
@@ -348,7 +346,7 @@ class Ec2Service:
 
         while not done:
 
-            ec2_resp = client.describe_instances_with_retries(**args)
+            ec2_resp = client.describe_instances(**args)
             for reservation_inst in jmespath.search(jmes, ec2_resp):
                 inst = self._select_instance_data(instance=reservation_inst, tagname=tagname, config=config)
                 number_of_instances += 1
@@ -506,19 +504,18 @@ class Ec2Service:
         instance = kwargs[schedulers.PARAM_INSTANCE]
         instance_type = kwargs[schedulers.PARAM_DESIRED_TYPE]
 
-        client = get_client_with_retries("ec2", ["modify_instance_attribute"],
-                                         context=self._context, session=self._session, region=self._region)
+        client = get_client_with_standard_retry("ec2", session=self._session, region=self._region)
 
         self._logger.info(INF_SETTING_SIZE, instance.id, instance_type)
 
         try:
-            client.modify_instance_attribute_with_retries(InstanceId=instance.id, InstanceType={"Value": instance_type})
+            client.modify_instance_attribute(InstanceId=instance.id, InstanceType={"Value": instance_type})
         except Exception as ex:
             self._logger.error(ERR_RESIZING_INSTANCE_, ",".join(instance.id), str(ex))
 
     # noinspection PyMethodMayBeStatic
     def get_instance_status(self, client, instance_ids):
-        status_resp = client.describe_instances_with_retries(InstanceIds=instance_ids)
+        status_resp = client.describe_instances(InstanceIds=instance_ids)
         jmes = "Reservations[*].Instances[*].{InstanceId:InstanceId, State:State}[]"
         return jmespath.search(jmes, status_resp)
 
@@ -540,8 +537,7 @@ class Ec2Service:
                            t["Key"] not in stop_tags_key_names]
 
         methods = ["stop_instances", "create_tags", "delete_tags", "describe_instances"]
-        client = get_client_with_retries("ec2", methods=methods, context=self._context, session=self._session,
-                                         region=self._region)
+        client = get_client_with_standard_retry("ec2", session=self._session, region=self._region)
 
         for instance_batch in list(self.instance_batches(stopped_instances, STOP_BATCH_SIZE)):
 
@@ -559,7 +555,7 @@ class Ec2Service:
             try:
                 while len(hibernated) > 0:
                     try:
-                        stop_resp = client.stop_instances_with_retries(InstanceIds=hibernated, Hibernate=True)
+                        stop_resp = client.stop_instances(InstanceIds=hibernated, Hibernate=True)
                         instances_stopping += [i["InstanceId"] for i in stop_resp.get("StoppingInstances", []) if
                                                is_in_stopping_state(i.get("CurrentState", {}).get("Code", ""))]
                         break
@@ -578,7 +574,7 @@ class Ec2Service:
 
                 if len(not_hibernated) > 0:
                     try:
-                        stop_resp = client.stop_instances_with_retries(InstanceIds=not_hibernated, Hibernate=False)
+                        stop_resp = client.stop_instances(InstanceIds=not_hibernated, Hibernate=False)
                         instances_stopping += [i["InstanceId"] for i in stop_resp.get("StoppingInstances", []) if
                                                is_in_stopping_state(i.get("CurrentState", {}).get("Code", ""))]
                     except Exception as ex:
@@ -607,10 +603,10 @@ class Ec2Service:
                             self._logger.info(INFO_REMOVING_KEYS, "start",
                                               ",".join(["\"{}\"".format(k["Key"]) for k in start_tags_keys]),
                                               ",".join(instances_stopping))
-                            client.delete_tags_with_retries(Resources=instances_stopping, Tags=start_tags_keys)
+                            client.delete_tags(Resources=instances_stopping, Tags=start_tags_keys)
                         if len(stop_tags) > 0:
                             self._logger.info(INF_ADD_KEYS, "stop", str(stop_tags), ",".join(instances_stopping))
-                            client.create_tags_with_retries(Resources=instances_stopping, Tags=stop_tags)
+                            client.create_tags(Resources=instances_stopping, Tags=stop_tags)
                     except Exception as ex:
                         self._logger.warning(WARN_STOPPED_INSTANCES_TAGGING, ','.join(instances_stopping), str(ex))
 
@@ -635,8 +631,7 @@ class Ec2Service:
         start_tags_key_names = [t["Key"] for t in start_tags]
         stop_tags_keys = [{"Key": t["Key"]} for t in kwargs[schedulers.PARAM_CONFIG].stopped_tags if
                           t["Key"] not in start_tags_key_names]
-        client = get_client_with_retries("ec2", ["start_instances", "describe_instances", "create_tags", "delete_tags"],
-                                         context=self._context, session=self._session, region=self._region)
+        client = get_client_with_standard_retry("ec2", session=self._session, region=self._region)
 
         if os.environ['START_EC2_BATCH_SIZE'] is not None:
             try:
@@ -648,7 +643,7 @@ class Ec2Service:
 
             instance_ids = [i.id for i in list(instance_batch)]
             try:
-                start_resp = client.start_instances_with_retries(InstanceIds=instance_ids)
+                start_resp = client.start_instances(InstanceIds=instance_ids)
                 instances_starting = [i["InstanceId"] for i in start_resp.get("StartingInstances", []) if
                                       is_in_starting_state(i.get("CurrentState", {}).get("Code", ""))]
 
@@ -675,10 +670,10 @@ class Ec2Service:
                             self._logger.info(INFO_REMOVING_KEYS, "stop",
                                               ",".join(["\"{}\"".format(k["Key"]) for k in stop_tags_keys]),
                                               ",".join(instances_starting))
-                            client.delete_tags_with_retries(Resources=instances_starting, Tags=stop_tags_keys)
+                            client.delete_tags(Resources=instances_starting, Tags=stop_tags_keys)
                         if len(start_tags) > 0:
                             self._logger.info(INF_ADD_KEYS, "start", str(start_tags), ",".join(instances_starting))
-                            client.create_tags_with_retries(Resources=instances_starting, Tags=start_tags)
+                            client.create_tags(Resources=instances_starting, Tags=start_tags)
                     except Exception as ex:
                         self._logger.warning(WARN_STARTED_INSTANCES_TAGGING, ','.join(instances_starting), str(ex))
 

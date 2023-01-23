@@ -21,7 +21,7 @@ import boto3
 import configuration
 import pytz
 import schedulers
-from boto_retry import get_client_with_retries
+from boto_retry import get_client_with_standard_retry
 from configuration.instance_schedule import InstanceSchedule
 from .instance_states import InstanceStates
 from util.metrics import send_metrics_data, allow_send_metrics
@@ -116,7 +116,7 @@ class InstanceScheduler:
     @property
     def _sts(self):
         if self._sts_client is None:
-            self._sts_client = get_client_with_retries("sts", ["assume_role"], self._context)
+            self._sts_client = get_client_with_standard_retry("sts")
         return self._sts_client
 
     @property
@@ -127,7 +127,7 @@ class InstanceScheduler:
             try:
                 session_name = "{}-scheduler-{}".format(self._service.service_name, aws_account)
                 # assume a role
-                token = self._sts.assume_role_with_retries(RoleArn=cross_account_role, RoleSessionName=session_name)
+                token = self._sts.assume_role(RoleArn=cross_account_role, RoleSessionName=session_name)
                 credentials = token["Credentials"]
                 # create a session using the assumed role credentials
                 return boto3.Session(aws_access_key_id=credentials["AccessKeyId"],

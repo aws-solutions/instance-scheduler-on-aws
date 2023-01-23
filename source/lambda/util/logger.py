@@ -107,7 +107,7 @@ class Logger:
     @property
     def sns(self):
         if self._sns is None:
-            self._sns = boto_retry.get_client_with_retries("sns", ["publish"], context=self._context)
+            self._sns = boto_retry.get_client_with_standard_retry("sns")
         return self._sns
 
     @debug_enabled.setter
@@ -129,7 +129,7 @@ class Logger:
         sns_arn = os.getenv(ENV_ISSUES_TOPIC_ARN, None)
         if sns_arn is not None:
             message = "Loggroup: {}\nLogstream {}\n{} : {}".format(self._loggroup, self._logstream, level, msg)
-            self.sns.publish_with_retries(TopicArn=sns_arn, Message=message)
+            self.sns.publish(TopicArn=sns_arn, Message=message)
 
     def info(self, msg, *args):
         """
@@ -181,7 +181,7 @@ class Logger:
     def client(self):
         if self._client is None:
             methods = ["create_log_stream"]
-            self._client = boto_retry.get_client_with_retries("logs", methods, context=self._context)
+            self._client = boto_retry.get_client_with_standard_retry("logs")
         return self._client
 
     def flush(self):
@@ -208,7 +208,7 @@ class Logger:
                 return
             except self.client.exceptions.ResourceNotFoundException:
                 retries -= 1
-                self.client.create_log_stream_with_retries(logGroupName=self._loggroup, logStreamName=self._logstream)
+                self.client.create_log_stream(logGroupName=self._loggroup, logStreamName=self._logstream)
             except self.client.exceptions.InvalidSequenceTokenException as ex:
                 retries -= 1
                 put_event_args["sequenceToken"] = ex.response.get("expectedSequenceToken")
