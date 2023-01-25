@@ -3,20 +3,19 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      python: 3.10    
+      python: 3.10
     commands:
       - pip install --upgrade pip
+      - pip install -r source/lambda/requirements.txt -t source/lambda/
   pre_build:
     commands:
       - echo "Installing dependencies and executing unit tests - `pwd`"
-      - cd source
-      - chmod +x ./run-all-tests.sh && ./run-all-tests.sh
+      - cd deployment
+      - chmod +x ./run-unit-tests.sh && ./run-unit-tests.sh
       - echo "Installing dependencies and executing unit tests completed `date`"
   build:
     commands:
       - echo "`pwd`"
-      - echo "cd ../deployment"
-      - cd ../deployment
       - echo "Starting build `date` in `pwd`"
       - chmod +x ./build-s3-dist.sh && ./build-s3-dist.sh $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION
       - echo "Build completed `date`" 
@@ -34,5 +33,7 @@ phases:
 artifacts:
   files:
       - deployment/**/*
+      - source/**/*
       - buildspec.yml
       - CHANGELOG.md
+      - sonar-project.properties
