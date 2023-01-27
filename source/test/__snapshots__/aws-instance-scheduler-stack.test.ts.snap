@@ -153,6 +153,40 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Description": "Account to give access to when creating cross-account access role for cross account scenario ",
       "Value": "111111111111",
     },
+    "AppRegistryApplicationManagerUrl775D5C3D": {
+      "Description": "Application manager url for the application created.",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://eu-west-1.console.aws.amazon.com/systems-manager/appmanager/application/AWS_AppRegistry_Application-",
+            {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Fn::FindInMap": [
+                      "AppRegistryForInstanceSchedulerSolution25A90F05",
+                      "Data",
+                      "AppRegistryApplicationName",
+                    ],
+                  },
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  {
+                    "Ref": "AWS::AccountId",
+                  },
+                  {
+                    "Ref": "AWS::StackName",
+                  },
+                ],
+              ],
+            },
+          ],
+        ],
+      },
+    },
     "ConfigurationTable": {
       "Description": "Name of the DynamoDB configuration table",
       "Value": {
