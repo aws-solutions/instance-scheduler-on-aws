@@ -1,11 +1,12 @@
 from unittest import mock
 import os
 from configuration.instance_schedule import InstanceSchedule
-
-mock.patch.dict(os.environ, {'MAINTENANCE_WINDOW_TABLE': 'test_table'}).start()
+from tests.botomock import mock_boto_env_vars
 from schedulers import Ec2Service
 from util.named_tuple_builder import as_namedtuple
 from schedulers.instance_scheduler import InstanceScheduler
+
+mock_boto_env_vars()
 
 
 def test_get_desired_state_and_type_1(mocker):

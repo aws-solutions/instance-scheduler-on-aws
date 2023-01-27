@@ -29,6 +29,9 @@ var/
 .installed.cfg
 *.egg
 
+#PyCharm/Webstorm
+.idea/
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -49,6 +52,7 @@ nosetests.xml
 coverage.xml
 *,cover
 .hypothesis/
+coverage-reports/
 
 # Translations
 *.mo
@@ -111,7 +115,6 @@ deployment/open-source
 deployment/dist
 source/deploy
 
-.env
 source/code/sample_events
 .vscode
 __pycache__
