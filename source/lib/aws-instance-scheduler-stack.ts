@@ -29,6 +29,7 @@ import { Aws, RemovalPolicy } from 'aws-cdk-lib';
 import { Construct } from "constructs";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import {SUPPORTED_TIME_ZONES} from "./time-zones";
+import { AppRegistryForInstanceScheduler } from './app-registry';
 
 
 export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
@@ -38,7 +39,9 @@ export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
   readonly solutionProvider: string,
   readonly solutionBucket: string,
   readonly solutionName: string,
-  readonly solutionVersion: string
+  readonly solutionVersion: string,
+  readonly appregApplicationName: string,
+  readonly appregSolutionName: string,
 }
 
 /*
@@ -203,6 +206,15 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     send.setValue('ParameterKey', 'UniqueId', `/Solutions/${props.solutionName}/UUID/`)
 
     //End Mappings for instance scheduler.
+
+
+    new AppRegistryForInstanceScheduler(this, "AppRegistryForInstanceScheduler", {
+      solutionId: props.solutionId,
+      solutionName: props.solutionName,
+      solutionVersion: props.solutionVersion,
+      appregSolutionName: props.appregSolutionName,
+      appregAppName: props.appregApplicationName
+    })
 
     /*
     * Instance Scheduler solutions bucket reference.  

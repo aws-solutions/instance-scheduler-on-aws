@@ -18,6 +18,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { ArnPrincipal, CompositePrincipal, Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
+import { AppRegistryForInstanceScheduler } from './app-registry';
 
 export interface AwsInstanceSchedulerRemoteStackProps extends cdk.StackProps {
     readonly description: string,
@@ -26,7 +27,9 @@ export interface AwsInstanceSchedulerRemoteStackProps extends cdk.StackProps {
     readonly solutionProvider: string,
     readonly solutionBucket: string,
     readonly solutionName: string,
-    readonly solutionVersion: string
+    readonly solutionVersion: string,
+    readonly appregApplicationName: string,
+    readonly appregSolutionName: string,
   }
 
 export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
@@ -41,6 +44,14 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
             allowedPattern: '(^[0-9]{12}$)',
             constraintDescription: 'Account number is a 12 digit number'
         });
+
+        new AppRegistryForInstanceScheduler(this, "AppRegistryForInstanceScheduler", {
+            solutionId: props.solutionId,
+            solutionName: props.solutionName,
+            solutionVersion: props.solutionVersion,
+            appregSolutionName: props.appregSolutionName,
+            appregAppName: props.appregApplicationName
+          })
 
         let accountPrincipal = new ArnPrincipal(cdk.Fn.sub('arn:${AWS::Partition}:iam::${accountId}:root', {
             accountId: instanceSchedulerAccount.valueAsString

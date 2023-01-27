@@ -24,6 +24,8 @@ const SOLUTION_ID = process.env['SOLUTION_ID'] ? process.env['SOLUTION_ID'] : "S
 const SOLUTION_BUCKET = process.env['DIST_OUTPUT_BUCKET'] ? process.env['DIST_OUTPUT_BUCKET'] : "";
 const SOLUTION_TMN = process.env['SOLUTION_TRADEMARKEDNAME'] ? process.env['SOLUTION_TRADEMARKEDNAME'] : "aws-instance-scheduler";
 const SOLUTION_PROVIDER = 'AWS Solution Development';
+const APP_REG_APPLICATION_TYPE = process.env['APP_REG_APPLICATION_TYPE'] ? process.env['APP_REG_APPLICATION_TYPE'] : 'AWS-Solutions';
+const APP_REG_SOLUTION_NAME = process.env['APP_REG_SOLUTION_NAME'] ? process.env['APP_REG_SOLUTION_NAME'] : "instance-scheduler-on-aws";
 
 const app = new cdk.App();
 
@@ -37,7 +39,9 @@ new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
     solutionProvider: SOLUTION_PROVIDER,
     solutionBucket: SOLUTION_BUCKET,
     solutionName: SOLUTION_NAME,
-    solutionVersion: SOLUTION_VERSION
+    solutionVersion: SOLUTION_VERSION,
+    appregApplicationName: APP_REG_APPLICATION_TYPE,
+    appregSolutionName: APP_REG_SOLUTION_NAME
 });
 new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
     synthesizer: new cdk.DefaultStackSynthesizer({
@@ -49,5 +53,7 @@ new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
     solutionProvider: SOLUTION_PROVIDER,
     solutionBucket: SOLUTION_BUCKET,
     solutionName: SOLUTION_NAME,
-    solutionVersion: SOLUTION_VERSION
+    solutionVersion: SOLUTION_VERSION,
+    appregApplicationName: APP_REG_APPLICATION_TYPE,
+    appregSolutionName: APP_REG_SOLUTION_NAME
 });
