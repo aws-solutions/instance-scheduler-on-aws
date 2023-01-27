@@ -29,7 +29,9 @@ export function createHubStack(): cdk.Stack {
     solutionProvider: 'AWS Solution Development',
     solutionBucket: "solutions",
     solutionName: 'aws-instance-scheduler',
-    solutionVersion: 'v1.4.0'
+    solutionVersion: 'v1.5.0',
+    appregApplicationName: "AWS-Solutions",
+    appregSolutionName: "instance-scheduler-on-aws"
   })
 
   const instanceSchedulerStackMetadata =
@@ -146,7 +148,9 @@ export function createSpokeStack(): cdk.Stack {
     solutionProvider: 'AWS Solution Development',
     solutionBucket: "solutions",
     solutionName: 'aws-instance-scheduler',
-    solutionVersion: 'v1.4.0'
+    solutionVersion: 'v1.5.0',
+    appregApplicationName: "AWS-Solutions",
+    appregSolutionName: "instance-scheduler-on-aws"
   })
 
   const instanceSchedulerRemoteStackMetadata =

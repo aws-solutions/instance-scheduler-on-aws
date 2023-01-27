@@ -22,6 +22,7 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
+    "@aws-cdk/aws-servicecatalogappregistry-alpha": "^2.39.1-alpha.0",
     "@aws-solutions-constructs/aws-lambda-dynamodb": "2.30.0",
     "aws-cdk-lib": "2.59.0",
     "constructs": "^10.0.0",

@@ -5,6 +5,15 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "",
   "Mappings": {
+    "AppRegistryForInstanceSchedulerSolution25A90F05": {
+      "Data": {
+        "AppRegistryApplicationName": "instance-scheduler-on-aws",
+        "ApplicationType": "AWS-Solutions",
+        "ID": "SO0030",
+        "SolutionName": "aws-instance-scheduler",
+        "Version": "v1.5.0",
+      },
+    },
     "Send": {
       "AnonymousUsage": {
         "Data": "Yes",
@@ -772,6 +781,160 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
     },
   },
   "Resources": {
+    "AppRegistry968496A3": {
+      "Properties": {
+        "Description": {
+          "Fn::Join": [
+            "",
+            [
+              "Service Catalog application to track and manage all your resources for the solution ",
+              {
+                "Fn::FindInMap": [
+                  "AppRegistryForInstanceSchedulerSolution25A90F05",
+                  "Data",
+                  "SolutionName",
+                ],
+              },
+            ],
+          ],
+        },
+        "Name": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Fn::FindInMap": [
+                  "AppRegistryForInstanceSchedulerSolution25A90F05",
+                  "Data",
+                  "AppRegistryApplicationName",
+                ],
+              },
+              {
+                "Ref": "AWS::Region",
+              },
+              {
+                "Ref": "AWS::AccountId",
+              },
+              {
+                "Ref": "AWS::StackName",
+              },
+            ],
+          ],
+        },
+        "Tags": {
+          "Solutions:ApplicationType": {
+            "Fn::FindInMap": [
+              "AppRegistryForInstanceSchedulerSolution25A90F05",
+              "Data",
+              "ApplicationType",
+            ],
+          },
+          "Solutions:SolutionID": {
+            "Fn::FindInMap": [
+              "AppRegistryForInstanceSchedulerSolution25A90F05",
+              "Data",
+              "ID",
+            ],
+          },
+          "Solutions:SolutionName": {
+            "Fn::FindInMap": [
+              "AppRegistryForInstanceSchedulerSolution25A90F05",
+              "Data",
+              "SolutionName",
+            ],
+          },
+          "Solutions:SolutionVersion": {
+            "Fn::FindInMap": [
+              "AppRegistryForInstanceSchedulerSolution25A90F05",
+              "Data",
+              "Version",
+            ],
+          },
+        },
+      },
+      "Type": "AWS::ServiceCatalogAppRegistry::Application",
+    },
+    "AppRegistryAttributeGroupAssociation2328adb27afd49C57352": {
+      "Properties": {
+        "Application": {
+          "Fn::GetAtt": [
+            "AppRegistry968496A3",
+            "Id",
+          ],
+        },
+        "AttributeGroup": {
+          "Fn::GetAtt": [
+            "AppRegistryForInstanceSchedulerDefaultApplicationAttributes78274898",
+            "Id",
+          ],
+        },
+      },
+      "Type": "AWS::ServiceCatalogAppRegistry::AttributeGroupAssociation",
+    },
+    "AppRegistryForInstanceSchedulerDefaultApplicationAttributes78274898": {
+      "Properties": {
+        "Attributes": {
+          "applicationType": {
+            "Fn::FindInMap": [
+              "AppRegistryForInstanceSchedulerSolution25A90F05",
+              "Data",
+              "ApplicationType",
+            ],
+          },
+          "solutionID": {
+            "Fn::FindInMap": [
+              "AppRegistryForInstanceSchedulerSolution25A90F05",
+              "Data",
+              "ID",
+            ],
+          },
+          "solutionName": {
+            "Fn::FindInMap": [
+              "AppRegistryForInstanceSchedulerSolution25A90F05",
+              "Data",
+              "SolutionName",
+            ],
+          },
+          "version": {
+            "Fn::FindInMap": [
+              "AppRegistryForInstanceSchedulerSolution25A90F05",
+              "Data",
+              "Version",
+            ],
+          },
+        },
+        "Description": "Attribute group for solution information",
+        "Name": {
+          "Fn::Join": [
+            "-",
+            [
+              {
+                "Ref": "AWS::Region",
+              },
+              {
+                "Ref": "AWS::StackName",
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::ServiceCatalogAppRegistry::AttributeGroup",
+    },
+    "AppRegistryResourceAssociationdf1bce20c35e43B5355E": {
+      "Properties": {
+        "Application": {
+          "Fn::GetAtt": [
+            "AppRegistry968496A3",
+            "Id",
+          ],
+        },
+        "Resource": {
+          "Ref": "AWS::StackId",
+        },
+        "ResourceType": "CFN_STACK",
+      },
+      "Type": "AWS::ServiceCatalogAppRegistry::ResourceAssociation",
+    },
     "ConfigTable": {
       "DeletionPolicy": "Delete",
       "Properties": {
@@ -1026,9 +1189,9 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Properties": {
         "Code": {
           "S3Bucket": "solutions-eu-west-1",
-          "S3Key": "aws-instance-scheduler/v1.4.0/instance-scheduler.zip",
+          "S3Key": "aws-instance-scheduler/v1.5.0/instance-scheduler.zip",
         },
-        "Description": "EC2 and RDS instance scheduler, version v1.4.0",
+        "Description": "EC2 and RDS instance scheduler, version v1.5.0",
         "Environment": {
           "Variables": {
             "ACCOUNT": "111111111111",
@@ -1116,11 +1279,11 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
                   {
                     "Ref": "AWS::StackName",
                   },
-                  "-v1.4.0",
+                  "-v1.5.0",
                 ],
               ],
             },
-            "USER_AGENT_EXTRA": "AwsSolution/SO0030/v1.4.0",
+            "USER_AGENT_EXTRA": "AwsSolution/SO0030/v1.5.0",
             "UUID_KEY": {
               "Fn::FindInMap": [
                 "Send",
@@ -1274,7 +1437,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
             },
           ],
         },
-        "stack_version": "v1.4.0",
+        "stack_version": "v1.5.0",
         "started_tags": {
           "Ref": "StartedTags",
         },
@@ -1588,7 +1751,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
     },
     "SchedulerRule": {
       "Properties": {
-        "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version v1.4.0",
+        "Description": "Instance Scheduler - Rule to trigger instance for scheduler function version v1.5.0",
         "ScheduleExpression": {
           "Fn::FindInMap": [
             "mappings",
