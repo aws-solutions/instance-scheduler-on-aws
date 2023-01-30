@@ -23,3 +23,4 @@
  test('AwsInstanceSchedulerStack snapshot test', () => {
    expect(SynthUtils.toCloudFormation(createSpokeStack())).toMatchSnapshot();
  });
+ 
