@@ -316,7 +316,7 @@ class SchedulerConfigBuilder:
     @staticmethod
     def configuration_from_dict(d):
         """
-        This method builds a configuration object instance that is passed as a dictionary in the event of a lambda function
+        This method builds a configuration object instance that is passed as a dictionary in the event of a app function
         :param d:
         :return:
         """
@@ -402,7 +402,7 @@ class SchedulerConfigBuilder:
     @staticmethod
     def configuration_as_dict(config):
         """
-        This method build a dictionary from a configuration instance to be passed safely in the event of a lambda function
+        This method build a dictionary from a configuration instance to be passed safely in the event of a app function
         :param config:
         :return:
         """

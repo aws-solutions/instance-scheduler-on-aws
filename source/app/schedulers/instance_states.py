@@ -45,7 +45,7 @@ class InstanceStates:
         :param table_name: name of the state table
         :param service: name of the service
         :param logger: logger to log output of ste logic
-        :param context: lambda context
+        :param context: app context
         """
         self._table_name = table_name
         self._state_table = None

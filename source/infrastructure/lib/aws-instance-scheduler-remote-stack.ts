@@ -56,7 +56,7 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
         let accountPrincipal = new ArnPrincipal(cdk.Fn.sub('arn:${AWS::Partition}:iam::${accountId}:root', {
             accountId: instanceSchedulerAccount.valueAsString
         }));
-        let servicePrincipal = new iam.ServicePrincipal('lambda.amazonaws.com')
+        let servicePrincipal = new iam.ServicePrincipal('app.amazonaws.com')
 
         let principalPolicyStatement = new PolicyStatement();
         principalPolicyStatement.addActions("sts:AssumeRole");

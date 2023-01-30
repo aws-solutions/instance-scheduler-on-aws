@@ -30,7 +30,7 @@ INF_CONFIG_TABLE = "Configuration table is {}"
 INF_HANDLER = "Handler {} : Received request {} at {}"
 INF_RUN_SCHEDULER_LOCAL = "Running scheduling request for service(s) {}, account(s) {}, region(s) {}"
 INF_SCHEDULER_RESULT = "Scheduler result is {}"
-INF_STARTING_LAMBDA = "Starting lambda function for scheduling {} instances for account {} in region {}"
+INF_STARTING_LAMBDA = "Starting app function for scheduling {} instances for account {} in region {}"
 
 LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
 LOG_STREAM_PREFIX = "Scheduler"
@@ -69,11 +69,11 @@ class CloudWatchEventHandler:
     @property
     def lambda_client(self):
         """
-        Get the lambda client
-        :return: lambda client
+        Get the app client
+        :return: app client
         """
         if self._lambda_client is None:
-            self._lambda_client = get_client_with_standard_retry("lambda")
+            self._lambda_client = get_client_with_standard_retry("app")
         return self._lambda_client
 
     @property
@@ -219,27 +219,27 @@ class CloudWatchEventHandler:
 
     def _run_schedulers_as_lambda(self, number_of_accounts, number_of_regions, number_of_services):
 
-        # each service/account/region combination is executed in it's own lambda instance
+        # each service/account/region combination is executed in it's own app instance
         level = CloudWatchEventHandler.TOP_LEVEL
-        # multiple services, lambda per service
+        # multiple services, app per service
         if number_of_services() > 1:
             level = CloudWatchEventHandler.SERVICE_LEVEL
-        # multiple accounts, one lambda per service/account
+        # multiple accounts, one app per service/account
         if number_of_accounts() > 1:
             level = CloudWatchEventHandler.ACCOUNT_LEVEL
-        # multiple regions, one lambda per service/account/region
+        # multiple regions, one app per service/account/region
         if number_of_regions() > 1:
             level = CloudWatchEventHandler.REGION_LEVEL
         result = []
 
-        # partition configuration in service/account/region specific subsets and start lambda for each
+        # partition configuration in service/account/region specific subsets and start app for each
         for level_configuration in self._configuration_level_partitions(level):
             # noinspection PyTypeChecker
             result.append(self._execute_as_lambda(level_configuration))
         return result
 
     def _run_schedulers_in_process(self):
-        # local execution, used for debugging in non lambda environment and IDE's
+        # local execution, used for debugging in non app environment and IDE's
         result = {}
 
         # noinspection PyTypeChecker
@@ -262,7 +262,7 @@ class CloudWatchEventHandler:
         return result
 
     def _execute_as_lambda(self, conf):
-        # runs a service/account/region subset of the configuration as a new lambda function
+        # runs a service/account/region subset of the configuration as a new app function
         self._logger.info(INF_STARTING_LAMBDA,
                           "-".join(conf.scheduled_services),
                           "-".join(self.account_names(conf)),
@@ -286,7 +286,7 @@ class CloudWatchEventHandler:
                 "dispatch_time": str(datetime.now())
             }))
 
-        # start the lambda function
+        # start the app function
         resp = self.lambda_client.invoke(FunctionName=self._context.function_name,
                                                       InvocationType="Event", LogType="None", Payload=payload)
         if resp["StatusCode"] != 202:

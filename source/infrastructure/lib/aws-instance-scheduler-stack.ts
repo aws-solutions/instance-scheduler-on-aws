@@ -45,9 +45,9 @@ export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
 }
 
 /*
-* AWS instance scheduler stack, utilizes two cdk constructs, aws-lambda-dynamodb and aws-events-rule-lambda.
+* AWS instance scheduler stack, utilizes two cdk constructs, aws-app-dynamodb and aws-events-rule-app.
 * The stack has three dynamoDB tables defined for storing the state, configuration and maintenance information.
-* The stack also includes one lambda, which is scheduled using a AWS CloudWatch Event Rule. 
+* The stack also includes one app, which is scheduled using a AWS CloudWatch Event Rule.
 * The stack also includes a cloudwatch log group for the entire solution, encrycption key, encyrption key alias and SNS topic,
 * and the necessary AWS IAM Policies and IAM Roles. For more information on the architecture, refer to the documentation at
 * https://aws.amazon.com/solutions/implementations/instance-scheduler/?did=sl_card&trk=sl_card
@@ -245,7 +245,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     }
 
     //Start instance scheduler scheduler role reference and related references of principle, policy statement, and policy document.
-    const compositePrincipal = new iam.CompositePrincipal(new iam.ServicePrincipal('events.amazonaws.com'), new iam.ServicePrincipal('lambda.amazonaws.com'))
+    const compositePrincipal = new iam.CompositePrincipal(new iam.ServicePrincipal('events.amazonaws.com'), new iam.ServicePrincipal('app.amazonaws.com'))
 
     const schedulerRole = new iam.Role(this, "SchedulerRole", {
       assumedBy: compositePrincipal,
@@ -296,7 +296,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       masterKey: instanceSchedulerEncryptionKey
     });
 
-    //Start instance scheduler aws-lambda-dynamoDB construct reference. 
+    //Start instance scheduler aws-app-dynamoDB construct reference.
     const lambdaToDynamoDBProps: LambdaToDynamoDBProps = {
       lambdaFunctionProps: {
         functionName: Aws.STACK_NAME + '-InstanceSchedulerMain',
@@ -343,7 +343,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     };
 
-    const lambdaToDynamoDb = new LambdaToDynamoDB(this, 'instance-scheduler-lambda', lambdaToDynamoDBProps);
+    const lambdaToDynamoDb = new LambdaToDynamoDB(this, 'instance-scheduler-app', lambdaToDynamoDBProps);
 
     const cfnStateTable = lambdaToDynamoDb.dynamoTable.node.defaultChild as dynamodb.CfnTable
     cfnStateTable.overrideLogicalId('StateTable')
@@ -353,7 +353,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       "SSEType": 'KMS'
     })
 
-    //End instance scheduler aws-lambda-dynamoDB construct reference. 
+    //End instance scheduler aws-app-dynamoDB construct reference.
 
     //Start instance scheduler configuration table dynamoDB Table reference.
 
@@ -407,12 +407,12 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     })
     //End instance scheduler maintenance window table dynamoDB Table reference.
 
-    //Adding all the dynamo DB references to the lambda environment variables.
+    //Adding all the dynamo DB references to the app environment variables.
     lambdaToDynamoDb.lambdaFunction.addEnvironment('CONFIG_TABLE', cfnConfigTable.ref)
     lambdaToDynamoDb.lambdaFunction.addEnvironment('MAINTENANCE_WINDOW_TABLE', cfnMaintenanceWindowTable.ref)
     lambdaToDynamoDb.lambdaFunction.addEnvironment('STATE_TABLE', cfnStateTable.ref)
 
-    //Start instance scheduler database policy statement for lambda.
+    //Start instance scheduler database policy statement for app.
 
     const dynamodbPolicy = new PolicyStatement({
       actions: [
@@ -443,7 +443,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       ]
     })
     lambdaToDynamoDb.lambdaFunction.addToRolePolicy(ssmParameterPolicyStatement)
-    //End instance scheduler database policy statement for lambda.
+    //End instance scheduler database policy statement for app.
 
 
     const schedulerRule = new events.Rule(this, 'SchedulerEventRule', {
@@ -456,7 +456,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     const eventRule_cfn_ref = schedulerRule.node.defaultChild as events.CfnRule
     eventRule_cfn_ref.addPropertyOverride('State', mappings.findInMap('EnabledDisabled', schedulingActive.valueAsString));
 
-    //End instance scheduler aws-event-lambda construct reference.
+    //End instance scheduler aws-event-app construct reference.
 
 
     /*
@@ -507,7 +507,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'SchedulerRoleArn', {
       value: schedulerRole.roleArn,
-      description: 'Role for the instance scheduler lambda function'
+      description: 'Role for the instance scheduler app function'
     })
 
     new cdk.CfnOutput(this, 'ServiceInstanceScheduleServiceToken', {
@@ -523,7 +523,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         'logs:PutLogEvents',
         'logs:PutRetentionPolicy'],
       resources: [
-        cdk.Fn.sub("arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*"),
+        cdk.Fn.sub("arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/app/*"),
         schedulerLogGroup.logGroupArn
       ],
       effect: Effect.ALLOW
@@ -622,9 +622,9 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     })
 
     const schedulerPolicyStatement5 = new PolicyStatement({
-      actions: ['lambda:InvokeFunction'],
+      actions: ['app:InvokeFunction'],
       effect: Effect.ALLOW,
-      resources: [cdk.Fn.sub("arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-InstanceSchedulerMain")]
+      resources: [cdk.Fn.sub("arn:${AWS::Partition}:app:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-InstanceSchedulerMain")]
     })
 
     const schedulerPolicyStatement6 = new PolicyStatement({
@@ -662,7 +662,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       ]
     })
 
-    //Adding the EC2 and scheduling policy dependencies to the lambda. 
+    //Adding the EC2 and scheduling policy dependencies to the app.
     const lambdaFunction = lambdaToDynamoDb.lambdaFunction.node.defaultChild as lambda.CfnFunction
     lambdaFunction.addDependency(ec2DynamoDBPolicy.node.defaultChild as iam.CfnPolicy)
     lambdaFunction.addDependency(ec2Permissions.node.defaultChild as iam.CfnPolicy)

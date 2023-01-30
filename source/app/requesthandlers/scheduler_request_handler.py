@@ -54,8 +54,8 @@ class SchedulerRequestHandler:
     @property
     def lambda_account(self):
         """
-        Returns the name of the lambda account
-        :return: lambda account
+        Returns the name of the app account
+        :return: app account
         """
         if "account" in self._event:
             return self._event["account"]

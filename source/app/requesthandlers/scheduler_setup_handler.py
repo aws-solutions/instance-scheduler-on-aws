@@ -170,8 +170,8 @@ class SchedulerSetupHandler(CustomResource):
     @property
     def schedule_lambda_account(self):
         """
-        Returns flag for processing lambda account switch
-        :return: lambda account process switch
+        Returns flag for processing app account switch
+        :return: app account process switch
         """
         return self.resource_properties.get(configuration.SCHEDULE_LAMBDA_ACCOUNT, "True")
 

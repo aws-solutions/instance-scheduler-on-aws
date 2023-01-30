@@ -103,7 +103,7 @@ TAGNAME = "tagname"
 WEEKDAYS = "weekdays"
 # cross_account_roles_arn_list
 CROSS_ACCOUNT_ROLES = "cross_account_roles"
-# process instances in account in which lambda function is installed
+# process instances in account in which app function is installed
 SCHEDULE_LAMBDA_ACCOUNT = "schedule_lambda_account"
 # enforce schedule state
 ENFORCED = "enforced"

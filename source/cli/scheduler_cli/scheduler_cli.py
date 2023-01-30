@@ -119,7 +119,7 @@ def handle_command(args, command):
         lambda_resource = cloudformation_client.describe_stack_resource(
             StackName=args.stack, LogicalResourceId="Main").get("StackResourceDetail", None)
 
-        lambda_client = _service_client("lambda", region=args.region, profile_name=args.profile_name)
+        lambda_client = _service_client("app", region=args.region, profile_name=args.profile_name)
 
         event = {
             "source": EVENT_SOURCE,
@@ -133,13 +133,13 @@ def handle_command(args, command):
         payload = str.encode(json.dumps(event))
         lambda_name = lambda_resource["PhysicalResourceId"]
 
-        # start lambda function
+        # start app function
         resp = lambda_client.invoke(FunctionName=lambda_name,
                                     InvocationType="RequestResponse",
                                     LogType="None",
                                     Payload=payload)
 
-        # read lambda response and load json
+        # read app response and load json
         lambda_response = resp["Payload"].read().decode("utf-8")
         result = json.loads(lambda_response)
 

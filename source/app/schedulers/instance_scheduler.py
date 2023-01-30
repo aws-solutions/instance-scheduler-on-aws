@@ -110,7 +110,7 @@ class InstanceScheduler:
                     result.append(r)
             return result
 
-        # no regions, use region of lambda function
+        # no regions, use region of app function
         return [boto3.Session().region_name]
 
     @property
@@ -140,7 +140,7 @@ class InstanceScheduler:
         # keep track of accounts processed
         accounts_done = []
 
-        # return session for lambda account if processing instances in that account
+        # return session for app account if processing instances in that account
         if self._configuration.schedule_lambda_account:
             accounts_done.append(self._lambda_account)
             yield as_namedtuple("Account", {"session": boto3.Session(), "name": self._lambda_account, "role": None})
@@ -196,7 +196,7 @@ class InstanceScheduler:
         :param state_table: name of the instance state table
         :param scheduler_config: scheduler configuration data
         :param logger: logger to log output of scheduling process
-        :param lambda_account: lambda account
+        :param lambda_account: app account
         :param context: Lambda context
         :return:
         """

@@ -42,7 +42,7 @@ if __name__ == "__main__":
         lambda_resource = cloudformation_client.describe_stack_resource(
             StackName=stack, LogicalResourceId="Main").get("StackResourceDetail", None)
 
-        lambda_client = boto3.client("lambda")
+        lambda_client = boto3.client("app")
         lambda_function = lambda_client.get_function(FunctionName=lambda_resource["PhysicalResourceId"])
 
         environment = lambda_function["Configuration"]["Environment"]["Variables"]

@@ -34,7 +34,7 @@ class AdminCliRequestHandler(object):
         """
         Initializes handle instance
         :param event: event to handle
-        :param context: lambda context
+        :param context: app context
         """
         self._event = event
         self._context = context
