@@ -64,8 +64,8 @@ echo "[Synth] CDK Project"
 echo "------------------------------------------------------------------------------"
 
 # Install the global aws-cdk package
-echo "cd $source_dir"
-cd $source_dir
+echo "cd $cdk_source_dir"
+cd $cdk_source_dir
 echo "npm install aws-cdk@$cdk_version"
 npm install aws-cdk@$cdk_version
 
