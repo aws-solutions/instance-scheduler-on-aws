@@ -3,24 +3,7 @@ Config
 
 ^docs/
 ^viperlight/
-source/lambda/schedulers/instance_scheduler.py:133
-source/lambda/schedulers/instance_scheduler.py:134
-source/lambda/requesthandlers/setup_demo_data.py:64
+source/app/requesthandlers/setup_demo_data.py:64
 deployment/buildspecs/mainline-s3-spec.yml:20
-source/lambda/models/rds/2014-10-31/service-2.json:152
-source/lambda/models/ssm/2014-11-06/service-2.json:3240
-source/lambda/tests/cloudformation_util.py:26
-source/lambda/tests/cloudformation_util.py:27
-source/lambda/tests/rds_util.py:27
-source/lambda/tests/rds_util.py:28
-source/lambda/tests/ec2_util.py:27
-source/lambda/tests/ec2_util.py:28
 CODE_OF_CONDUCT.md:4
 CONTRIBUTING.md:51
-source/package-lock.json:6526
-source/package-lock.json:3672
-source/package-lock.json:3510
-source/package-lock.json:3667
-source/test/aws-instance-scheduler-stack.test.ts:25
-source/test/aws-instance-scheduler-remote-stack.test.ts:24
-source/lambda/models/rds/2014-10-31/service-2.json:4873
