@@ -107,16 +107,16 @@ echo "--------------------------------------------------------------------------
 echo "[Packing] Source code lambda python artifacts and scheduler-cli artifacts"
 echo "------------------------------------------------------------------------------"
 echo "Copy the python lambda files from source/lambda directory to staging lambda directory"
-cp -pr $source_dir/lambda $staging_dist_dir/
+cp -pr $source_dir/app $staging_dist_dir/
 cp -pr $source_dir/cli $staging_dist_dir/
 
 echo "Update the version information in version.py"
-cd $staging_dist_dir/lambda
+cd $staging_dist_dir/app
 mv version.py version.py.org
 sed "s/%version%/$DIST_VERSION/g" version.py.org > version.py
 
 echo "Install all the python dependencies in the staging directory before packaging"
-pip3 install -U -r $source_dir/lambda/requirements.txt -t $staging_dist_dir/lambda/
+pip3 install -U -r $source_dir/app/requirements.txt -t $staging_dist_dir/app/
 
 echo "Build lambda distribution packaging"
 zip -q --recurse-paths ./instance-scheduler.zip version.txt main.py version.py configuration/* requesthandlers/* chardet/* urllib3/* idna/* requests/* schedulers/* util/* boto_retry/* models/* pytz/* certifi/*
