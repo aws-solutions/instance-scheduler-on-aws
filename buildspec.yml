@@ -18,10 +18,7 @@ phases:
       - echo "`pwd`"
       - echo "Starting build `date` in `pwd`"
       - chmod +x ./build-s3-dist.sh && ./build-s3-dist.sh $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION
-      - echo "Build completed `date`" 
-      - echo "Starting open-source-dist `date` in `pwd`" 
-      - chmod +x ./build-open-source-dist.sh && ./build-open-source-dist.sh $SOLUTION_NAME
-      - echo "Open Source Dist completed `date`" 
+      - echo "Build completed `date`"
 
   post_build:
     commands:
@@ -29,6 +26,8 @@ phases:
       - aws s3 cp s3://solutions-build-assets/changelog-spec.yml ../buildspec.yml
       - echo "Retrieving next stage buildspec complete"
       - echo "Post build completed on `date`"
+      - mkdir -p open-source
+      - touch open-source/source-is-on-github
 
 artifacts:
   files:
