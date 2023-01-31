@@ -31,8 +31,8 @@ export SOLUTION_TRADEMARKEDNAME=$2
 # Get reference for all important folders
 template_dir="$PWD"
 staging_dist_dir="$template_dir/staging"
-template_dist_dir="$template_dir/global-s3-assets"
-build_dist_dir="$template_dir/regional-s3-assets"
+global_dist_dir="$template_dir/global-s3-assets"
+regional_dist_dir="$template_dir/regional-s3-assets"
 lambda_source_dir="$template_dir/../source/app"
 cli_source_dir="$template_dir/../source/cli"
 cdk_source_dir="$template_dir/../source/infrastructure"
@@ -46,14 +46,14 @@ echo "--------------------------------------------------------------------------
 echo "[Init] Remove any old dist files from previous runs"
 echo "------------------------------------------------------------------------------"
 
-echo "rm -rf $template_dist_dir"
-rm -rf $template_dist_dir
-echo "mkdir -p $template_dist_dir"
-mkdir -p $template_dist_dir
-echo "rm -rf $build_dist_dir"
-rm -rf $build_dist_dir
-echo "mkdir -p $build_dist_dir"
-mkdir -p $build_dist_dir
+echo "rm -rf $global_dist_dir"
+rm -rf $global_dist_dir
+echo "mkdir -p $global_dist_dir"
+mkdir -p $global_dist_dir
+echo "rm -rf $regional_dist_dir"
+rm -rf $regional_dist_dir
+echo "mkdir -p $regional_dist_dir"
+mkdir -p $regional_dist_dir
 echo "rm -rf $staging_dist_dir"
 rm -rf $staging_dist_dir
 echo "mkdir -p $staging_dist_dir"
@@ -93,16 +93,16 @@ echo "--------------------------------------------------------------------------
 echo "[Packing] Template artifacts"
 echo "------------------------------------------------------------------------------"
 
-# Move outputs from staging to template_dist_dir
-echo "Move outputs from staging to template_dist_dir"
-echo "cp $template_dir/*.template $template_dist_dir/"
-cp $staging_dist_dir/*.template.json $template_dist_dir/
+# Move outputs from staging to global_dist_dir
+echo "Move outputs from staging to global_dist_dir"
+echo "cp $template_dir/*.template $global_dist_dir/"
+cp $staging_dist_dir/*.template.json $global_dist_dir/
 rm *.template.json
 
 # Rename all *.template.json files to *.template
 echo "Rename all *.template.json to *.template"
 echo "copy templates and rename"
-for f in $template_dist_dir/*.template.json; do
+for f in $global_dist_dir/*.template.json; do
     mv -- "$f" "${f%.template.json}.template"
 done
 
@@ -123,8 +123,8 @@ pip3 install -U -r $lambda_source_dir/requirements.txt -t $staging_dist_dir/app/
 
 echo "Build lambda distribution packaging"
 zip -q --recurse-paths ./instance-scheduler.zip version.txt main.py version.py configuration/* requesthandlers/* chardet/* urllib3/* idna/* requests/* schedulers/* util/* boto_retry/* models/* pytz/* certifi/*
-echo "Copy lambda distribution to $build_dist_dir"
-cp -pr ./instance-scheduler.zip $build_dist_dir/
+echo "Copy lambda distribution to $regional_dist_dir"
+cp -pr ./instance-scheduler.zip $regional_dist_dir/
 
 echo "cd into the scheduler cli folder ./cli"
 
@@ -140,5 +140,5 @@ sed "s/#version#/$DIST_VERSION/g" ./scheduler_cli/scheduler_cli.bak.py > ./sched
 rm ./scheduler_cli/scheduler_cli.bak.py
 zip -q --recurse-paths ./scheduler-cli.zip scheduler_cli/* setup.py instance-scheduler-cli-runner.py
 
-echo "Copy the scheduler cli package to $build_dist_dir"
-cp -pr ./scheduler-cli.zip $build_dist_dir/
+echo "Copy the scheduler cli package to $global_dist_dir"
+cp -pr ./scheduler-cli.zip $global_dist_dir/
