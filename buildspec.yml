@@ -6,7 +6,7 @@ phases:
       python: 3.10
     commands:
       - pip install --upgrade pip
-      - pip install -r source/lambda/requirements.txt -t source/lambda/
+      - pip install -r source/app/requirements.txt -t source/app/
   pre_build:
     commands:
       - echo "Installing dependencies and executing unit tests - `pwd`"
