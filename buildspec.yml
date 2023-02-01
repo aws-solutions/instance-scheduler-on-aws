@@ -26,6 +26,8 @@ phases:
       - aws s3 cp s3://solutions-build-assets/changelog-spec.yml ../buildspec.yml
       - echo "Retrieving next stage buildspec complete"
       - echo "Post build completed on `date`"
+      - mkdir -p open-source
+      - touch open-source/source-is-on-github
 
 artifacts:
   files:
