@@ -54,7 +54,7 @@ wget https://github.com/awslabs/aws-instance-scheduler/archive/master.zip
     |- aws-instance-scheduler-remote-stack.test.ts   - unit and snapshot tests for aws instance scheduler remote stack.
     |- aws-instance-scheduler-stack.test.ts   - unit and snapshot tests for aws instance scheduler.
   |- cdk.json                 - config file for CDK.
-  |- jest.config.js           - config file for unit tests.
+  |- jest.config.ts           - config file for unit tests.
   |- package.json             - package file for the aws instance scheduler CDK project.
   |- README.md                - doc file for the CDK project.
   |- run-all-tests.sh         - runs all tests within the /source folder. Referenced in the buildspec and build scripts.
