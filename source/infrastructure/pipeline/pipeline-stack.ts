@@ -80,14 +80,23 @@ class PipelineStack extends Stack {
       input: this.get_connection(),
       installCommands: [
         'pip install tox',
-        'tox -e cdk -- --ci --reporters=default --reporters=jest-junit',
+        'tox -e cdk -- --ci',
       ],
       commands: [
         'cd source/infrastructure',
-        "npx cdk synth"
+        "npx cdk synth",
+        'cd ../../deployment',
+        'ls -r',
       ],
-      partialBuildSpec:
-          this.get_reports_partial_build_spec("deployment/test-reports/cdk-test-report.xml"),
+      partialBuildSpec: codebuild.BuildSpec.fromObject({
+        reports: {
+          jest_reports: {
+            files: ["cdk-test-report.xml"],
+            "file-format": "JUNITXML",
+            "base-directory": "deployment/test-reports"
+          },
+        },
+      }),
       primaryOutputDirectory: 'deployment/cdk.out'
     });
   }

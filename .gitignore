@@ -52,7 +52,8 @@ nosetests.xml
 coverage.xml
 *,cover
 .hypothesis/
-coverage-reports/
+deployment/coverage-reports/
+deployment/test-reports/
 
 # Translations
 *.mo

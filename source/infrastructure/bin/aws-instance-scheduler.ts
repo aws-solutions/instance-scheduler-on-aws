@@ -17,6 +17,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { AwsInstanceSchedulerStack } from '../lib/aws-instance-scheduler-stack';
 import { AwsInstanceSchedulerRemoteStack } from '../lib/aws-instance-scheduler-remote-stack';
+import PipelineStack from "../pipeline/pipeline-stack";
 
 const SOLUTION_VERSION = process.env['DIST_VERSION'] || '%%VERSION%%';
 const SOLUTION_NAME = process.env['SOLUTION_NAME'] ? process.env['SOLUTION_NAME'] : "aws-instance-scheduler";
@@ -57,3 +58,4 @@ new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
     appregApplicationName: APP_REG_APPLICATION_TYPE,
     appregSolutionName: APP_REG_SOLUTION_NAME
 });
+new PipelineStack(app, 'testing-pipeline');
