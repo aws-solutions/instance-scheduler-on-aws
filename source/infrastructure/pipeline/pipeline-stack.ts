@@ -80,7 +80,8 @@ class PipelineStack extends Stack {
       input: this.get_connection(),
       installCommands: [
         'pip install tox',
-        'tox -e cdk -- --ci',
+        'tox -e cdk',
+        'tox -e lambda -- --junitxml=deployment/test-reports/lambda-test-report.xml'
       ],
       commands: [
         'cd source/infrastructure',
@@ -90,11 +91,16 @@ class PipelineStack extends Stack {
       ],
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
-          jest_reports: {
+          cdk_test_reports: {
             files: ["cdk-test-report.xml"],
             "file-format": "JUNITXML",
             "base-directory": "deployment/test-reports"
           },
+          lambda_test_reports: {
+            files: ["lambda-test-report.xml"],
+            "file-format": "JUNITXML",
+            "base-directory": "deployment/test-reports"
+          }
         },
       }),
       primaryOutputDirectory: 'deployment/cdk.out'
