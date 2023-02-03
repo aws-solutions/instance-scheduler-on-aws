@@ -20,13 +20,13 @@ class PipelineStack extends Stack {
     to GitHub to trigger the pipeline when commits are pushed.
 
     The repo is configured using SSM parameters, specifically the following:
-        - /refreezer-build/connection/owner
+        - /InstanceScheduler-build/connection/owner
         - GitHub repo owner
-        - /refreezer-build/connection/repo
+        - /InstanceScheduler-build/connection/repo
         - GitHub repo name
-        - /refreezer-build/connection/branch
+        - /InstanceScheduler-build/connection/branch
         - GitHub repo branch
-        - /refreezer-build/connection/arn
+        - /InstanceScheduler-build/connection/arn
         - CodeStar Connection ARN
 
     Set up the connection by following the documentation at
@@ -55,23 +55,23 @@ class PipelineStack extends Stack {
 
   get_connection() {
     return new CodeStarSource(
-      "CodeStarConnection",
-      StringParameter.valueForStringParameter(
-        this,
-        "/refreezer-build/connection/arn"
-      ),
-      StringParameter.valueForStringParameter(
-        this,
-        "/refreezer-build/connection/owner"
-      ),
-      StringParameter.valueForStringParameter(
-        this,
-        "/refreezer-build/connection/repo"
-      ),
-      StringParameter.valueForStringParameter(
-        this,
-        "/refreezer-build/connection/branch"
-      )
+        "CodeStarConnection",
+        StringParameter.valueForStringParameter(
+            this,
+            "/InstanceScheduler-build/connection/arn"
+        ),
+        StringParameter.valueForStringParameter(
+            this,
+            "/InstanceScheduler-build/connection/owner"
+        ),
+        StringParameter.valueForStringParameter(
+            this,
+            "/InstanceScheduler-build/connection/repo"
+        ),
+        StringParameter.valueForStringParameter(
+            this,
+            "/InstanceScheduler-build/connection/branch"
+        )
     );
   }
 
@@ -79,12 +79,16 @@ class PipelineStack extends Stack {
     return new CodeBuildStep("Synth", {
       input: this.get_connection(),
       installCommands: [
-        'pip install ".[dev]"',
-        "tox -- --junitxml=pytest-report.xml",
+        'pip install tox',
+        'tox -e cdk -- --ci --reporters=default --reporters=jest-junit',
       ],
-      commands: ["npx cdk synth"],
+      commands: [
+        'cd source/infrastructure',
+        "npx cdk synth"
+      ],
       partialBuildSpec:
-        this.get_reports_partial_build_spec("pytest-report.xml"),
+          this.get_reports_partial_build_spec("deployment/test-reports/cdk-test-report.xml"),
+      primaryOutputDirectory: 'deployment/cdk.out'
     });
   }
 
@@ -97,7 +101,7 @@ class PipelineStack extends Stack {
       envFromCfnOutputs: outputs_map,
       rolePolicyStatements: [],
       partialBuildSpec: this.get_reports_partial_build_spec(
-        "pytest-integration-report.xml"
+          "pytest-integration-report.xml"
       ),
     });
   }
