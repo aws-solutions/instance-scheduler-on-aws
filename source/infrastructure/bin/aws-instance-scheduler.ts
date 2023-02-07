@@ -19,7 +19,7 @@ import { AwsInstanceSchedulerStack } from '../lib/aws-instance-scheduler-stack';
 import { AwsInstanceSchedulerRemoteStack } from '../lib/aws-instance-scheduler-remote-stack';
 import PipelineStack from "../pipeline/pipeline-stack";
 
-const SOLUTION_VERSION = process.env['DIST_VERSION'] || '%%VERSION%%';
+const SOLUTION_VERSION = process.env['DIST_VERSION'] || 'SNAPSHOT';
 const SOLUTION_NAME = process.env['SOLUTION_NAME'] ? process.env['SOLUTION_NAME'] : "aws-instance-scheduler";
 const SOLUTION_ID = process.env['SOLUTION_ID'] ? process.env['SOLUTION_ID'] : "SO0030";
 const SOLUTION_BUCKET = process.env['DIST_OUTPUT_BUCKET'] ? process.env['DIST_OUTPUT_BUCKET'] : "";
