@@ -139,22 +139,26 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     const regions = new cdk.CfnParameter(this, 'Regions', {
       type: 'CommaDelimitedList',
-      description: 'List of regions in which instances are scheduled, leave blank for current region only.'
+      description: 'List of regions in which instances are scheduled, leave blank for current region only.',
+      default: ''
     })
 
     const crossAccountRoles = new cdk.CfnParameter(this, 'CrossAccountRoles', {
       type: 'CommaDelimitedList',
-      description: 'Comma separated list of ARN\'s for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.'
+      description: 'Comma separated list of ARN\'s for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.',
+      default: ''
     })
 
     const startedTags = new cdk.CfnParameter(this, 'StartedTags', {
       type: 'String',
-      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances'
+      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances',
+      default: ''
     })
 
     const stoppedTags = new cdk.CfnParameter(this, 'StoppedTags', {
       type: 'String',
-      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on stopped instances'
+      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on stopped instances',
+      default: ''
     })
 
     const schedulerFrequency = new cdk.CfnParameter(this, 'SchedulerFrequency', {

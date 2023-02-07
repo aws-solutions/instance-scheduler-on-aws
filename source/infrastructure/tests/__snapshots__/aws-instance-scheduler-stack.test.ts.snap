@@ -232,6 +232,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "String",
     },
     "CrossAccountRoles": {
+      "Default": "",
       "Description": "Comma separated list of ARN's for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.",
       "Type": "CommaDelimitedList",
     },
@@ -726,6 +727,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "Number",
     },
     "Regions": {
+      "Default": "",
       "Description": "List of regions in which instances are scheduled, leave blank for current region only.",
       "Type": "CommaDelimitedList",
     },
@@ -781,10 +783,12 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "String",
     },
     "StartedTags": {
+      "Default": "",
       "Description": "Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances",
       "Type": "String",
     },
     "StoppedTags": {
+      "Default": "",
       "Description": "Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on stopped instances",
       "Type": "String",
     },

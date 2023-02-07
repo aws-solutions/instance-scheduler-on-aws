@@ -55,23 +55,23 @@ class PipelineStack extends Stack {
 
   get_connection() {
     return new CodeStarSource(
-        "CodeStarConnection",
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/arn"
-        ),
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/owner"
-        ),
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/repo"
-        ),
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/branch"
-        )
+      "CodeStarConnection",
+      StringParameter.valueForStringParameter(
+        this,
+        "/InstanceScheduler-build/connection/arn"
+      ),
+      StringParameter.valueForStringParameter(
+        this,
+        "/InstanceScheduler-build/connection/owner"
+      ),
+      StringParameter.valueForStringParameter(
+        this,
+        "/InstanceScheduler-build/connection/repo"
+      ),
+      StringParameter.valueForStringParameter(
+        this,
+        "/InstanceScheduler-build/connection/branch"
+      )
     );
   }
 
@@ -114,20 +114,15 @@ class PipelineStack extends Stack {
       ],
       envFromCfnOutputs: outputs_map,
       rolePolicyStatements: [],
-      partialBuildSpec: this.get_reports_partial_build_spec(
-          "pytest-integration-report.xml"
-      ),
-    });
-  }
-
-  get_reports_partial_build_spec(filename: string) {
-    return codebuild.BuildSpec.fromObject({
-      reports: {
-        pytest_reports: {
-          files: [filename],
-          "file-format": "JUNITXML",
+      partialBuildSpec: codebuild.BuildSpec.fromObject({
+        reports: {
+          integration_test_reports: {
+            files: ["integration-test-report.xml"],
+            "file-format": "JUNITXML",
+            "base-directory": "deployment/test-reports"
+          }
         },
-      },
+      }),
     });
   }
 }
@@ -138,15 +133,15 @@ class DeployStage extends Stage {
   }
 
   instanceSchedulerStack = new AwsInstanceSchedulerStack(this, STACK_NAME, {
+    description: "AWS Instance Scheduler Test Stack",
+    solutionId: "SO0030",
+    solutionTradeMarkName: "aws-instance-scheduler",
+    solutionProvider: "AWS Solution Development",
+    solutionBucket: "",
+    solutionName: "aws-instance-scheduler",
+    solutionVersion: "TEST",
     appregApplicationName: "",
     appregSolutionName: "",
-    description: "",
-    solutionBucket: "",
-    solutionId: "",
-    solutionName: "",
-    solutionProvider: "",
-    solutionTradeMarkName: "",
-    solutionVersion: "",
   });
 }
 
