@@ -87,7 +87,6 @@ class PipelineStack extends Stack {
         'cd source/infrastructure',
         "npx cdk synth",
         'cd ../../deployment',
-        'ls -r',
       ],
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {

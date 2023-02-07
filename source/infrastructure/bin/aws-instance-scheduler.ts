@@ -58,4 +58,4 @@ new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
     appregApplicationName: APP_REG_APPLICATION_TYPE,
     appregSolutionName: APP_REG_SOLUTION_NAME
 });
-new PipelineStack(app, 'testing-pipeline');
+new PipelineStack(app, 'aws-instance-scheduler-testing-pipeline');
