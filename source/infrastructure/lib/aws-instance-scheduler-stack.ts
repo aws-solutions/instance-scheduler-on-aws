@@ -15,21 +15,21 @@
  *****************************************************************************/
 
 import * as cdk from 'aws-cdk-lib';
+import {Aws, RemovalPolicy} from 'aws-cdk-lib';
 import * as kms from 'aws-cdk-lib/aws-kms';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import {ArnPrincipal, Effect, PolicyStatement} from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as events from 'aws-cdk-lib/aws-events';
-import { ArnPrincipal, Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
-import { LambdaToDynamoDBProps, LambdaToDynamoDB } from '@aws-solutions-constructs/aws-lambda-dynamodb';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
-import { Aws, RemovalPolicy } from 'aws-cdk-lib';
-import { Construct } from "constructs";
-import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
+import {Construct} from "constructs";
+import {LambdaFunction} from "aws-cdk-lib/aws-events-targets";
 import {SUPPORTED_TIME_ZONES} from "./time-zones";
-import { AppRegistryForInstanceScheduler } from './app-registry';
+import {AppRegistryForInstanceScheduler} from './app-registry';
+import {CoreScheduler, DeploymentType} from "./aws-instance-scheduler-lambda";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 
 
 export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
@@ -47,7 +47,7 @@ export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
 /*
 * AWS instance scheduler stack, utilizes two cdk constructs, aws-lambda-dynamodb and aws-events-rule-lambda.
 * The stack has three dynamoDB tables defined for storing the state, configuration and maintenance information.
-* The stack also includes one lambda, which is scheduled using a AWS CloudWatch Event Rule. 
+* The stack also includes one lambda, which is scheduled using an AWS CloudWatch Event Rule.
 * The stack also includes a cloudwatch log group for the entire solution, encrycption key, encyrption key alias and SNS topic,
 * and the necessary AWS IAM Policies and IAM Roles. For more information on the architecture, refer to the documentation at
 * https://aws.amazon.com/solutions/implementations/instance-scheduler/?did=sl_card&trk=sl_card
@@ -244,7 +244,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       }
     }
 
-    //Start instance scheduler scheduler role reference and related references of principle, policy statement, and policy document.
+    //Start instance scheduler role reference and related references of principle, policy statement, and policy document.
     const compositePrincipal = new iam.CompositePrincipal(new iam.ServicePrincipal('events.amazonaws.com'), new iam.ServicePrincipal('lambda.amazonaws.com'))
 
     const schedulerRole = new iam.Role(this, "SchedulerRole", {
@@ -252,7 +252,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       path: '/'
     })
 
-    //End instance scheduler scheduler role reference
+    //End instance scheduler role reference
 
     //Start instance scheduler encryption key and encryption key alias.
     const instanceSchedulerEncryptionKey = new kms.Key(this, "InstanceSchedulerEncryptionKey", {
@@ -296,141 +296,34 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       masterKey: instanceSchedulerEncryptionKey
     });
 
-    //Start instance scheduler aws-lambda-dynamoDB construct reference. 
-    const lambdaToDynamoDBProps: LambdaToDynamoDBProps = {
-      lambdaFunctionProps: {
-        functionName: Aws.STACK_NAME + '-InstanceSchedulerMain',
-        description: 'EC2 and RDS instance scheduler, version ' + props["solutionVersion"],
-        code: lambda.Code.fromBucket(solutionsBucket, props["solutionTradeMarkName"] + '/' + props["solutionVersion"] + '/instance-scheduler.zip'),
-        runtime: lambda.Runtime.PYTHON_3_9,
-        handler: 'main.lambda_handler',
-        role: schedulerRole,
-        memorySize: memorySize.valueAsNumber,
-        timeout: cdk.Duration.seconds(300),
-        environment: {
-          SCHEDULER_FREQUENCY: schedulerFrequency.valueAsString,
-          TAG_NAME: tagName.valueAsString,
-          LOG_GROUP: schedulerLogGroup.logGroupName,
-          ACCOUNT: this.account,
-          ISSUES_TOPIC_ARN: snsTopic.topicArn,
-          STACK_NAME: Aws.STACK_NAME,
-          SEND_METRICS: mappings.findInMap('TrueFalse', send.findInMap('AnonymousUsage', 'Data')),
-          SOLUTION_ID: mappings.findInMap('Settings', 'MetricsSolutionId'),
-          TRACE: mappings.findInMap('TrueFalse', trace.valueAsString),
-          ENABLE_SSM_MAINTENANCE_WINDOWS: mappings.findInMap('TrueFalse', enableSSMMaintenanceWindows.valueAsString),
-          USER_AGENT: 'InstanceScheduler-' + Aws.STACK_NAME + '-' + props.solutionVersion,
-          USER_AGENT_EXTRA: `AwsSolution/${props.solutionId}/${props.solutionVersion}`,
-          METRICS_URL: mappings.findInMap('Settings', 'MetricsUrl'),
-          STACK_ID: `${cdk.Aws.STACK_ID}`,
-          UUID_KEY: send.findInMap('ParameterKey', 'UniqueId'),
-          START_EC2_BATCH_SIZE: '5'
-        }
-      },
-      dynamoTableProps: {
-        partitionKey: {
-          name: 'service',
-          type: dynamodb.AttributeType.STRING
-        },
-        sortKey: {
-          name: 'account-region',
-          type: dynamodb.AttributeType.STRING
-        },
-        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-        removalPolicy: RemovalPolicy.DESTROY,
-        pointInTimeRecovery: true
-      },
-      tablePermissions: "ReadWrite",
-
-    };
-
-    const lambdaToDynamoDb = new LambdaToDynamoDB(this, 'instance-scheduler-lambda', lambdaToDynamoDBProps);
-
-    const cfnStateTable = lambdaToDynamoDb.dynamoTable.node.defaultChild as dynamodb.CfnTable
-    cfnStateTable.overrideLogicalId('StateTable')
-    cfnStateTable.addPropertyOverride("SSESpecification", {
-      "KMSMasterKeyId": { "Ref": "InstanceSchedulerEncryptionKey" },
-      "SSEEnabled": true,
-      "SSEType": 'KMS'
+    //instance scheduler core scheduler construct reference.
+    const coreScheduler = new CoreScheduler(this, 'instance-scheduler-lambda', {
+      deploymentType: DeploymentType.SOLUTIONS_S3,
+      solutionVersion: props["solutionVersion"],
+      solutionTradeMarkName: props["solutionTradeMarkName"],
+      solutionsBucket: solutionsBucket,
+      memorySize: memorySize.valueAsNumber,
+      schedulerRole: schedulerRole,
+      environment: {
+        SCHEDULER_FREQUENCY: schedulerFrequency.valueAsString,
+        TAG_NAME: tagName.valueAsString,
+        LOG_GROUP: schedulerLogGroup.logGroupName,
+        ACCOUNT: this.account,
+        ISSUES_TOPIC_ARN: snsTopic.topicArn,
+        STACK_NAME: Aws.STACK_NAME,
+        SEND_METRICS: mappings.findInMap('TrueFalse', send.findInMap('AnonymousUsage', 'Data')),
+        SOLUTION_ID: mappings.findInMap('Settings', 'MetricsSolutionId'),
+        TRACE: mappings.findInMap('TrueFalse', trace.valueAsString),
+        ENABLE_SSM_MAINTENANCE_WINDOWS: mappings.findInMap('TrueFalse', enableSSMMaintenanceWindows.valueAsString),
+        USER_AGENT: 'InstanceScheduler-' + Aws.STACK_NAME + '-' + props.solutionVersion,
+        USER_AGENT_EXTRA: `AwsSolution/${props.solutionId}/${props.solutionVersion}`,
+        METRICS_URL: mappings.findInMap('Settings', 'MetricsUrl'),
+        STACK_ID: `${cdk.Aws.STACK_ID}`,
+        UUID_KEY: send.findInMap('ParameterKey', 'UniqueId'),
+        START_EC2_BATCH_SIZE: '5'
+      }
     })
 
-    //End instance scheduler aws-lambda-dynamoDB construct reference. 
-
-    //Start instance scheduler configuration table dynamoDB Table reference.
-
-    const configTable = new dynamodb.Table(this, 'ConfigTable', {
-      sortKey: {
-        name: 'name',
-        type: dynamodb.AttributeType.STRING
-      },
-      partitionKey: {
-        name: 'type',
-        type: dynamodb.AttributeType.STRING
-      },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.DESTROY,
-      pointInTimeRecovery: true
-    })
-
-    const cfnConfigTable = configTable.node.defaultChild as dynamodb.CfnTable
-    cfnConfigTable.overrideLogicalId('ConfigTable')
-    cfnConfigTable.addPropertyOverride("SSESpecification", {
-      "KMSMasterKeyId": { "Ref": "InstanceSchedulerEncryptionKey" },
-      "SSEEnabled": true,
-      "SSEType": 'KMS'
-    })
-
-    //End instance scheduler configuration table dynamoDB Table reference.
-
-
-    //Start instance scheduler maintenance window table dynamoDB Table reference.
-
-    const maintenanceWindowTable = new dynamodb.Table(this, 'MaintenanceWindowTable', {
-      partitionKey: {
-        name: 'Name',
-        type: dynamodb.AttributeType.STRING
-      },
-      sortKey: {
-        name: "account-region",
-        type: dynamodb.AttributeType.STRING
-      },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.DESTROY,
-      pointInTimeRecovery: true
-    })
-
-    const cfnMaintenanceWindowTable = maintenanceWindowTable.node.defaultChild as dynamodb.CfnTable
-    cfnMaintenanceWindowTable.overrideLogicalId('MaintenanceWindowTable')
-    cfnMaintenanceWindowTable.addPropertyOverride("SSESpecification", {
-      "KMSMasterKeyId": { "Ref": "InstanceSchedulerEncryptionKey" },
-      "SSEEnabled": true,
-      "SSEType": 'KMS'
-    })
-    //End instance scheduler maintenance window table dynamoDB Table reference.
-
-    //Adding all the dynamo DB references to the lambda environment variables.
-    lambdaToDynamoDb.lambdaFunction.addEnvironment('CONFIG_TABLE', cfnConfigTable.ref)
-    lambdaToDynamoDb.lambdaFunction.addEnvironment('MAINTENANCE_WINDOW_TABLE', cfnMaintenanceWindowTable.ref)
-    lambdaToDynamoDb.lambdaFunction.addEnvironment('STATE_TABLE', cfnStateTable.ref)
-
-    //Start instance scheduler database policy statement for lambda.
-
-    const dynamodbPolicy = new PolicyStatement({
-      actions: [
-        'dynamodb:DeleteItem',
-        'dynamodb:GetItem',
-        'dynamodb:PutItem',
-        'dynamodb:Query',
-        'dynamodb:Scan',
-        'dynamodb:BatchWriteItem'
-      ],
-      effect: Effect.ALLOW,
-      resources: [
-        cfnConfigTable.attrArn,
-        cfnMaintenanceWindowTable.attrArn
-      ]
-    })
-
-    lambdaToDynamoDb.lambdaFunction.addToRolePolicy(dynamodbPolicy)
     //PolicyStatement for SSM Get and Put Parameters
     const ssmParameterPolicyStatement = new PolicyStatement({
       actions: [
@@ -442,7 +335,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         cdk.Fn.sub("arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/Solutions/aws-instance-scheduler/UUID/*")
       ]
     })
-    lambdaToDynamoDb.lambdaFunction.addToRolePolicy(ssmParameterPolicyStatement)
+    coreScheduler.lambdaFunction.addToRolePolicy(ssmParameterPolicyStatement)
     //End instance scheduler database policy statement for lambda.
 
 
@@ -451,7 +344,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       schedule: events.Schedule.expression(mappings.findInMap('Timeouts', schedulerFrequency.valueAsString))
     })
 
-    schedulerRule.addTarget(new LambdaFunction(lambdaToDynamoDb.lambdaFunction))
+    schedulerRule.addTarget(new LambdaFunction(coreScheduler.lambdaFunction))
 
     const eventRule_cfn_ref = schedulerRule.node.defaultChild as events.CfnRule
     eventRule_cfn_ref.addPropertyOverride('State', mappings.findInMap('EnabledDisabled', schedulingActive.valueAsString));
@@ -463,11 +356,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     * Instance scheduler custom resource reference.
     */
     let customService = new cdk.CustomResource(this, 'ServiceSetup', {
-      serviceToken: lambdaToDynamoDb.lambdaFunction.functionArn,
+      serviceToken: coreScheduler.lambdaFunction.functionArn,
       resourceType: 'Custom::ServiceSetup',
       properties: {
         timeout: 120,
-        config_table: cfnConfigTable.ref,
+        config_table: (coreScheduler.configTable.node.defaultChild as dynamodb.CfnTable).ref,
         tagname: tagName,
         default_timezone: defaultTimezone,
         use_metrics: mappings.findInMap('TrueFalse', useCloudWatchMetrics.valueAsString),
@@ -496,7 +389,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     })
 
     new cdk.CfnOutput(this, 'ConfigurationTable', {
-      value: cfnConfigTable.attrArn,
+      value: (coreScheduler.configTable.node.defaultChild as dynamodb.CfnTable).attrArn,
       description: 'Name of the DynamoDB configuration table'
     })
 
@@ -511,7 +404,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     })
 
     new cdk.CfnOutput(this, 'ServiceInstanceScheduleServiceToken', {
-      value: lambdaToDynamoDb.lambdaFunction.functionArn,
+      value: coreScheduler.lambdaFunction.functionArn,
       description: 'Arn to use as ServiceToken property for custom resource type Custom::ServiceInstanceSchedule'
     })
 
@@ -663,7 +556,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     })
 
     //Adding the EC2 and scheduling policy dependencies to the lambda. 
-    const lambdaFunction = lambdaToDynamoDb.lambdaFunction.node.defaultChild as lambda.CfnFunction
+    const lambdaFunction = coreScheduler.lambdaFunction.node.defaultChild as lambda.CfnFunction
     lambdaFunction.addDependency(ec2DynamoDBPolicy.node.defaultChild as iam.CfnPolicy)
     lambdaFunction.addDependency(ec2Permissions.node.defaultChild as iam.CfnPolicy)
     lambdaFunction.addDependency(schedulerPolicy.node.defaultChild as iam.CfnPolicy)
