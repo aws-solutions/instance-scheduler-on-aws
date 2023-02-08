@@ -1508,7 +1508,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "Custom::ServiceSetup",
       "UpdateReplacePolicy": "Delete",
     },
-    "SchedulerEventRuleAllowEventRulestackinstanceschedulerlambdaLambdaFunction84B79C6A71C84E7F": {
+    "SchedulerEventRuleAllowEventRulestackinstanceschedulerlambdaLambdaFunctionB03951D4875046F3": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -1860,7 +1860,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "AWS::DynamoDB::Table",
       "UpdateReplacePolicy": "Delete",
     },
-    "instanceschedulerlambdaLambdaFunctionServiceRoleEBF44CD1": {
+    "instanceschedulerlambdaLambdaFunctionServiceRole52771BBE": {
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
