@@ -154,12 +154,9 @@ class RunningPeriod:
 
         self._logger = logger
 
-        state = InstanceSchedule.STATE_STOPPED
-
         self._log_debug(DEBUG_CHECK_DT, self.name)
         for check in [check_weekday, check_month, check_monthday]:
             if not check(current_dt):
-                return state
+                return InstanceSchedule.STATE_STOPPED
 
-        state = check_time(current_dt)
-        return state
+        return check_time(current_dt)
