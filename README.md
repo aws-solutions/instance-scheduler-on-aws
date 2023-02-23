@@ -1,17 +1,19 @@
-# AWS Instance Scheduler (ID SO0030)
+# Instance Scheduler on AWS (ID SO0030)
 
 Scheduler for Cross-Account and Cross-Region scheduling for EC2 and RDS instances
 
 ## Getting Started
 
-To get started with the AWS Instance Scheduler, please review the solution documentation. [AWS Instance Scheduler](https://aws.amazon.com/solutions/implementations/instance-scheduler/?did=sl_card&trk=sl_card)
+To get started with Instance Scheduler, please review the solution documentation. 
+[Instance Scheduler on AWS](https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/)
 
 ## Building from GitHub
 ***
 
 ### Overview of the process
 
-Building from GitHub source will allow you to modify the solution. The process consists of downloading the source from GitHub, creating buckets to be used for deployment, building the solution, and uploading the artifacts needed for deployment.
+Building from GitHub source will allow you to modify the solution. The process consists of downloading the source from 
+GitHub, creating buckets to be used for deployment, building the solution, and uploading the artifacts needed for deployment.
 
 #### You will need:
 
@@ -21,55 +23,25 @@ Building from GitHub source will allow you to modify the solution. The process c
 
 ### Download from GitHub
 
-Clone or download the repository to a local directory on your linux client. Note: if you intend to modify Ops Automator you may wish to create your own fork of the GitHub repo and work from that. This allows you to check in any changes you make to your private copy of the solution.
+Clone the repository to a local directory on your linux client. Note: if you intend to 
+modify Instance Scheduler you may wish to create your own fork of the GitHub repo and work from that. 
+This allows you to check in any changes you make to your private copy of the solution.
 
-**Git Clone example:**
 
-```
-git clone https://github.com/awslabs/aws-instance-scheduler.git
-```
-
-**Download Zip example:**
-```
-wget https://github.com/awslabs/aws-instance-scheduler/archive/master.zip
-```
-
-#### Repository Organization
+## Repository Organization
 
 ```
 |- deployment/                - contains build scripts, deployment templates, and dist folders for staging assets.
-  |- build-open-source-dist.sh  - builds the open source package with cleaned assets and builds a .zip file in the /open-source folder for distribution to GitHub
   |- build-s3-dist.sh         - builds the solution and copies artifacts to the appropriate /global-s3-assets or /regional-s3-assets folders.
-  |- run-unit-tests.sh         - runs the unit tests for the lambda files.
+  |- run-unit-tests.sh        - runs the unit tests for the lambda files.
 |- source/                    - all source code, scripts, tests, etc.
-  |- bin/
-    |- aws-instance-scheduler.ts - the AWS Instance scheduler cdk app.
-  |- cli/                     - scheduler-cli source files.
-  |- lambda/                  - Lambda function with source code and test cases.        
-  |- lib/
-    |- aws-instance-scheduler-stack.ts  - the main CDK stack for aws instance scheduler solution.
-    |- aws-instance-scheduler-remote-stack.ts  - the main CDK stack for aws instance scheduler solution remote template.
-  |- test/
-    |- __snapshots__/
-    |- aws-instance-scheduler-remote-stack.test.ts   - unit and snapshot tests for aws instance scheduler remote stack.
-    |- aws-instance-scheduler-stack.test.ts   - unit and snapshot tests for aws instance scheduler.
-  |- cdk.json                 - config file for CDK.
-  |- jest.config.ts           - config file for unit tests.
-  |- package.json             - package file for the aws instance scheduler CDK project.
-  |- README.md                - doc file for the CDK project.
-  |- run-all-tests.sh         - runs all tests within the /source folder. Referenced in the buildspec and build scripts.
-  |- tsconfig.json            - typescript configurations.
-|- .gitignore
-|- CHANGELOG.md               - required for every solution to include changes based on version to auto-build release notes.
-|- CODE_OF_CONDUCT.md         - standardized open source file for all solutions.
-|- CONTRIBUTING.md            - standardized open source file for all solutions.
-|- LICENSE.txt                - required open source file for all solutions - should contain the Apache 2.0 license.
-|- NOTICE.txt                 - required open source file for all solutions - should contain references to all 3rd party libraries.
-|- README.md                  - required file for all solutions.
-
+  |- app/                     - lambda source file
+  |- cli/                     - scheduler-cli source files
+  |- infrastructure/          - cdk source files
+    |- pipeline               - automated testing pipeline source files
 ```
 
-### Build
+## Deploy the Solution From Github
 
 AWS Solutions use two buckets: a bucket for global access to templates, which is accessed via HTTPS, and regional buckets for access to assets within the region, such as Lambda code. You will need:
 
@@ -86,15 +58,7 @@ chmod +x build-s3-dist.sh
 build-s3-dist.sh <bucketname> aws-instance-scheduler <version>
 ```
 
-**Run Unit Tests**
 
-```
-cd ./deployment
-chmod +x ./run-unit-tests.sh
-./run-unit-tests.sh
-```
-
-Confirm that all unit tests pass.
 
 **Upload to your buckets**
 
@@ -109,11 +73,87 @@ s3://mybucket/aws-instance-scheduler/v1.4.0/instance-scheduler.template
 s3://mybucket/aws-instance-scheduler/v1.4.0/instance-scheduler-remote.template
 ```
 
-## Deploy
+### Deploy
 
 See the [AWS Instance Scheduler Implementation Guide](https://s3.amazonaws.com/solutions-reference/aws-instance-scheduler/latest/instance-scheduler.pdf) for deployment instructions, using the link to the instance-scheduler.template from your bucket, rather than the one for AWS Solutions. Ex. https://mybucket.s3.amazonaws.com/aws-instance-scheduler/v1.4.0.mybuild/instance-scheduler.template
 
-## CDK Documentation
+
+# Testing the Solution
+
+## Running Tests Locally
+To test the solution you will need to install tox
+
+```
+pip install tox
+```
+
+Then from the root directory of the solution
+```
+//run all unit tests
+tox
+
+//test just the lambda code
+tox -e lambda
+
+//test just the cdk code
+tox -e cdk
+```
+
+## Automated Testing Pipeline
+
+#### _Prerequisites - You must have an AWS account and a fork of this repo_
+
+Instance Scheduler on AWS includes an optional automated testing pipeline that can be deployed to automatically test any changes you
+develop for the solution on your own development fork. Once setup, this pipeline will automatically download, 
+build, and test any changes that you push to a specified branch on your development fork.
+
+
+
+### Step 1 - Connect CodeStar to Your Github Account
+
+For the pipeline to be able to test your changes, you must provide permission for CodeStar to 
+access your development repo
+
+https://docs.aws.amazon.com/dtconsole/latest/userguide/connections-create-github.html
+
+_note: codestar only needs access to your Instance Scheduler development fork, it does not need access to all repositories_
+
+Once the connection has been setup, make sure you save the connection ARN for the next step
+
+### Step 2 -  Setup Pipeline Parameters
+Go to [Systems Manager Parameter Store](https://us-east-1.console.aws.amazon.com/systems-manager/parameters) 
+and configure the following string parameters
+
+- /InstanceScheduler-build/connection/arn    -- the CodeStar connection ARN from the previous step
+- /InstanceScheduler-build/connection/owner  -- the github owner of your fork
+- /InstanceScheduler-build/connection/repo   -- the repo name of your fork
+- /InstanceScheduler-build/connection/branch -- The branch in your fork that you want to test
+
+For example, if your github username is "myUser" and you would like to test changes pushed to the develop branch of your fork
+the values you would need to set would be:
+```
+arn = {arn from Step 1}
+owner = myUser
+repo = aws-instance-scheduler
+branch = develop
+```
+
+### Step 3 - Deploy the Testing Pipeline
+
+```
+cd /source/infrastructure
+cdk bootstrap
+cdk deploy testing-pipeline
+```
+This will deploy the automated testing pipeline into your AWS account which will then begin running tests against your
+development fork automatically
+
+To view the results. Go to [CodePipeline](https://us-east-1.console.aws.amazon.com/codesuite/codepipeline/pipelines) and
+click on the pipeline that begins with aws-instance-scheduler-testing-pipeline
+
+(note - the final deployment stage failing is expected. this will be fixed in a later PR)
+
+# CDK Documentation
 
 AWS Instance Scheduler templates are generated using AWS CDK, for further information on CDK please refer to the [documentation](https://docs.aws.amazon.com/cdk/latest/guide/getting_started.html)
 
