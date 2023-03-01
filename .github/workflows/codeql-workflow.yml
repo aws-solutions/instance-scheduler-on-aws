@@ -1,0 +1,23 @@
+name: CodeQL
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+on: [push, pull_request]
+
+jobs:
+  codeql:
+    name: CodeQL Check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ javascript, typescript, python ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: github/codeql-action/init@v2
+        with:
+            languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v2
