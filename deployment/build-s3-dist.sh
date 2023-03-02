@@ -78,10 +78,10 @@ echo "npm install"
 npm install
 
 # Run 'cdk synth' to generate raw solution outputs
-echo "cd "$cdk_source_dir""
+echo "cd $cdk_source_dir"
 cd "$cdk_source_dir"
 echo "node_modules/aws-cdk/bin/cdk synth --output=$staging_dist_dir"
-npm run build && node_modules/aws-cdk/bin/cdk synth --output=$staging_dist_dir --no-version-reporting
+node_modules/aws-cdk/bin/cdk synth --output=$staging_dist_dir --no-version-reporting
 
 # Remove unnecessary output files
 echo "cd $staging_dist_dir"
