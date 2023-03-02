@@ -244,6 +244,14 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
     },
     "EC2SchedulerCrossAccountRole": {
       "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+            },
+          ],
+        },
         "cfn_nag": {
           "rules_to_suppress": [
             {
@@ -358,6 +366,16 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "AWS::IAM::Role",
     },
     "Ec2ModifyInstanceAttrPolicy4B693ACF": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+            },
+          ],
+        },
+      },
       "Properties": {
         "PolicyDocument": {
           "Statement": [

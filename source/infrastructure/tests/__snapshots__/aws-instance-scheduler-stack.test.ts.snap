@@ -1009,6 +1009,14 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
     },
     "EC2DynamoDBPolicy": {
       "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+            },
+          ],
+        },
         "cfn_nag": {
           "rules_to_suppress": [
             {
@@ -1078,6 +1086,16 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "AWS::IAM::Policy",
     },
     "Ec2PermissionsB6E87802": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "This Lambda function needs to be able to modify ec2 instances for scheduling purposes.",
+            },
+          ],
+        },
+      },
       "Properties": {
         "PolicyDocument": {
           "Statement": [
@@ -1555,6 +1573,16 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "UpdateReplacePolicy": "Delete",
     },
     "SchedulerPolicy": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+            },
+          ],
+        },
+      },
       "Properties": {
         "PolicyDocument": {
           "Statement": [
@@ -1623,6 +1651,16 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "AWS::IAM::Policy",
     },
     "SchedulerRDSPolicy2E7C328A": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+            },
+          ],
+        },
+      },
       "Properties": {
         "PolicyDocument": {
           "Statement": [
@@ -1857,6 +1895,16 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "UpdateReplacePolicy": "Delete",
     },
     "instanceschedulerlambdaLambdaFunctionServiceRoleEBF44CD1": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-IAM5",
+              "reason": "This Lambda function needs to be able to write a log streams for each scheduler execution (1 per account/region/service)",
+            },
+          ],
+        },
+      },
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [

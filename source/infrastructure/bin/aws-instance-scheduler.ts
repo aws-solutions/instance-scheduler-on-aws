@@ -18,6 +18,8 @@ import * as cdk from 'aws-cdk-lib';
 import { AwsInstanceSchedulerStack } from '../lib/aws-instance-scheduler-stack';
 import { AwsInstanceSchedulerRemoteStack } from '../lib/aws-instance-scheduler-remote-stack';
 import PipelineStack from "../pipeline/pipeline-stack";
+import {Aspects} from "aws-cdk-lib";
+import {AwsSolutionsChecks, NagSuppressions} from "cdk-nag";
 
 const SOLUTION_VERSION = process.env['DIST_VERSION'] || '%%VERSION%%';
 const SOLUTION_NAME = process.env['SOLUTION_NAME'] ? process.env['SOLUTION_NAME'] : "aws-instance-scheduler";
@@ -30,7 +32,7 @@ const APP_REG_SOLUTION_NAME = process.env['APP_REG_SOLUTION_NAME'] ? process.env
 
 const app = new cdk.App();
 
-new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
+const hubStack = new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
     synthesizer: new cdk.DefaultStackSynthesizer({
         generateBootstrapVersionRule: false
     }),
@@ -59,3 +61,15 @@ new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
     appregSolutionName: APP_REG_SOLUTION_NAME
 });
 new PipelineStack(app, 'aws-instance-scheduler-testing-pipeline');
+
+
+NagSuppressions.addResourceSuppressionsByPath(hubStack, "/aws-instance-scheduler/SchedulerRole/DefaultPolicy/Resource", [
+    {
+        id: "AwsSolutions-IAM5",
+        reason: "The scheduling lambda must access multiple resources across services"
+    }
+])
+
+Aspects.of(app).add(new AwsSolutionsChecks({
+    verbose: true
+}))
