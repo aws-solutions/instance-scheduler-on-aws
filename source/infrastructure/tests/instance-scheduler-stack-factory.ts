@@ -15,8 +15,8 @@
 
 import * as instanceSchedulerHubStack from '../lib/aws-instance-scheduler-stack';
 import * as instanceSchedulerSpokeStack from '../lib/aws-instance-scheduler-remote-stack';
-import '@aws-cdk/assert/jest';
 import * as cdk from 'aws-cdk-lib';
+import {DefaultStackSynthesizer} from "aws-cdk-lib";
 
 export function createHubStack(): cdk.Stack {
   const app = new cdk.App();
@@ -31,7 +31,8 @@ export function createHubStack(): cdk.Stack {
     solutionName: 'aws-instance-scheduler',
     solutionVersion: 'v1.5.0',
     appregApplicationName: "AWS-Solutions",
-    appregSolutionName: "instance-scheduler-on-aws"
+    appregSolutionName: "instance-scheduler-on-aws",
+    synthesizer: new DefaultStackSynthesizer(({ generateBootstrapVersionRule: false}))
   })
 
   const instanceSchedulerStackMetadata =
@@ -150,8 +151,10 @@ export function createSpokeStack(): cdk.Stack {
     solutionName: 'aws-instance-scheduler',
     solutionVersion: 'v1.5.0',
     appregApplicationName: "AWS-Solutions",
-    appregSolutionName: "instance-scheduler-on-aws"
+    appregSolutionName: "instance-scheduler-on-aws",
+    synthesizer: new DefaultStackSynthesizer(({ generateBootstrapVersionRule: false}))
   })
+
 
   const instanceSchedulerRemoteStackMetadata =
   {

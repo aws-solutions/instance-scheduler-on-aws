@@ -13,13 +13,12 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
- import { SynthUtils } from '@aws-cdk/assert';
- import '@aws-cdk/assert/jest';
+ import {Template} from 'aws-cdk-lib/assertions';
  import {createHubStack} from './instance-scheduler-stack-factory';
 
  /*
   * SnapShot Testing for the AwsInstanceSchedulerStack.
   */
  test('AwsInstanceSchedulerStack snapshot test', () => {
-   expect(SynthUtils.toCloudFormation(createHubStack())).toMatchSnapshot();
+   expect(Template.fromStack(createHubStack())).toMatchSnapshot();
  });
