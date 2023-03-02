@@ -13,14 +13,13 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
- import { SynthUtils } from '@aws-cdk/assert';
- import '@aws-cdk/assert/jest';
+
  import {createSpokeStack} from './instance-scheduler-stack-factory';
+import {Template} from "aws-cdk-lib/assertions";
 
  /*
   * SnapShot Testing for the AwsInstanceSchedulerStack.
   */
  test('AwsInstanceSchedulerStack snapshot test', () => {
-   expect(SynthUtils.toCloudFormation(createSpokeStack())).toMatchSnapshot();
+   expect(Template.fromStack(createSpokeStack())).toMatchSnapshot();
  });
- 
