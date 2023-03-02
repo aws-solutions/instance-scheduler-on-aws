@@ -22,7 +22,9 @@
     "strictNullChecks": true,
     "strictPropertyInitialization": true,
     "stripInternal": true,
-    "target": "ES2018"
+    "target": "ES2022",
+    "allowJs" : false,
+    "outDir" : "../../deployment/cdk.dist",
   },
   "include": [
     "**/*.ts"
