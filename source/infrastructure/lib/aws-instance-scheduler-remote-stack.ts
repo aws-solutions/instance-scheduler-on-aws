@@ -19,6 +19,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import { ArnPrincipal, CompositePrincipal, Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import { AppRegistryForInstanceScheduler } from './app-registry';
+import {NagSuppressions} from "cdk-nag";
 
 export interface AwsInstanceSchedulerRemoteStackProps extends cdk.StackProps {
     readonly description: string,
@@ -139,7 +140,7 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
             }
         })
 
-        new iam.Policy(this, "Ec2ModifyInstanceAttrPolicy", {
+        const ec2ModifyInstancePolicy = new iam.Policy(this, "Ec2ModifyInstanceAttrPolicy", {
             roles: [ec2SchedulerCrossAccountRole],
             statements: [
                 new PolicyStatement({
@@ -153,6 +154,11 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                 })
             ]
         })
+
+        NagSuppressions.addResourceSuppressions(ec2ModifyInstancePolicy, [{
+            id: "AwsSolutions-IAM5",
+            reason: "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+        }])
 
         //CFN Output
         new cdk.CfnOutput(this, 'CrossAccountRole', {
@@ -172,6 +178,13 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                 ]
             }
         }
+        NagSuppressions.addResourceSuppressions(
+          ec2SchedulerCrossAccountRole_cfn_ref,
+          [{
+              id: "AwsSolutions-IAM5",
+              reason: "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+          }]
+        )
 
         const stack = cdk.Stack.of(this)
 

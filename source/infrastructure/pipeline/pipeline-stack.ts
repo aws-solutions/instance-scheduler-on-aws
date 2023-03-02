@@ -9,6 +9,7 @@ import { Stack, Stage } from "aws-cdk-lib";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
 import { AwsInstanceSchedulerStack } from "../lib/aws-instance-scheduler-stack";
+import {NagSuppressions} from "cdk-nag";
 
 const DEPLOY_STAGE_NAME = "test-deploy";
 const STACK_NAME = "InstanceScheduler";
@@ -51,6 +52,28 @@ class PipelineStack extends Stack {
     pipeline.addStage(deployStage, {
       post: [this.getIntegrationTestStep({})],
     });
+
+
+
+    //pipeline must be built before findings can be suppressed
+    pipeline.buildPipeline();
+    NagSuppressions.addStackSuppressions(this, [
+      {
+        id: "AwsSolutions-IAM5",
+        reason: "necessary permissions for the pipeline to build, update, and self-mutate"
+      },
+      {
+        id: "AwsSolutions-CB4",
+        reason: "Update step provided by construct"
+      }
+    ]);
+
+    NagSuppressions.addResourceSuppressions(pipeline.pipeline.artifactBucket, [
+      {
+        id: "AwsSolutions-S1",
+        reason: "Bucket is used internally by the pipeline and does not need access logging"
+      }
+    ]);
   }
 
   get_connection() {

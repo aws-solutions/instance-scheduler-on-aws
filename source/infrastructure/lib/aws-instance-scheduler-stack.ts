@@ -30,6 +30,7 @@ import { Construct } from "constructs";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import {SUPPORTED_TIME_ZONES} from "./time-zones";
 import { AppRegistryForInstanceScheduler } from './app-registry';
+import {NagSuppressions} from "cdk-nag";
 
 
 export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
@@ -244,15 +245,14 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       }
     }
 
-    //Start instance scheduler scheduler role reference and related references of principle, policy statement, and policy document.
+    //Start scheduler role reference and related references of principle, policy statement, and policy document.
     const compositePrincipal = new iam.CompositePrincipal(new iam.ServicePrincipal('events.amazonaws.com'), new iam.ServicePrincipal('lambda.amazonaws.com'))
 
     const schedulerRole = new iam.Role(this, "SchedulerRole", {
       assumedBy: compositePrincipal,
       path: '/'
     })
-
-    //End instance scheduler scheduler role reference
+    //End scheduler role reference
 
     //Start instance scheduler encryption key and encryption key alias.
     const instanceSchedulerEncryptionKey = new kms.Key(this, "InstanceSchedulerEncryptionKey", {
@@ -574,6 +574,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       roles: [schedulerRole]
     })
 
+    NagSuppressions.addResourceSuppressions(ec2Permissions, [{
+      id: "AwsSolutions-IAM5",
+      reason: "This Lambda function needs to be able to modify ec2 instances for scheduling purposes."
+    }])
+
     const ec2DynamoDBPolicy = new iam.Policy(this, "EC2DynamoDBPolicy", {
       roles: [schedulerRole],
       policyName: 'EC2DynamoDBPolicy',
@@ -653,6 +658,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       policyName: 'SchedulerPolicy',
       statements: [schedulerPolicyStatement2, schedulerPolicyStatement3, schedulerPolicyStatement4, schedulerPolicyStatement5, schedulerPolicyStatement6]
     })
+    NagSuppressions.addResourceSuppressions(schedulerPolicy, [{
+      id: "AwsSolutions-IAM5",
+      reason: "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+    }])
+
 
     const schedulerRDSPolicy  = new iam.Policy(this, "SchedulerRDSPolicy", {
       roles:[schedulerRole],
@@ -661,6 +671,10 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         schedulerPolicyStatement7
       ]
     })
+    NagSuppressions.addResourceSuppressions(schedulerRDSPolicy, [{
+      id: "AwsSolutions-IAM5",
+      reason: "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+    }])
 
     //Adding the EC2 and scheduling policy dependencies to the lambda. 
     const lambdaFunction = lambdaToDynamoDb.lambdaFunction.node.defaultChild as lambda.CfnFunction
@@ -687,6 +701,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       }
     }
 
+    NagSuppressions.addResourceSuppressions(lambdaToDynamoDb.node.findChild("LambdaFunctionServiceRole"), [{
+      id: "AwsSolutions-IAM5",
+      reason: "This Lambda function needs to be able to write a log streams for each scheduler execution (1 per account/region/service)"
+    }])
+
     //Cloud Formation cfn references for ensuring the resource names are similar to earlier releases, and additional metadata for the cfn nag rules.
     const instanceSchedulerEncryptionKey_cfn_ref = instanceSchedulerEncryptionKey.node.defaultChild as kms.CfnKey
     instanceSchedulerEncryptionKey_cfn_ref.overrideLogicalId('InstanceSchedulerEncryptionKey')
@@ -707,6 +726,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         ]
       }
     }
+
+    NagSuppressions.addResourceSuppressions(ec2DynamoDBPolicy_cfn_ref, [{
+      id: "AwsSolutions-IAM5",
+      reason: "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+    }])
 
     const schedulerPolicy_cfn_Ref = schedulerPolicy.node.defaultChild as iam.CfnPolicy
     schedulerPolicy_cfn_Ref.overrideLogicalId('SchedulerPolicy')
