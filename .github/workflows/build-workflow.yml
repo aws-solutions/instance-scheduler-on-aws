@@ -1,0 +1,21 @@
+name: CDK-Build
+on: [push, pull_request]
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: source/infrastructure/package-lock.json
+      - name: npm build
+        working-directory: source/infrastructure
+        run: |
+          npm ci
+          npm run build
