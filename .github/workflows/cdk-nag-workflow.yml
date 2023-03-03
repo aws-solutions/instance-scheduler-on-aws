@@ -1,4 +1,4 @@
-# Workflow that runs unit test
+# Workflow that runs cdk-nag via cdk synth
 name: CDK Nag
 
 on: [push, pull_request]
