@@ -1,4 +1,4 @@
-name: Pull Request Workflow
+name: Viperlight
 
 on: 
   pull_request:

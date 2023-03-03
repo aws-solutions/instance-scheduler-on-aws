@@ -1,4 +1,4 @@
-name: CDK-Build
+name: Typescript Build
 on: [push, pull_request]
 jobs:
   build:
