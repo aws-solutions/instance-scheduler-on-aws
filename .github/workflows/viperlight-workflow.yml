@@ -1,8 +1,6 @@
 name: Viperlight
 
-on: 
-  pull_request:
-    types: [opened, edited, reopened, synchronize]
+on: [push, pull_request]
 
 jobs:
   pull-request-job:
