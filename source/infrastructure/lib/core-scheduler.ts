@@ -142,7 +142,7 @@ function extractLambdaToDynamoPropsFrom(props: InstanceSchedulerLambdaProps) : L
     lambdaFunctionProps: {
       functionName: Aws.STACK_NAME + '-InstanceSchedulerMain',
       description: 'EC2 and RDS instance scheduler, version ' + props.solutionVersion,
-      code: lambda.Code.fromBucket(props.solutionsBucket!, props.solutionTradeMarkName + '/' + props.solutionVersion + '/instance-scheduler.zip'),
+      code: lambda.Code.fromAsset( "../app"),
       runtime: lambda.Runtime.PYTHON_3_9,
       handler: 'main.lambda_handler',
       role: props.schedulerRole,
