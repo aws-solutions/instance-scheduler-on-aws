@@ -164,7 +164,6 @@ class DeployStage extends Stage {
     appregApplicationName: "",
     appregSolutionName: "",
     description: "",
-    solutionBucket: "",
     solutionId: "",
     solutionName: "",
     solutionProvider: "",
