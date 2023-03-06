@@ -232,6 +232,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "String",
     },
     "CrossAccountRoles": {
+      "Default": "",
       "Description": "Comma separated list of ARN's for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.",
       "Type": "CommaDelimitedList",
     },
@@ -726,6 +727,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "Number",
     },
     "Regions": {
+      "Default": "",
       "Description": "List of regions in which instances are scheduled, leave blank for current region only.",
       "Type": "CommaDelimitedList",
     },
@@ -781,10 +783,12 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "String",
     },
     "StartedTags": {
+      "Default": "",
       "Description": "Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances",
       "Type": "String",
     },
     "StoppedTags": {
+      "Default": "",
       "Description": "Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on stopped instances",
       "Type": "String",
     },
@@ -1240,8 +1244,8 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       },
       "Properties": {
         "Code": {
-          "S3Bucket": "solutions-eu-west-1",
-          "S3Key": "aws-instance-scheduler/v1.5.0/instance-scheduler.zip",
+          "S3Bucket": "cdk-hnb659fds-assets-111111111111-eu-west-1",
+          "S3Key": "7c4c123fd757ba6eff670a577b4458410dedfb4c007924b54153f2f2911e4863.zip",
         },
         "Description": "EC2 and RDS instance scheduler, version v1.5.0",
         "Environment": {

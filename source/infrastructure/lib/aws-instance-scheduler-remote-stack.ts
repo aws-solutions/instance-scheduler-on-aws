@@ -26,7 +26,6 @@ export interface AwsInstanceSchedulerRemoteStackProps extends cdk.StackProps {
     readonly solutionId: string,
     readonly solutionTradeMarkName: string,
     readonly solutionProvider: string,
-    readonly solutionBucket: string,
     readonly solutionName: string,
     readonly solutionVersion: string,
     readonly appregApplicationName: string,

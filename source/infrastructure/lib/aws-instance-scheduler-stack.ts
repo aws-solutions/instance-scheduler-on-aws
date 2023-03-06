@@ -21,7 +21,6 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import {ArnPrincipal, Effect, PolicyStatement} from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as events from 'aws-cdk-lib/aws-events';
 import {Construct} from "constructs";
@@ -38,7 +37,6 @@ export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
   readonly solutionId: string,
   readonly solutionTradeMarkName: string,
   readonly solutionProvider: string,
-  readonly solutionBucket: string,
   readonly solutionName: string,
   readonly solutionVersion: string,
   readonly appregApplicationName: string,
@@ -140,22 +138,26 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     const regions = new cdk.CfnParameter(this, 'Regions', {
       type: 'CommaDelimitedList',
-      description: 'List of regions in which instances are scheduled, leave blank for current region only.'
+      description: 'List of regions in which instances are scheduled, leave blank for current region only.',
+      default: ''
     })
 
     const crossAccountRoles = new cdk.CfnParameter(this, 'CrossAccountRoles', {
       type: 'CommaDelimitedList',
-      description: 'Comma separated list of ARN\'s for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.'
+      description: 'Comma separated list of ARN\'s for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.',
+      default: ''
     })
 
     const startedTags = new cdk.CfnParameter(this, 'StartedTags', {
       type: 'String',
-      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances'
+      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances',
+      default: ''
     })
 
     const stoppedTags = new cdk.CfnParameter(this, 'StoppedTags', {
       type: 'String',
-      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on stopped instances'
+      description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on stopped instances',
+      default: ''
     })
 
     const schedulerFrequency = new cdk.CfnParameter(this, 'SchedulerFrequency', {
@@ -216,13 +218,6 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       appregSolutionName: props.appregSolutionName,
       appregAppName: props.appregApplicationName
     })
-
-    /*
-    * Instance Scheduler solutions bucket reference.  
-    */
-    const solutionsBucket = s3.Bucket.fromBucketAttributes(this, 'SolutionsBucket', {
-      bucketName: props["solutionBucket"] + '-' + this.region
-    });
 
     /*
     * Instance Scheduler solutions log group reference.
@@ -300,7 +295,6 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     const coreScheduler = new CoreScheduler(this,  {
       solutionVersion: props.solutionVersion,
       solutionTradeMarkName: props.solutionTradeMarkName,
-      solutionsBucket: solutionsBucket,
       memorySize: memorySize.valueAsNumber,
       schedulerRole: schedulerRole,
       kmsEncryptionKey: instanceSchedulerEncryptionKey,
@@ -375,7 +369,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         log_retention_days: logRetention.valueAsNumber,
         started_tags: startedTags.valueAsString,
         stopped_tags: stoppedTags.valueAsString,
-        stack_version: props["solutionVersion"]
+        stack_version: props.solutionVersion
       }
     })
 
