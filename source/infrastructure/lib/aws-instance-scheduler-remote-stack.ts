@@ -24,7 +24,6 @@ import {NagSuppressions} from "cdk-nag";
 export interface AwsInstanceSchedulerRemoteStackProps extends cdk.StackProps {
     readonly description: string,
     readonly solutionId: string,
-    readonly solutionTradeMarkName: string,
     readonly solutionProvider: string,
     readonly solutionName: string,
     readonly solutionVersion: string,
