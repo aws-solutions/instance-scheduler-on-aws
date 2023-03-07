@@ -20,23 +20,19 @@ import { AwsInstanceSchedulerRemoteStack } from '../lib/aws-instance-scheduler-r
 import PipelineStack from "../pipeline/pipeline-stack";
 import {Aspects, DefaultStackSynthesizer} from "aws-cdk-lib";
 import {AwsSolutionsChecks, NagSuppressions} from "cdk-nag";
+import {getSolutionContext} from "./cdk-context";
 
-const SOLUTION_VERSION = process.env['DIST_VERSION'] || 'DEV-SNAPSHOT';
-const SOLUTION_ID = process.env['SOLUTION_ID'] ? process.env['SOLUTION_ID'] : "SO0030";
 const SOLUTION_TMN = process.env['SOLUTION_TRADEMARKEDNAME'] ? process.env['SOLUTION_TRADEMARKEDNAME'] : "aws-instance-scheduler";
 const SOLUTION_PROVIDER = 'AWS Solution Development';
-const APP_REG_APPLICATION_TYPE = process.env['APP_REG_APPLICATION_TYPE'] ? process.env['APP_REG_APPLICATION_TYPE'] : 'AWS-Solutions';
-const APP_REG_SOLUTION_NAME = process.env['APP_REG_SOLUTION_NAME'] ? process.env['APP_REG_SOLUTION_NAME'] : "instance-scheduler-on-aws";
 
 
-const SOLUTION_NAME = process.env['SOLUTION_NAME'] ? process.env['SOLUTION_NAME'] : "aws-instance-scheduler";
-const { DIST_OUTPUT_BUCKET, VERSION } = process.env;
 
 let synthesizer = new DefaultStackSynthesizer({
     generateBootstrapVersionRule: false,
 });
 
 // Solutions pipeline deployment
+const { DIST_OUTPUT_BUCKET, SOLUTION_NAME, VERSION } = process.env;
 if (DIST_OUTPUT_BUCKET && SOLUTION_NAME && VERSION)
     synthesizer = new DefaultStackSynthesizer({
         generateBootstrapVersionRule: false,
@@ -45,30 +41,32 @@ if (DIST_OUTPUT_BUCKET && SOLUTION_NAME && VERSION)
     });
 
 const app = new cdk.App();
+const solutionDetails = getSolutionContext(app);
 
 const hubStack = new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
     synthesizer: synthesizer,
-    description: `(${SOLUTION_ID}) - The AWS CloudFormation template for deployment of the ${SOLUTION_NAME}, version: ${SOLUTION_VERSION}`,
-    solutionId: SOLUTION_ID,
+    description: `(${solutionDetails.solutionId}) - The AWS CloudFormation template for deployment of the ${solutionDetails.solutionName}, version: ${solutionDetails.solutionVersion}`,
+    solutionId: solutionDetails.solutionId,
     solutionTradeMarkName: SOLUTION_TMN,
     solutionProvider: SOLUTION_PROVIDER,
-    solutionName: SOLUTION_NAME,
-    solutionVersion: SOLUTION_VERSION,
-    appregApplicationName: APP_REG_APPLICATION_TYPE,
-    appregSolutionName: APP_REG_SOLUTION_NAME
+    solutionName: solutionDetails.solutionName,
+    solutionVersion: solutionDetails.solutionVersion,
+    appregApplicationName: solutionDetails.appRegAppName,
+    appregSolutionName: solutionDetails.appRegSolutionName
 });
 
 new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
     synthesizer: synthesizer,
-    description:  `(${SOLUTION_ID}S) - The AWS CloudFormation template for ${SOLUTION_NAME} cross account role, version: ${SOLUTION_VERSION}`,
-    solutionId: SOLUTION_ID,
+    description:  `(${solutionDetails.solutionId}) - The AWS CloudFormation template for ${solutionDetails.solutionName} cross account role, version: ${solutionDetails.solutionVersion}`,
+    solutionId: solutionDetails.solutionId,
     solutionTradeMarkName: SOLUTION_TMN,
     solutionProvider: SOLUTION_PROVIDER,
-    solutionName: SOLUTION_NAME,
-    solutionVersion: SOLUTION_VERSION,
-    appregApplicationName: APP_REG_APPLICATION_TYPE,
-    appregSolutionName: APP_REG_SOLUTION_NAME
+    solutionName: solutionDetails.solutionName,
+    solutionVersion: solutionDetails.solutionVersion,
+    appregApplicationName: solutionDetails.appRegAppName,
+    appregSolutionName: solutionDetails.appRegSolutionName
 });
+
 new PipelineStack(app, 'aws-instance-scheduler-testing-pipeline');
 
 
