@@ -166,7 +166,6 @@ class DeployStage extends Stage {
     description: "",
     solutionId: "",
     solutionName: "",
-    solutionProvider: "",
     solutionVersion: "",
   });
 }

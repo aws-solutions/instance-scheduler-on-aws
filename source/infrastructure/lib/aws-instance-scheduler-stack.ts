@@ -35,7 +35,6 @@ import {CoreScheduler} from "./core-scheduler";
 export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
   readonly description: string,
   readonly solutionId: string,
-  readonly solutionProvider: string,
   readonly solutionName: string,
   readonly solutionVersion: string,
   readonly appregApplicationName: string,
