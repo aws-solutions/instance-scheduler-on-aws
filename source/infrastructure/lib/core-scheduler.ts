@@ -27,7 +27,6 @@ import * as kms from "aws-cdk-lib/aws-kms";
 export interface InstanceSchedulerLambdaProps {
 
   readonly solutionVersion: string
-  readonly solutionTradeMarkName: string
   readonly solutionsBucket?: s3.IBucket
   readonly memorySize: number
   readonly schedulerRole: iam.Role

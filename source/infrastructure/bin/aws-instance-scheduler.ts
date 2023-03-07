@@ -21,8 +21,6 @@ import PipelineStack from "../pipeline/pipeline-stack";
 import {Aspects, DefaultStackSynthesizer} from "aws-cdk-lib";
 import {AwsSolutionsChecks, NagSuppressions} from "cdk-nag";
 import {getSolutionContext} from "./cdk-context";
-
-const SOLUTION_TMN = process.env['SOLUTION_TRADEMARKEDNAME'] ? process.env['SOLUTION_TRADEMARKEDNAME'] : "aws-instance-scheduler";
 const SOLUTION_PROVIDER = 'AWS Solution Development';
 
 
@@ -47,7 +45,6 @@ const hubStack = new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
     synthesizer: synthesizer,
     description: `(${solutionDetails.solutionId}) - The AWS CloudFormation template for deployment of the ${solutionDetails.solutionName}, version: ${solutionDetails.solutionVersion}`,
     solutionId: solutionDetails.solutionId,
-    solutionTradeMarkName: SOLUTION_TMN,
     solutionProvider: SOLUTION_PROVIDER,
     solutionName: solutionDetails.solutionName,
     solutionVersion: solutionDetails.solutionVersion,
@@ -59,7 +56,6 @@ new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
     synthesizer: synthesizer,
     description:  `(${solutionDetails.solutionId}) - The AWS CloudFormation template for ${solutionDetails.solutionName} cross account role, version: ${solutionDetails.solutionVersion}`,
     solutionId: solutionDetails.solutionId,
-    solutionTradeMarkName: SOLUTION_TMN,
     solutionProvider: SOLUTION_PROVIDER,
     solutionName: solutionDetails.solutionName,
     solutionVersion: solutionDetails.solutionVersion,
