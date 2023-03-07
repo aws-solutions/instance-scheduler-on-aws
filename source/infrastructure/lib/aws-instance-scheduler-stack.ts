@@ -35,7 +35,6 @@ import {CoreScheduler} from "./core-scheduler";
 export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
   readonly description: string,
   readonly solutionId: string,
-  readonly solutionTradeMarkName: string,
   readonly solutionProvider: string,
   readonly solutionName: string,
   readonly solutionVersion: string,
@@ -294,7 +293,6 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     //instance scheduler core scheduler construct reference.
     const coreScheduler = new CoreScheduler(this,  {
       solutionVersion: props.solutionVersion,
-      solutionTradeMarkName: props.solutionTradeMarkName,
       memorySize: memorySize.valueAsNumber,
       schedulerRole: schedulerRole,
       kmsEncryptionKey: instanceSchedulerEncryptionKey,
