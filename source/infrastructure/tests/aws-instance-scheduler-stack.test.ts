@@ -20,5 +20,7 @@
   * SnapShot Testing for the AwsInstanceSchedulerStack.
   */
  test('AwsInstanceSchedulerStack snapshot test', () => {
-   expect(Template.fromStack(createHubStack())).toMatchSnapshot();
+   let hubStackJson = Template.fromStack(createHubStack()).toJSON()
+   hubStackJson.Resources.Main.Properties.Code = "Omitted to remove snapshot dependency on code hash"
+   expect(hubStackJson).toMatchSnapshot();
  });
