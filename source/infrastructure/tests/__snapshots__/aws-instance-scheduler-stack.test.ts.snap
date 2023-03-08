@@ -1243,10 +1243,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         },
       },
       "Properties": {
-        "Code": {
-          "S3Bucket": "cdk-hnb659fds-assets-111111111111-eu-west-1",
-          "S3Key": "7c4c123fd757ba6eff670a577b4458410dedfb4c007924b54153f2f2911e4863.zip",
-        },
+        "Code": "Omitted to remove snapshot dependency on code hash",
         "Description": "EC2 and RDS instance scheduler, version v1.5.0",
         "Environment": {
           "Variables": {
