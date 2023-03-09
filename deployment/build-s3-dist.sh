@@ -12,8 +12,6 @@
 #  and limitations under the License.
 #
 
-# Important: CDK global version number
-cdk_version=2.62.2
 
 # Check to see if the required parameters have been provided:
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
@@ -22,20 +20,26 @@ if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
     exit 1
 fi
 
-export DIST_VERSION=$3
 export DIST_OUTPUT_BUCKET=$1
-export SOLUTION_ID=SO0030
 export SOLUTION_NAME=$2
-export SOLUTION_TRADEMARKEDNAME=$2
+export VERSION=$3
 
 # Get reference for all important folders
-template_dir="$PWD"
-staging_dist_dir="$template_dir/staging"
-global_dist_dir="$template_dir/global-s3-assets"
-regional_dist_dir="$template_dir/regional-s3-assets"
-lambda_source_dir="$template_dir/../source/app"
-cli_source_dir="$template_dir/../source/cli"
-cdk_source_dir="$template_dir/../source/infrastructure"
+project_root="$PWD/.."
+deployment_dir="$PWD"
+#output folders
+global_dist_dir="$deployment_dir/global-s3-assets"
+regional_dist_dir="$deployment_dir/regional-s3-assets"
+
+#build directories
+build_dir="$project_root/build"
+cdk_out_dir="$build_dir/cdk.out"
+
+#project folders
+lambda_source_dir="$project_root/source/app" #not currently needed, but here for reference
+cli_source_dir="$project_root/source/cli"
+cdk_source_dir="$project_root/source/infrastructure"
+
 
 
 
@@ -54,50 +58,35 @@ echo "rm -rf $regional_dist_dir"
 rm -rf $regional_dist_dir
 echo "mkdir -p $regional_dist_dir"
 mkdir -p $regional_dist_dir
-echo "rm -rf $staging_dist_dir"
-rm -rf $staging_dist_dir
-echo "mkdir -p $staging_dist_dir"
-mkdir -p $staging_dist_dir
+echo "rm -rf $build_dir"
+rm -rf $build_dir
+echo "mkdir -p $build_dir"
+mkdir -p $build_dir
+echo "rm -rf $cdk_out_dir"
+rm -rf $cdk_out_dir
+
 
 echo "------------------------------------------------------------------------------"
 echo "[Synth] CDK Project"
 echo "------------------------------------------------------------------------------"
 
-# Install the global aws-cdk package
-echo "cd $cdk_source_dir"
-cd $cdk_source_dir
-echo "npm install aws-cdk@$cdk_version"
-npm install aws-cdk@$cdk_version
-
-echo "------------------------------------------------------------------------------"
-echo "NPM Install in the source folder"
-echo "------------------------------------------------------------------------------"
-
 # Install the npm install in the source folder
-echo "npm install"
-npm install
-
-# Run 'cdk synth' to generate raw solution outputs
 echo "cd $cdk_source_dir"
 cd "$cdk_source_dir"
-echo "node_modules/aws-cdk/bin/cdk synth --output=$staging_dist_dir"
-node_modules/aws-cdk/bin/cdk synth --output=$staging_dist_dir --no-version-reporting
-
-# Remove unnecessary output files
-echo "cd $staging_dist_dir"
-cd "$staging_dist_dir"
-echo "rm tree.json manifest.json cdk.out"
-rm tree.json manifest.json cdk.out
+echo "npm ci"
+npm ci
+echo "node_modules/aws-cdk/bin/cdk synth --output=$build_dir"
+node_modules/aws-cdk/bin/cdk synth --no-version-reporting
 
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Template artifacts"
 echo "------------------------------------------------------------------------------"
 
-# Move outputs from staging to global_dist_dir
-echo "Move outputs from staging to global_dist_dir"
-echo "cp $template_dir/*.template $global_dist_dir/"
-cp $staging_dist_dir/*.template.json $global_dist_dir/
-rm *.template.json
+# copy templates to global_dist_dir
+echo "Move templates from staging to global_dist_dir"
+echo "cp $cdk_out_dir/*.template.json $global_dist_dir/"
+cp "$cdk_out_dir"/*.template.json "$global_dist_dir"/
+
 
 # Rename all *.template.json files to *.template
 echo "Rename all *.template.json to *.template"
@@ -106,29 +95,18 @@ for f in $global_dist_dir/*.template.json; do
     mv -- "$f" "${f%.template.json}.template"
 done
 
+
 echo "------------------------------------------------------------------------------"
-echo "[Packing] Source code lambda python artifacts and scheduler-cli artifacts"
+echo "[CDK-Helper] Copy the Lambda Asset"
 echo "------------------------------------------------------------------------------"
-echo "Copy the python lambda files from source/lambda directory to staging lambda directory"
-cp -pr $lambda_source_dir $staging_dist_dir/
-cp -pr $cli_source_dir $staging_dist_dir/
+cd "$deployment_dir"/cdk-solution-helper/asset-packager && npm ci
+npx ts-node ./index "$cdk_out_dir" "$regional_dist_dir"
 
-echo "Update the version information in version.py"
-cd $staging_dist_dir/app
-mv version.py version.py.org
-sed "s/%version%/$DIST_VERSION/g" version.py.org > version.py
-
-echo "Install all the python dependencies in the staging directory before packaging"
-pip3 install -U -r $lambda_source_dir/requirements.txt -t $staging_dist_dir/app/
-
-echo "Build lambda distribution packaging"
-zip -q --recurse-paths ./instance-scheduler.zip version.txt main.py version.py configuration/* requesthandlers/* chardet/* urllib3/* idna/* requests/* schedulers/* util/* boto_retry/* models/* pytz/* certifi/*
-echo "Copy lambda distribution to $regional_dist_dir"
-cp -pr ./instance-scheduler.zip $regional_dist_dir/
-
-echo "cd into the scheduler cli folder ./cli"
-
-cd ../cli
+echo "------------------------------------------------------------------------------"
+echo "[Scheduler-CLI] Package the Scheduler cli"
+echo "------------------------------------------------------------------------------"
+cp -pr $cli_source_dir $build_dir/
+cd "$build_dir/cli"
 echo "Build the scheduler cli package"
 mv ./setup.py ./setup.bak.py
 echo "update the version in setup.py"

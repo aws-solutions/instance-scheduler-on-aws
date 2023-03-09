@@ -1,6 +1,6 @@
 {
   "app": "npx ts-node bin/aws-instance-scheduler.ts",
-  "output": "../../deployment/cdk.out",
+  "output": "../../build/cdk.out",
   "context" : {
     "solutionId": "SO0030",
     "solutionVersion": "1.5.0",
