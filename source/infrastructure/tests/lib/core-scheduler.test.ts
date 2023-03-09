@@ -7,7 +7,7 @@ import {
 } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket } from "aws-cdk-lib/aws-s3";
-import { CoreScheduler } from "./core-scheduler";
+import { CoreScheduler } from "../../lib/core-scheduler";
 
 describe("core scheduler", function () {
   const stack = new Stack();
@@ -25,7 +25,6 @@ describe("core scheduler", function () {
     kmsEncryptionKey: key,
     memorySize: 128,
     schedulerRole: role,
-    solutionTradeMarkName: "instance-scheduler-on-aws",
     solutionsBucket: bucket,
     solutionVersion: "v9.9.9",
   });
