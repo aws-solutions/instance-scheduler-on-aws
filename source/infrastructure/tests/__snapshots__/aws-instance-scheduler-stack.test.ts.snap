@@ -1369,9 +1369,6 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         },
         "Runtime": "python3.9",
         "Timeout": 300,
-        "TracingConfig": {
-          "Mode": "Active",
-        },
       },
       "Type": "AWS::Lambda::Function",
     },
@@ -1523,7 +1520,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "Custom::ServiceSetup",
       "UpdateReplacePolicy": "Delete",
     },
-    "SchedulerEventRuleAllowEventRulestackinstanceschedulerlambdaLambdaFunction84B79C6A71C84E7F": {
+    "SchedulerEventRuleAllowEventRulestackschedulerlambdaC9E2D53DB26536BE": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
         "FunctionName": {
@@ -1726,27 +1723,9 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "AWS::IAM::Role",
     },
     "SchedulerRoleDefaultPolicy66F774B8": {
-      "Metadata": {
-        "cfn_nag": {
-          "rules_to_suppress": [
-            {
-              "id": "W12",
-              "reason": "Lambda needs the following minimum required permissions to send trace data to X-Ray and access ENIs in a VPC.",
-            },
-          ],
-        },
-      },
       "Properties": {
         "PolicyDocument": {
           "Statement": [
-            {
-              "Action": [
-                "xray:PutTraceSegments",
-                "xray:PutTelemetryRecords",
-              ],
-              "Effect": "Allow",
-              "Resource": "*",
-            },
             {
               "Action": [
                 "dynamodb:BatchGetItem",
@@ -1894,71 +1873,6 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       },
       "Type": "AWS::DynamoDB::Table",
       "UpdateReplacePolicy": "Delete",
-    },
-    "instanceschedulerlambdaLambdaFunctionServiceRoleEBF44CD1": {
-      "Metadata": {
-        "cdk_nag": {
-          "rules_to_suppress": [
-            {
-              "id": "AwsSolutions-IAM5",
-              "reason": "This Lambda function needs to be able to write a log streams for each scheduler execution (1 per account/region/service)",
-            },
-          ],
-        },
-      },
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "lambda.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "Policies": [
-          {
-            "PolicyDocument": {
-              "Statement": [
-                {
-                  "Action": [
-                    "logs:CreateLogGroup",
-                    "logs:CreateLogStream",
-                    "logs:PutLogEvents",
-                  ],
-                  "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Join": [
-                      "",
-                      [
-                        "arn:",
-                        {
-                          "Ref": "AWS::Partition",
-                        },
-                        ":logs:",
-                        {
-                          "Ref": "AWS::Region",
-                        },
-                        ":",
-                        {
-                          "Ref": "AWS::AccountId",
-                        },
-                        ":log-group:/aws/lambda/*",
-                      ],
-                    ],
-                  },
-                },
-              ],
-              "Version": "2012-10-17",
-            },
-            "PolicyName": "LambdaFunctionServiceRolePolicy",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Role",
     },
   },
 }
