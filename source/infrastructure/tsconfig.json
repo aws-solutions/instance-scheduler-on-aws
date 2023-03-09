@@ -24,7 +24,7 @@
     "stripInternal": true,
     "target": "ES2022",
     "allowJs" : false,
-    "outDir" : "../../deployment/cdk.dist",
+    "outDir" : "../../build/cdk.ts.dist"
   },
   "include": [
     "**/*.ts"
