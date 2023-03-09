@@ -1369,6 +1369,9 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         },
         "Runtime": "python3.9",
         "Timeout": 300,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
       },
       "Type": "AWS::Lambda::Function",
     },
@@ -1726,6 +1729,14 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Properties": {
         "PolicyDocument": {
           "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
             {
               "Action": [
                 "dynamodb:BatchGetItem",
