@@ -13,9 +13,8 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
-import {LambdaToDynamoDB, LambdaToDynamoDBProps} from "@aws-solutions-constructs/aws-lambda-dynamodb";
+import {LambdaToDynamoDB} from "@aws-solutions-constructs/aws-lambda-dynamodb";
 import {Aws, RemovalPolicy, Stack} from "aws-cdk-lib";
-import {NagSuppressions} from "cdk-nag";
 
 import * as iam from "aws-cdk-lib/aws-iam"
 import * as s3 from "aws-cdk-lib/aws-s3"
@@ -23,6 +22,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as cdk from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as kms from "aws-cdk-lib/aws-kms";
+import * as python from "@aws-cdk/aws-lambda-python-alpha"
 
 export interface InstanceSchedulerLambdaProps {
 
@@ -47,9 +47,38 @@ export class CoreScheduler {
 
   constructor(scope: Stack, props: InstanceSchedulerLambdaProps) {
 
-    const lambdaToDynamoDbConstruct = new LambdaToDynamoDB(scope, 'instance-scheduler-lambda', extractLambdaToDynamoPropsFrom(props))
+    this.lambdaFunction = new python.PythonFunction(scope, "scheduler-lambda",{
+      functionName: Aws.STACK_NAME + '-InstanceSchedulerMain',
+      description: 'EC2 and RDS instance scheduler, version ' + props.solutionVersion,
+      entry: "../app",
+      index: "main.py",
+      handler: 'lambda_handler',
+      runtime: lambda.Runtime.PYTHON_3_9,
+      role: props.schedulerRole,
+      memorySize: props.memorySize,
+      timeout: cdk.Duration.seconds(300),
+      environment: props.environment,
+    })
 
-    this.lambdaFunction = lambdaToDynamoDbConstruct.lambdaFunction;
+    const lambdaToDynamoDbConstruct = new LambdaToDynamoDB(scope, 'instance-scheduler-lambda', {
+      existingLambdaObj: this.lambdaFunction,
+      dynamoTableProps: {
+        partitionKey: {
+          name: 'service',
+          type: dynamodb.AttributeType.STRING
+        },
+        sortKey: {
+          name: 'account-region',
+          type: dynamodb.AttributeType.STRING
+        },
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        removalPolicy: RemovalPolicy.DESTROY,
+        pointInTimeRecovery: true
+      },
+      tablePermissions: "ReadWrite",
+    })
+
+
     this.stateTable = lambdaToDynamoDbConstruct.dynamoTable;
 
     const cfnStateTable = this.stateTable.node.defaultChild as dynamodb.CfnTable
@@ -127,42 +156,42 @@ export class CoreScheduler {
 
     this.lambdaFunction.addToRolePolicy(dynamodbPolicy)
 
-    NagSuppressions.addResourceSuppressions(lambdaToDynamoDbConstruct.node.findChild("LambdaFunctionServiceRole"), [{
-      id: "AwsSolutions-IAM5",
-      reason: "This Lambda function needs to be able to write a log streams for each scheduler execution (1 per account/region/service)"
-    }])
+    // NagSuppressions.addResourceSuppressions(lambdaToDynamoDbConstruct.node.findChild("LambdaFunctionServiceRole"), [{
+    //   id: "AwsSolutions-IAM5",
+    //   reason: "This Lambda function needs to be able to write a log streams for each scheduler execution (1 per account/region/service)"
+    // }])
   }
 
 }
 
-function extractLambdaToDynamoPropsFrom(props: InstanceSchedulerLambdaProps) : LambdaToDynamoDBProps {
-
-  return {
-    lambdaFunctionProps: {
-      functionName: Aws.STACK_NAME + '-InstanceSchedulerMain',
-      description: 'EC2 and RDS instance scheduler, version ' + props.solutionVersion,
-      code: lambda.Code.fromAsset( "../app"),
-      runtime: lambda.Runtime.PYTHON_3_9,
-      handler: 'main.lambda_handler',
-      role: props.schedulerRole,
-      memorySize: props.memorySize,
-      timeout: cdk.Duration.seconds(300),
-      environment: props.environment
-    },
-    dynamoTableProps: {
-      partitionKey: {
-        name: 'service',
-        type: dynamodb.AttributeType.STRING
-      },
-      sortKey: {
-        name: 'account-region',
-        type: dynamodb.AttributeType.STRING
-      },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.DESTROY,
-      pointInTimeRecovery: true
-    },
-    tablePermissions: "ReadWrite",
-  }
-
-}
+// function extractLambdaToDynamoPropsFrom(props: InstanceSchedulerLambdaProps) : LambdaToDynamoDBProps {
+//
+//   return {
+//     lambdaFunctionProps: {
+//       functionName: Aws.STACK_NAME + '-InstanceSchedulerMain',
+//       description: 'EC2 and RDS instance scheduler, version ' + props.solutionVersion,
+//       code: lambda.Code.fromAsset( "../app"),
+//       runtime: lambda.Runtime.PYTHON_3_9,
+//       handler: 'main.lambda_handler',
+//       role: props.schedulerRole,
+//       memorySize: props.memorySize,
+//       timeout: cdk.Duration.seconds(300),
+//       environment: props.environment
+//     },
+//     dynamoTableProps: {
+//       partitionKey: {
+//         name: 'service',
+//         type: dynamodb.AttributeType.STRING
+//       },
+//       sortKey: {
+//         name: 'account-region',
+//         type: dynamodb.AttributeType.STRING
+//       },
+//       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+//       removalPolicy: RemovalPolicy.DESTROY,
+//       pointInTimeRecovery: true
+//     },
+//     tablePermissions: "ReadWrite",
+//   }
+//
+// }
