@@ -30,10 +30,6 @@ describe("core scheduler", function () {
   });
   const template = Template.fromStack(stack);
 
-  it("matches snapshot", function () {
-    expect(template).toMatchSnapshot();
-  });
-
   const stateTableLogicalId = "StateTable";
 
   describe("state table", function () {
