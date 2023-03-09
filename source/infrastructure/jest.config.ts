@@ -1,16 +1,17 @@
 module.exports = {
-  "roots": [
-    "<rootDir>/tests"
-  ],
-  testMatch: [ '**/*.test.ts'],
+  roots: ["<rootDir>/tests", "<rootDir>/lib"],
+  testMatch: ["**/*.test.ts"],
   transform: {
-    '^.+\\.tsx?$': 'ts-jest'
+    "^.+\\.tsx?$": "ts-jest",
   },
   reporters: [
-    'default',
-    ['jest-junit', {
-      outputDirectory: '../../deployment/test-reports',
-      outputName: 'cdk-test-report.xml'
-    }]
-  ]
-}
+    "default",
+    [
+      "jest-junit",
+      {
+        outputDirectory: "../../deployment/test-reports",
+        outputName: "cdk-test-report.xml",
+      },
+    ],
+  ],
+};
