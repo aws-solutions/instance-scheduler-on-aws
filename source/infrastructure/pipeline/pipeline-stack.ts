@@ -43,6 +43,7 @@ class PipelineStack extends Stack {
         buildEnvironment: {
           buildImage: LinuxBuildImage.STANDARD_6_0,
           computeType: ComputeType.LARGE,
+          privileged: true
         },
       },
     });
