@@ -58,6 +58,7 @@ export class CoreScheduler {
       memorySize: props.memorySize,
       timeout: cdk.Duration.seconds(300),
       environment: props.environment,
+      tracing: lambda.Tracing.ACTIVE
     })
 
     const lambdaToDynamoDbConstruct = new LambdaToDynamoDB(scope, 'instance-scheduler-lambda', {
