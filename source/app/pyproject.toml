@@ -19,9 +19,7 @@ description = "AWS Instance Scheduler"
 dependencies = [
     "pytz",
     "requests",
-    "boto3",
-    "aws-cdk-lib==2.60.0",
-    "constructs>=10.0.0,<11.0.0",
+    "chardet",
 ]
 
 [project.optional-dependencies]

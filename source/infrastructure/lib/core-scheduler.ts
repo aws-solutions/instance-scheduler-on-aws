@@ -58,7 +58,18 @@ export class CoreScheduler {
       memorySize: props.memorySize,
       timeout: cdk.Duration.seconds(300),
       environment: props.environment,
-      tracing: lambda.Tracing.ACTIVE
+      tracing: lambda.Tracing.ACTIVE,
+
+      bundling: {
+        commandHooks: {
+          beforeBundling(inputDir: string, outputDir: string): string[] {
+             return [`pip install --target ${outputDir} -e ${inputDir}`]
+           },
+          afterBundling(): string[] {
+            return []
+          }
+        }
+      }
     })
 
     const lambdaToDynamoDbConstruct = new LambdaToDynamoDB(scope, 'instance-scheduler-lambda', {
