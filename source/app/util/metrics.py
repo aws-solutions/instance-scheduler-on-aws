@@ -106,7 +106,7 @@ def send_metrics_data(metrics, logger):
             "content-length": str(len(data_json))
         }
 
-        response = requests.post(url, data=data_json, headers=headers)
+        response = requests.post(url, data=data_json, headers=headers, timeout=300)
         response.raise_for_status()
         logger.debug(INF_METRICS_DATA_SENT, response.status_code, response.text)
     except Exception as exc:
