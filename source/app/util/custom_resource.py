@@ -177,7 +177,7 @@ class CustomResource:
 
         # PUT request to cloudformation
         try:
-            response = requests.put(self.response_url, data=json.dumps(self.response), headers=headers)
+            response = requests.put(self.response_url, data=json.dumps(self.response), headers=headers, timeout=300)
             response.raise_for_status()
             print("Status code: {}".format(response.status_code))
             print("Status message: {}".format(response.text))
