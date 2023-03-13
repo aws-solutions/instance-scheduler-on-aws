@@ -126,7 +126,7 @@ class PipelineStack extends Stack {
           }
         },
       }),
-      primaryOutputDirectory: 'deployment/cdk.out'
+      primaryOutputDirectory: 'build/cdk.out'
     });
   }
 
