@@ -13,6 +13,10 @@
 #
 
 
+#"$DEBUG" == 'true' -> enable detailed messages.
+#set -x enables a mode of the shell where all executed commands are printed to the terminal
+[ "$DEBUG" == 'true' ] && set -x
+
 # Check to see if the required parameters have been provided:
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
     echo "Please provide the base source bucket name, trademark approved solution name and version where the lambda code will eventually reside."
@@ -50,19 +54,12 @@ echo "--------------------------------------------------------------------------
 echo "[Init] Remove any old dist files from previous runs"
 echo "------------------------------------------------------------------------------"
 
-echo "rm -rf $global_dist_dir"
 rm -rf $global_dist_dir
-echo "mkdir -p $global_dist_dir"
 mkdir -p $global_dist_dir
-echo "rm -rf $regional_dist_dir"
 rm -rf $regional_dist_dir
-echo "mkdir -p $regional_dist_dir"
 mkdir -p $regional_dist_dir
-echo "rm -rf $build_dir"
 rm -rf $build_dir
-echo "mkdir -p $build_dir"
 mkdir -p $build_dir
-echo "rm -rf $cdk_out_dir"
 rm -rf $cdk_out_dir
 
 
@@ -71,11 +68,8 @@ echo "[Synth] CDK Project"
 echo "------------------------------------------------------------------------------"
 
 # Install the npm install in the source folder
-echo "cd $cdk_source_dir"
 cd "$cdk_source_dir"
-echo "npm ci"
 npm ci
-echo "node_modules/aws-cdk/bin/cdk synth --output=$build_dir"
 node_modules/aws-cdk/bin/cdk synth --no-version-reporting
 
 echo "------------------------------------------------------------------------------"
@@ -84,7 +78,6 @@ echo "--------------------------------------------------------------------------
 
 # copy templates to global_dist_dir
 echo "Move templates from staging to global_dist_dir"
-echo "cp $cdk_out_dir/*.template.json $global_dist_dir/"
 cp "$cdk_out_dir"/*.template.json "$global_dist_dir"/
 
 
