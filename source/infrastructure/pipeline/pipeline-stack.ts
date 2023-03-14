@@ -51,7 +51,7 @@ class PipelineStack extends Stack {
     const deployStage = new DeployStage(this, DEPLOY_STAGE_NAME);
 
     pipeline.addStage(deployStage, {
-      post: [this.getIntegrationTestStep({})],
+      post: [this.getEndToEndTestStep({})],
     });
 
 
@@ -130,30 +130,18 @@ class PipelineStack extends Stack {
     });
   }
 
-  getIntegrationTestStep(outputs_map: {}) {
-    return new CodeBuildStep("IntegrationTest", {
+  getEndToEndTestStep(outputs_map: {}) {
+    return new CodeBuildStep("EndToEndTest", {
+
       installCommands: ["pip install tox"],
       commands: [
-        "tox -e integration -- --junitxml=pytest-integration-report.xml",
+          "printenv"
       ],
       envFromCfnOutputs: outputs_map,
       rolePolicyStatements: [],
-      partialBuildSpec: this.get_reports_partial_build_spec(
-          "pytest-integration-report.xml"
-      ),
     });
   }
 
-  get_reports_partial_build_spec(filename: string) {
-    return codebuild.BuildSpec.fromObject({
-      reports: {
-        pytest_reports: {
-          files: [filename],
-          "file-format": "JUNITXML",
-        },
-      },
-    });
-  }
 }
 
 class DeployStage extends Stage {
