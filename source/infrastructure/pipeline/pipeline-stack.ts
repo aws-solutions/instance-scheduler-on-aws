@@ -10,9 +10,12 @@ import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
 import { AwsInstanceSchedulerStack } from "../lib/aws-instance-scheduler-stack";
 import {NagSuppressions} from "cdk-nag";
+import {E2eTestStack} from "./e2e-test-stack";
 
-const DEPLOY_STAGE_NAME = "test-deploy";
+const DEPLOY_STAGE_NAME = "Deployment-Test";
+const END_TO_END_STAGE_NAME = "End-to-End-Tests"
 const STACK_NAME = "InstanceScheduler";
+const TEST_RESOURCES_STACK_NAME = "InstanceSchedulerE2ETestResources";
 
 class PipelineStack extends Stack {
   /*
@@ -45,14 +48,11 @@ class PipelineStack extends Stack {
           computeType: ComputeType.LARGE,
           privileged: true
         },
-      },
+      }
     });
 
-    const deployStage = new DeployStage(this, DEPLOY_STAGE_NAME);
-
-    pipeline.addStage(deployStage, {
-      post: [this.getEndToEndTestStep({})],
-    });
+    pipeline.addStage(new DeployStage(this, DEPLOY_STAGE_NAME));
+    pipeline.addStage(new EndToEndTestStage(this, END_TO_END_STAGE_NAME))
 
 
 
@@ -112,6 +112,7 @@ class PipelineStack extends Stack {
         "npx cdk synth",
         'cd ../../deployment',
       ],
+
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
           cdk_test_reports: {
@@ -157,6 +158,14 @@ class DeployStage extends Stage {
     solutionName: "",
     solutionVersion: "",
   });
+}
+
+class EndToEndTestStage extends Stage {
+  constructor(scope: Construct, construct_id: string) {
+    super(scope, construct_id);
+  }
+
+  e2eTestResourcesStack = new E2eTestStack(this, TEST_RESOURCES_STACK_NAME)
 }
 
 export default PipelineStack;
