@@ -167,43 +167,6 @@ export class CoreScheduler {
     })
 
     this.lambdaFunction.addToRolePolicy(dynamodbPolicy)
-
-    // NagSuppressions.addResourceSuppressions(lambdaToDynamoDbConstruct.node.findChild("LambdaFunctionServiceRole"), [{
-    //   id: "AwsSolutions-IAM5",
-    //   reason: "This Lambda function needs to be able to write a log streams for each scheduler execution (1 per account/region/service)"
-    // }])
   }
 
 }
-
-// function extractLambdaToDynamoPropsFrom(props: InstanceSchedulerLambdaProps) : LambdaToDynamoDBProps {
-//
-//   return {
-//     lambdaFunctionProps: {
-//       functionName: Aws.STACK_NAME + '-InstanceSchedulerMain',
-//       description: 'EC2 and RDS instance scheduler, version ' + props.solutionVersion,
-//       code: lambda.Code.fromAsset( "../app"),
-//       runtime: lambda.Runtime.PYTHON_3_9,
-//       handler: 'main.lambda_handler',
-//       role: props.schedulerRole,
-//       memorySize: props.memorySize,
-//       timeout: cdk.Duration.seconds(300),
-//       environment: props.environment
-//     },
-//     dynamoTableProps: {
-//       partitionKey: {
-//         name: 'service',
-//         type: dynamodb.AttributeType.STRING
-//       },
-//       sortKey: {
-//         name: 'account-region',
-//         type: dynamodb.AttributeType.STRING
-//       },
-//       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-//       removalPolicy: RemovalPolicy.DESTROY,
-//       pointInTimeRecovery: true
-//     },
-//     tablePermissions: "ReadWrite",
-//   }
-//
-// }

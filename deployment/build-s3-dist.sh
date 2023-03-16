@@ -13,10 +13,6 @@
 #
 
 
-#"$DEBUG" == 'true' -> enable detailed messages.
-#set -x enables a mode of the shell where all executed commands are printed to the terminal
-[ "$DEBUG" == 'true' ] && set -x
-
 # Check to see if the required parameters have been provided:
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
     echo "Please provide the base source bucket name, trademark approved solution name and version where the lambda code will eventually reside."
@@ -24,9 +20,14 @@ if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
     exit 1
 fi
 
+#"$DEBUG" == 'true' -> enable detailed messages.
+#set -x enables a mode of the shell where all executed commands are printed to the terminal
+[[ $DEBUG ]] && set -x
+set -eou pipefail
+
 export DIST_OUTPUT_BUCKET=$1
 export SOLUTION_NAME=$2
-export VERSION=$3
+export DIST_VERSION=$3
 
 # Get reference for all important folders
 project_root="$PWD/.."
@@ -44,11 +45,6 @@ lambda_source_dir="$project_root/source/app" #not currently needed, but here for
 cli_source_dir="$project_root/source/cli"
 cdk_source_dir="$project_root/source/infrastructure"
 
-
-
-
-[ "$DEBUG" == 'true' ] && set -x
-set -e
 
 echo "------------------------------------------------------------------------------"
 echo "[Init] Remove any old dist files from previous runs"
