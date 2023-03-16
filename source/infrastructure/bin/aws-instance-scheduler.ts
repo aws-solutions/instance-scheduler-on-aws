@@ -28,13 +28,14 @@ let synthesizer = new DefaultStackSynthesizer({
 });
 
 // Solutions pipeline deployment
-const { DIST_OUTPUT_BUCKET, SOLUTION_NAME, VERSION } = process.env;
-if (DIST_OUTPUT_BUCKET && SOLUTION_NAME && VERSION)
+const { DIST_OUTPUT_BUCKET, SOLUTION_NAME, DIST_VERSION } = process.env;
+if (DIST_OUTPUT_BUCKET && SOLUTION_NAME && DIST_VERSION) {
     synthesizer = new DefaultStackSynthesizer({
         generateBootstrapVersionRule: false,
         fileAssetsBucketName: `${DIST_OUTPUT_BUCKET}-\${AWS::Region}`,
-        bucketPrefix: `${SOLUTION_NAME}/${VERSION}/`,
+        bucketPrefix: `${SOLUTION_NAME}/${DIST_VERSION}/`,
     });
+}
 
 const app = new cdk.App();
 const solutionDetails = getSolutionContext(app);
@@ -51,7 +52,7 @@ const hubStack = new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
 
 new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
     synthesizer: synthesizer,
-    description:  `(${solutionDetails.solutionId}) - The AWS CloudFormation template for ${solutionDetails.solutionName} cross account role, version: ${solutionDetails.solutionVersion}`,
+    description:  `(${solutionDetails.solutionId}S) - The AWS CloudFormation template for ${solutionDetails.solutionName} cross account role, version: ${solutionDetails.solutionVersion}`,
     solutionId: solutionDetails.solutionId,
     solutionName: solutionDetails.solutionName,
     solutionVersion: solutionDetails.solutionVersion,
