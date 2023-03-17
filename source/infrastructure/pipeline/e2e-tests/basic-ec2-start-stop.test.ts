@@ -43,3 +43,7 @@ export class BasicEc2StartStopTest implements E2ETest {
   }
 
 }
+
+test('Print Environment', ()=> {
+  console.log(process.env)
+})

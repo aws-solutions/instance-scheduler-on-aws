@@ -9,6 +9,7 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
+    "e2e-tests": "jest --config pipeline/jest.config.ts",
     "cdk": "cdk"
   },
   "devDependencies": {
