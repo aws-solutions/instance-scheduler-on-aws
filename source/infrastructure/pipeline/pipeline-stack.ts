@@ -5,7 +5,7 @@ import CodeStarSource from "./code-star-source";
 import { Construct } from "constructs";
 import { CodeBuildStep, CodePipeline } from "aws-cdk-lib/pipelines";
 import { ComputeType, LinuxBuildImage } from "aws-cdk-lib/aws-codebuild";
-import { Stack, Stage } from "aws-cdk-lib";
+import { CfnOutput, Stack, Stage } from "aws-cdk-lib";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
 import { AwsInstanceSchedulerStack } from "../lib/aws-instance-scheduler-stack";
@@ -111,7 +111,7 @@ class PipelineStack extends Stack {
     });
   }
 
-  getIntegrationTestStep(outputs_map: {}) {
+  getIntegrationTestStep(outputs_map: { [_: string]: CfnOutput }) {
     return new CodeBuildStep("IntegrationTest", {
       installCommands: ["pip install tox"],
       commands: ["tox -e integration -- --junitxml=pytest-integration-report.xml"],

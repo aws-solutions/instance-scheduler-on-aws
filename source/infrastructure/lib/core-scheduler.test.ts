@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 import { Stack } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { CompositePrincipal, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
@@ -34,7 +36,7 @@ describe("core scheduler", function () {
   const stateTableLogicalId = "StateTable";
 
   describe("state table", function () {
-    const table: any = template.findResources("AWS::DynamoDB::Table")[stateTableLogicalId];
+    const table = template.findResources("AWS::DynamoDB::Table")[stateTableLogicalId];
 
     it("partition key is service", function () {
       const key = "service";
@@ -108,7 +110,7 @@ describe("core scheduler", function () {
   const configTableLogicalId = "ConfigTable";
 
   describe("config table", function () {
-    const table: any = template.findResources("AWS::DynamoDB::Table")[configTableLogicalId];
+    const table = template.findResources("AWS::DynamoDB::Table")[configTableLogicalId];
 
     it("partition key is type", function () {
       const key = "type";
@@ -182,7 +184,7 @@ describe("core scheduler", function () {
   const maintenanceWindowTableLogicalId = "MaintenanceWindowTable";
 
   describe("maintenance window table", function () {
-    const table: any = template.findResources("AWS::DynamoDB::Table")[maintenanceWindowTableLogicalId];
+    const table = template.findResources("AWS::DynamoDB::Table")[maintenanceWindowTableLogicalId];
 
     it("partition key is Name", function () {
       const key = "Name";
