@@ -17,11 +17,9 @@
 import * as cdk from 'aws-cdk-lib';
 import { AwsInstanceSchedulerStack } from '../lib/aws-instance-scheduler-stack';
 import { AwsInstanceSchedulerRemoteStack } from '../lib/aws-instance-scheduler-remote-stack';
-import PipelineStack from "../../pipeline/lib/pipeline-stack";
 import {Aspects, DefaultStackSynthesizer} from "aws-cdk-lib";
 import {AwsSolutionsChecks, NagSuppressions} from "cdk-nag";
 import {getSolutionContext} from "./cdk-context";
-import {E2eTestStack} from "../../pipeline/lib/e2e-test-stack";
 
 
 let synthesizer = new DefaultStackSynthesizer({
@@ -60,10 +58,6 @@ new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
     appregApplicationName: solutionDetails.appRegAppName,
     appregSolutionName: solutionDetails.appRegSolutionName
 });
-
-new PipelineStack(app, 'aws-instance-scheduler-testing-pipeline');
-
-new E2eTestStack(app, 'aws-instance-scheduler-end-to-end-testing-resources');
 
 NagSuppressions.addResourceSuppressionsByPath(hubStack, "/aws-instance-scheduler/SchedulerRole/DefaultPolicy/Resource", [
     {

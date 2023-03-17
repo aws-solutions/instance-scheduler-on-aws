@@ -48,11 +48,20 @@ class PipelineStack extends Stack {
           computeType: ComputeType.LARGE,
           privileged: true
         },
-      }
+      },
     });
 
-    pipeline.addStage(new DeployStage(this, DEPLOY_STAGE_NAME));
-    pipeline.addStage(new EndToEndTestStage(this, END_TO_END_STAGE_NAME))
+    pipeline.addStage(new DeployStage(this, DEPLOY_STAGE_NAME), {
+      pre: [
+        this.getUnitTestStep()
+      ]
+
+    });
+    pipeline.addStage(new EndToEndTestStage(this, END_TO_END_STAGE_NAME), {
+      post: [
+        this.getEndToEndTestStep()
+      ]
+    })
 
 
 
@@ -104,15 +113,25 @@ class PipelineStack extends Stack {
       input: this.get_connection(),
       installCommands: [
         'pip install tox',
+      ],
+      commands: [
+        'cd source/infrastructure',
+        'npm ci',
+        'cd pipeline',
+        'npx cdk synth',
+      ],
+      primaryOutputDirectory: 'build/cdk.pipeline.out'
+    });
+  }
+
+  getUnitTestStep() {
+    return new CodeBuildStep("unitTests", {
+
+      installCommands: ["pip install tox"],
+      commands: [
         'tox -e cdk',
         'tox -e lambda -- --junitxml=deployment/test-reports/lambda-test-report.xml'
       ],
-      commands: [
-        'cd source/infrastructure/instance-scheduler',
-        "npx cdk synth",
-        'cd ../../../deployment',
-      ],
-
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
           cdk_test_reports: {
@@ -127,18 +146,25 @@ class PipelineStack extends Stack {
           }
         },
       }),
-      primaryOutputDirectory: 'build/cdk.out'
+      rolePolicyStatements: [],
     });
   }
 
-  getEndToEndTestStep(outputs_map: {}) {
-    return new CodeBuildStep("EndToEndTest", {
-
+  getEndToEndTestStep() {
+    return new CodeBuildStep("EndToEndTests", {
       installCommands: ["pip install tox"],
       commands: [
-          "tox -e e2e"
+        'tox -e e2e',
       ],
-      envFromCfnOutputs: outputs_map,
+      partialBuildSpec: codebuild.BuildSpec.fromObject({
+        reports: {
+          e2e_test_reports: {
+            files: ["e2e-test-report.xml"],
+            "file-format": "JUNITXML",
+            "base-directory": "deployment/test-reports"
+          }
+        },
+      }),
       rolePolicyStatements: [],
     });
   }
