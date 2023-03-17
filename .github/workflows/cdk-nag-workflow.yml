@@ -10,6 +10,7 @@ jobs:
     strategy:
       matrix:
         node-version: [16.x]
+        module: [instance-scheduler, pipeline]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
@@ -19,4 +20,5 @@ jobs:
         working-directory: source/infrastructure
         run: |
           npm ci
+          cd ${{ matrix.module }}
           npx cdk synth

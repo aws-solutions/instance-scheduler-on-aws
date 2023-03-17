@@ -23,7 +23,6 @@ import * as cdk from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as python from "@aws-cdk/aws-lambda-python-alpha"
-
 export interface InstanceSchedulerLambdaProps {
 
   readonly solutionVersion: string
@@ -46,11 +45,10 @@ export class CoreScheduler {
   private readonly maintenanceWindowTable: dynamodb.Table
 
   constructor(scope: Stack, props: InstanceSchedulerLambdaProps) {
-
     this.lambdaFunction = new python.PythonFunction(scope, "scheduler-lambda",{
       functionName: Aws.STACK_NAME + '-InstanceSchedulerMain',
       description: 'EC2 and RDS instance scheduler, version ' + props.solutionVersion,
-      entry: "../app",
+      entry: `${__dirname}/../../../app`,
       index: "main.py",
       handler: 'lambda_handler',
       runtime: lambda.Runtime.PYTHON_3_9,

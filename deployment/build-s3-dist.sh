@@ -43,7 +43,7 @@ cdk_out_dir="$build_dir/cdk.out"
 #project folders
 lambda_source_dir="$project_root/source/app" #not currently needed, but here for reference
 cli_source_dir="$project_root/source/cli"
-cdk_source_dir="$project_root/source/infrastructure"
+cdk_source_dir="$project_root/source/infrastructure/instance-scheduler"
 
 
 echo "------------------------------------------------------------------------------"

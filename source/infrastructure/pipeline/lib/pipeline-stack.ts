@@ -8,7 +8,7 @@ import { ComputeType, LinuxBuildImage } from "aws-cdk-lib/aws-codebuild";
 import { Stack, Stage } from "aws-cdk-lib";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
-import { AwsInstanceSchedulerStack } from "../lib/aws-instance-scheduler-stack";
+import { AwsInstanceSchedulerStack } from "../../instance-scheduler/lib/aws-instance-scheduler-stack";
 import {NagSuppressions} from "cdk-nag";
 import {E2eTestStack} from "./e2e-test-stack";
 
@@ -108,9 +108,9 @@ class PipelineStack extends Stack {
         'tox -e lambda -- --junitxml=deployment/test-reports/lambda-test-report.xml'
       ],
       commands: [
-        'cd source/infrastructure',
+        'cd source/infrastructure/instance-scheduler',
         "npx cdk synth",
-        'cd ../../deployment',
+        'cd ../../../deployment',
       ],
 
       partialBuildSpec: codebuild.BuildSpec.fromObject({

@@ -17,11 +17,11 @@
 import * as cdk from 'aws-cdk-lib';
 import { AwsInstanceSchedulerStack } from '../lib/aws-instance-scheduler-stack';
 import { AwsInstanceSchedulerRemoteStack } from '../lib/aws-instance-scheduler-remote-stack';
-import PipelineStack from "../pipeline/pipeline-stack";
+import PipelineStack from "../../pipeline/lib/pipeline-stack";
 import {Aspects, DefaultStackSynthesizer} from "aws-cdk-lib";
 import {AwsSolutionsChecks, NagSuppressions} from "cdk-nag";
 import {getSolutionContext} from "./cdk-context";
-import {E2eTestStack} from "../pipeline/e2e-test-stack";
+import {E2eTestStack} from "../../pipeline/lib/e2e-test-stack";
 
 
 let synthesizer = new DefaultStackSynthesizer({
