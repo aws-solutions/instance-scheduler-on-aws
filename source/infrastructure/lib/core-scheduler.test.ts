@@ -1,10 +1,6 @@
 import { Stack } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
-import {
-  CompositePrincipal,
-  Role,
-  ServicePrincipal,
-} from "aws-cdk-lib/aws-iam";
+import { CompositePrincipal, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { CoreScheduler } from "./core-scheduler";
@@ -38,9 +34,7 @@ describe("core scheduler", function () {
   const stateTableLogicalId = "StateTable";
 
   describe("state table", function () {
-    const table: any = template.findResources("AWS::DynamoDB::Table")[
-      stateTableLogicalId
-    ];
+    const table: any = template.findResources("AWS::DynamoDB::Table")[stateTableLogicalId];
 
     it("partition key is service", function () {
       const key = "service";
@@ -114,9 +108,7 @@ describe("core scheduler", function () {
   const configTableLogicalId = "ConfigTable";
 
   describe("config table", function () {
-    const table: any = template.findResources("AWS::DynamoDB::Table")[
-      configTableLogicalId
-    ];
+    const table: any = template.findResources("AWS::DynamoDB::Table")[configTableLogicalId];
 
     it("partition key is type", function () {
       const key = "type";
@@ -190,9 +182,7 @@ describe("core scheduler", function () {
   const maintenanceWindowTableLogicalId = "MaintenanceWindowTable";
 
   describe("maintenance window table", function () {
-    const table: any = template.findResources("AWS::DynamoDB::Table")[
-      maintenanceWindowTableLogicalId
-    ];
+    const table: any = template.findResources("AWS::DynamoDB::Table")[maintenanceWindowTableLogicalId];
 
     it("partition key is Name", function () {
       const key = "Name";
@@ -342,10 +332,7 @@ describe("core scheduler", function () {
           expect(policy.Properties.PolicyDocument.Statement).toEqual(
             expect.arrayContaining([
               {
-                Action: expect.arrayContaining([
-                  "xray:PutTraceSegments",
-                  "xray:PutTelemetryRecords",
-                ]),
+                Action: expect.arrayContaining(["xray:PutTraceSegments", "xray:PutTelemetryRecords"]),
                 Effect: "Allow",
                 Resource: "*",
               },

@@ -14,62 +14,73 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
-import * as cdk from 'aws-cdk-lib';
-import { AwsInstanceSchedulerStack } from '../lib/aws-instance-scheduler-stack';
-import { AwsInstanceSchedulerRemoteStack } from '../lib/aws-instance-scheduler-remote-stack';
+import * as cdk from "aws-cdk-lib";
+import { AwsInstanceSchedulerStack } from "../lib/aws-instance-scheduler-stack";
+import { AwsInstanceSchedulerRemoteStack } from "../lib/aws-instance-scheduler-remote-stack";
 import PipelineStack from "../pipeline/pipeline-stack";
-import {Aspects} from "aws-cdk-lib";
-import {AwsSolutionsChecks, NagSuppressions} from "cdk-nag";
+import { Aspects } from "aws-cdk-lib";
+import { AwsSolutionsChecks, NagSuppressions } from "cdk-nag";
 
-const SOLUTION_VERSION = process.env['DIST_VERSION'] || '%%VERSION%%';
-const SOLUTION_NAME = process.env['SOLUTION_NAME'] ? process.env['SOLUTION_NAME'] : "aws-instance-scheduler";
-const SOLUTION_ID = process.env['SOLUTION_ID'] ? process.env['SOLUTION_ID'] : "SO0030";
-const SOLUTION_BUCKET = process.env['DIST_OUTPUT_BUCKET'] ? process.env['DIST_OUTPUT_BUCKET'] : "";
-const SOLUTION_TMN = process.env['SOLUTION_TRADEMARKEDNAME'] ? process.env['SOLUTION_TRADEMARKEDNAME'] : "aws-instance-scheduler";
-const SOLUTION_PROVIDER = 'AWS Solution Development';
-const APP_REG_APPLICATION_TYPE = process.env['APP_REG_APPLICATION_TYPE'] ? process.env['APP_REG_APPLICATION_TYPE'] : 'AWS-Solutions';
-const APP_REG_SOLUTION_NAME = process.env['APP_REG_SOLUTION_NAME'] ? process.env['APP_REG_SOLUTION_NAME'] : "instance-scheduler-on-aws";
+const SOLUTION_VERSION = process.env["DIST_VERSION"] || "%%VERSION%%";
+const SOLUTION_NAME = process.env["SOLUTION_NAME"] ? process.env["SOLUTION_NAME"] : "aws-instance-scheduler";
+const SOLUTION_ID = process.env["SOLUTION_ID"] ? process.env["SOLUTION_ID"] : "SO0030";
+const SOLUTION_BUCKET = process.env["DIST_OUTPUT_BUCKET"] ? process.env["DIST_OUTPUT_BUCKET"] : "";
+const SOLUTION_TMN = process.env["SOLUTION_TRADEMARKEDNAME"]
+  ? process.env["SOLUTION_TRADEMARKEDNAME"]
+  : "aws-instance-scheduler";
+const SOLUTION_PROVIDER = "AWS Solution Development";
+const APP_REG_APPLICATION_TYPE = process.env["APP_REG_APPLICATION_TYPE"]
+  ? process.env["APP_REG_APPLICATION_TYPE"]
+  : "AWS-Solutions";
+const APP_REG_SOLUTION_NAME = process.env["APP_REG_SOLUTION_NAME"]
+  ? process.env["APP_REG_SOLUTION_NAME"]
+  : "instance-scheduler-on-aws";
 
 const app = new cdk.App();
 
-const hubStack = new AwsInstanceSchedulerStack(app, 'aws-instance-scheduler', {
-    synthesizer: new cdk.DefaultStackSynthesizer({
-        generateBootstrapVersionRule: false
-    }),
-    description: `(${SOLUTION_ID}) - The AWS CloudFormation template for deployment of the ${SOLUTION_NAME}, version: ${SOLUTION_VERSION}`,
-    solutionId: SOLUTION_ID,
-    solutionTradeMarkName: SOLUTION_TMN,
-    solutionProvider: SOLUTION_PROVIDER,
-    solutionBucket: SOLUTION_BUCKET,
-    solutionName: SOLUTION_NAME,
-    solutionVersion: SOLUTION_VERSION,
-    appregApplicationName: APP_REG_APPLICATION_TYPE,
-    appregSolutionName: APP_REG_SOLUTION_NAME
+const hubStack = new AwsInstanceSchedulerStack(app, "aws-instance-scheduler", {
+  synthesizer: new cdk.DefaultStackSynthesizer({
+    generateBootstrapVersionRule: false,
+  }),
+  description: `(${SOLUTION_ID}) - The AWS CloudFormation template for deployment of the ${SOLUTION_NAME}, version: ${SOLUTION_VERSION}`,
+  solutionId: SOLUTION_ID,
+  solutionTradeMarkName: SOLUTION_TMN,
+  solutionProvider: SOLUTION_PROVIDER,
+  solutionBucket: SOLUTION_BUCKET,
+  solutionName: SOLUTION_NAME,
+  solutionVersion: SOLUTION_VERSION,
+  appregApplicationName: APP_REG_APPLICATION_TYPE,
+  appregSolutionName: APP_REG_SOLUTION_NAME,
 });
-new AwsInstanceSchedulerRemoteStack(app, 'aws-instance-scheduler-remote', {
-    synthesizer: new cdk.DefaultStackSynthesizer({
-        generateBootstrapVersionRule: false
-    }),
-    description:  `(${SOLUTION_ID}S) - The AWS CloudFormation template for ${SOLUTION_NAME} cross account role, version: ${SOLUTION_VERSION}`,
-    solutionId: SOLUTION_ID,
-    solutionTradeMarkName: SOLUTION_TMN,
-    solutionProvider: SOLUTION_PROVIDER,
-    solutionBucket: SOLUTION_BUCKET,
-    solutionName: SOLUTION_NAME,
-    solutionVersion: SOLUTION_VERSION,
-    appregApplicationName: APP_REG_APPLICATION_TYPE,
-    appregSolutionName: APP_REG_SOLUTION_NAME
+new AwsInstanceSchedulerRemoteStack(app, "aws-instance-scheduler-remote", {
+  synthesizer: new cdk.DefaultStackSynthesizer({
+    generateBootstrapVersionRule: false,
+  }),
+  description: `(${SOLUTION_ID}S) - The AWS CloudFormation template for ${SOLUTION_NAME} cross account role, version: ${SOLUTION_VERSION}`,
+  solutionId: SOLUTION_ID,
+  solutionTradeMarkName: SOLUTION_TMN,
+  solutionProvider: SOLUTION_PROVIDER,
+  solutionBucket: SOLUTION_BUCKET,
+  solutionName: SOLUTION_NAME,
+  solutionVersion: SOLUTION_VERSION,
+  appregApplicationName: APP_REG_APPLICATION_TYPE,
+  appregSolutionName: APP_REG_SOLUTION_NAME,
 });
-new PipelineStack(app, 'aws-instance-scheduler-testing-pipeline');
+new PipelineStack(app, "aws-instance-scheduler-testing-pipeline");
 
-
-NagSuppressions.addResourceSuppressionsByPath(hubStack, "/aws-instance-scheduler/SchedulerRole/DefaultPolicy/Resource", [
+NagSuppressions.addResourceSuppressionsByPath(
+  hubStack,
+  "/aws-instance-scheduler/SchedulerRole/DefaultPolicy/Resource",
+  [
     {
-        id: "AwsSolutions-IAM5",
-        reason: "The scheduling lambda must access multiple resources across services"
-    }
-])
+      id: "AwsSolutions-IAM5",
+      reason: "The scheduling lambda must access multiple resources across services",
+    },
+  ]
+);
 
-Aspects.of(app).add(new AwsSolutionsChecks({
-    verbose: true
-}))
+Aspects.of(app).add(
+  new AwsSolutionsChecks({
+    verbose: true,
+  })
+);

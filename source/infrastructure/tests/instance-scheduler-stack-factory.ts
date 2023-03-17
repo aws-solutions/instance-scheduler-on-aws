@@ -13,37 +13,36 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
-import * as instanceSchedulerHubStack from '../lib/aws-instance-scheduler-stack';
-import * as instanceSchedulerSpokeStack from '../lib/aws-instance-scheduler-remote-stack';
-import * as cdk from 'aws-cdk-lib';
-import {DefaultStackSynthesizer} from "aws-cdk-lib";
+import * as instanceSchedulerHubStack from "../lib/aws-instance-scheduler-stack";
+import * as instanceSchedulerSpokeStack from "../lib/aws-instance-scheduler-remote-stack";
+import * as cdk from "aws-cdk-lib";
+import { DefaultStackSynthesizer } from "aws-cdk-lib";
 
 export function createHubStack(): cdk.Stack {
   const app = new cdk.App();
-  const envEU = { account: '111111111111', region: 'eu-west-1' };
-  const stack = new instanceSchedulerHubStack.AwsInstanceSchedulerStack(app, 'stack', {
+  const envEU = { account: "111111111111", region: "eu-west-1" };
+  const stack = new instanceSchedulerHubStack.AwsInstanceSchedulerStack(app, "stack", {
     env: envEU,
     description: "",
     solutionId: "SO0030",
-    solutionTradeMarkName: 'aws-instance-scheduler',
-    solutionProvider: 'AWS Solution Development',
+    solutionTradeMarkName: "aws-instance-scheduler",
+    solutionProvider: "AWS Solution Development",
     solutionBucket: "solutions",
-    solutionName: 'aws-instance-scheduler',
-    solutionVersion: 'v1.5.0',
+    solutionName: "aws-instance-scheduler",
+    solutionVersion: "v1.5.0",
     appregApplicationName: "AWS-Solutions",
     appregSolutionName: "instance-scheduler-on-aws",
-    synthesizer: new DefaultStackSynthesizer(({ generateBootstrapVersionRule: false}))
-  })
+    synthesizer: new DefaultStackSynthesizer({ generateBootstrapVersionRule: false }),
+  });
 
-  const instanceSchedulerStackMetadata =
-  {
+  const instanceSchedulerStackMetadata = {
     "AWS::CloudFormation::Interface": {
-      "ParameterGroups": [
+      ParameterGroups: [
         {
-          "Label": {
-            "default": "Scheduler (version v1.4.0)"
+          Label: {
+            default: "Scheduler (version v1.4.0)",
           },
-          "Parameters": [
+          Parameters: [
             "TagName",
             "ScheduledServices",
             "ScheduleRdsClusters",
@@ -54,127 +53,117 @@ export function createHubStack(): cdk.Stack {
             "CrossAccountRoles",
             "ScheduleLambdaAccount",
             "SchedulerFrequency",
-            "MemorySize"
-          ]
+            "MemorySize",
+          ],
         },
         {
-          "Label": {
-            "default": "Options"
+          Label: {
+            default: "Options",
           },
-          "Parameters": [
-            "UseCloudWatchMetrics",
-            "SendAnonymousData",
-            "Trace"
-          ]
+          Parameters: ["UseCloudWatchMetrics", "SendAnonymousData", "Trace"],
         },
         {
-          "Label": {
-            "default": "Other parameters"
+          Label: {
+            default: "Other parameters",
           },
-          "Parameters": [
-            "LogRetentionDays",
-            "StartedTags",
-            "StoppedTags"
-          ]
-        }
+          Parameters: ["LogRetentionDays", "StartedTags", "StoppedTags"],
+        },
       ],
-      "ParameterLabels": {
-        "LogRetentionDays": {
-          "default": "Log retention days"
+      ParameterLabels: {
+        LogRetentionDays: {
+          default: "Log retention days",
         },
-        "StartedTags": {
-          "default": "Started tags"
+        StartedTags: {
+          default: "Started tags",
         },
-        "StoppedTags": {
-          "default": "Stopped tags"
+        StoppedTags: {
+          default: "Stopped tags",
         },
-        "SchedulingActive": {
-          "default": "Scheduling enabled"
+        SchedulingActive: {
+          default: "Scheduling enabled",
         },
-        "CrossAccountRoles": {
-          "default": "Cross-account roles"
+        CrossAccountRoles: {
+          default: "Cross-account roles",
         },
-        "ScheduleLambdaAccount": {
-          "default": "This account"
+        ScheduleLambdaAccount: {
+          default: "This account",
         },
-        "UseCloudWatchMetrics": {
-          "default": "Enable CloudWatch Metrics"
+        UseCloudWatchMetrics: {
+          default: "Enable CloudWatch Metrics",
         },
-        "Trace": {
-          "default": "Enable CloudWatch Logs"
+        Trace: {
+          default: "Enable CloudWatch Logs",
         },
-        "TagName": {
-          "default": "Instance Scheduler tag name"
+        TagName: {
+          default: "Instance Scheduler tag name",
         },
-        "ScheduledServices": {
-          "default": "Service(s) to schedule"
+        ScheduledServices: {
+          default: "Service(s) to schedule",
         },
-        "ScheduleRdsClusters": {
-          "default": "Schedule Aurora Clusters"
+        ScheduleRdsClusters: {
+          default: "Schedule Aurora Clusters",
         },
-        "CreateRdsSnapshot": {
-          "default": "Create RDS instance snapshot"
+        CreateRdsSnapshot: {
+          default: "Create RDS instance snapshot",
         },
-        "DefaultTimezone": {
-          "default": "Default time zone"
+        DefaultTimezone: {
+          default: "Default time zone",
         },
-        "SchedulerFrequency": {
-          "default": "Frequency"
+        SchedulerFrequency: {
+          default: "Frequency",
         },
-        "Regions": {
-          "default": "Region(s)"
+        Regions: {
+          default: "Region(s)",
         },
-        "MemorySize": {
-          "default": "Memory size"
+        MemorySize: {
+          default: "Memory size",
         },
-        "SendAnonymousData": {
-          "default": "Send anonymous usage data"
-        }
-      }
-    }
-  }
-  stack.templateOptions.metadata = instanceSchedulerStackMetadata
-  stack.templateOptions.templateFormatVersion = "2010-09-09"
+        SendAnonymousData: {
+          default: "Send anonymous usage data",
+        },
+      },
+    },
+  };
+  stack.templateOptions.metadata = instanceSchedulerStackMetadata;
+  stack.templateOptions.templateFormatVersion = "2010-09-09";
   return stack;
 }
 
 export function createSpokeStack(): cdk.Stack {
-  const envEU = { account: '111111111111', region: 'eu-west-1' };
+  const envEU = { account: "111111111111", region: "eu-west-1" };
   const app = new cdk.App();
-  const stack = new instanceSchedulerSpokeStack.AwsInstanceSchedulerRemoteStack(app, 'stack', {
+  const stack = new instanceSchedulerSpokeStack.AwsInstanceSchedulerRemoteStack(app, "stack", {
     env: envEU,
     description: "",
     solutionId: "SO0030",
-    solutionTradeMarkName: 'aws-instance-scheduler',
-    solutionProvider: 'AWS Solution Development',
+    solutionTradeMarkName: "aws-instance-scheduler",
+    solutionProvider: "AWS Solution Development",
     solutionBucket: "solutions",
-    solutionName: 'aws-instance-scheduler',
-    solutionVersion: 'v1.5.0',
+    solutionName: "aws-instance-scheduler",
+    solutionVersion: "v1.5.0",
     appregApplicationName: "AWS-Solutions",
     appregSolutionName: "instance-scheduler-on-aws",
-    synthesizer: new DefaultStackSynthesizer(({ generateBootstrapVersionRule: false}))
-  })
+    synthesizer: new DefaultStackSynthesizer({ generateBootstrapVersionRule: false }),
+  });
 
-
-  const instanceSchedulerRemoteStackMetadata =
-  {
+  const instanceSchedulerRemoteStackMetadata = {
     "AWS::CloudFormation::Interface": {
-      "ParameterGroups": [{
-        "Label": {
-          "default": "Account"
+      ParameterGroups: [
+        {
+          Label: {
+            default: "Account",
+          },
+          Parameters: ["InstanceSchedulerAccount"],
         },
-        "Parameters": [
-          "InstanceSchedulerAccount"
-        ]
-      }],
-      "ParameterLabels": {
-        "InstanceSchedulerAccount": {
-          "default": "Primary account"
-        }
-      }
-    }
-  }
-  stack.templateOptions.metadata = instanceSchedulerRemoteStackMetadata
-  stack.templateOptions.templateFormatVersion = "2010-09-09"
+      ],
+      ParameterLabels: {
+        InstanceSchedulerAccount: {
+          default: "Primary account",
+        },
+      },
+    },
+  };
+  stack.templateOptions.metadata = instanceSchedulerRemoteStackMetadata;
+  stack.templateOptions.templateFormatVersion = "2010-09-09";
   return stack;
 }

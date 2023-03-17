@@ -13,12 +13,12 @@
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
 
- import {Template} from 'aws-cdk-lib/assertions';
- import {createHubStack} from './instance-scheduler-stack-factory';
+import { Template } from "aws-cdk-lib/assertions";
+import { createHubStack } from "./instance-scheduler-stack-factory";
 
- /*
-  * SnapShot Testing for the AwsInstanceSchedulerStack.
-  */
- test('AwsInstanceSchedulerStack snapshot test', () => {
-   expect(Template.fromStack(createHubStack())).toMatchSnapshot();
- });
+/*
+ * SnapShot Testing for the AwsInstanceSchedulerStack.
+ */
+test("AwsInstanceSchedulerStack snapshot test", () => {
+  expect(Template.fromStack(createHubStack())).toMatchSnapshot();
+});

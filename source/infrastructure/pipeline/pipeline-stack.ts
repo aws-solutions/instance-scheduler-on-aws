@@ -9,7 +9,7 @@ import { Stack, Stage } from "aws-cdk-lib";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
 import { AwsInstanceSchedulerStack } from "../lib/aws-instance-scheduler-stack";
-import {NagSuppressions} from "cdk-nag";
+import { NagSuppressions } from "cdk-nag";
 
 const DEPLOY_STAGE_NAME = "test-deploy";
 const STACK_NAME = "InstanceScheduler";
@@ -53,48 +53,34 @@ class PipelineStack extends Stack {
       post: [this.getIntegrationTestStep({})],
     });
 
-
-
     //pipeline must be built before findings can be suppressed
     pipeline.buildPipeline();
     NagSuppressions.addStackSuppressions(this, [
       {
         id: "AwsSolutions-IAM5",
-        reason: "necessary permissions for the pipeline to build, update, and self-mutate"
+        reason: "necessary permissions for the pipeline to build, update, and self-mutate",
       },
       {
         id: "AwsSolutions-CB4",
-        reason: "Update step provided by construct"
-      }
+        reason: "Update step provided by construct",
+      },
     ]);
 
     NagSuppressions.addResourceSuppressions(pipeline.pipeline.artifactBucket, [
       {
         id: "AwsSolutions-S1",
-        reason: "Bucket is used internally by the pipeline and does not need access logging"
-      }
+        reason: "Bucket is used internally by the pipeline and does not need access logging",
+      },
     ]);
   }
 
   get_connection() {
     return new CodeStarSource(
-        "CodeStarConnection",
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/arn"
-        ),
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/owner"
-        ),
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/repo"
-        ),
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/branch"
-        )
+      "CodeStarConnection",
+      StringParameter.valueForStringParameter(this, "/InstanceScheduler-build/connection/arn"),
+      StringParameter.valueForStringParameter(this, "/InstanceScheduler-build/connection/owner"),
+      StringParameter.valueForStringParameter(this, "/InstanceScheduler-build/connection/repo"),
+      StringParameter.valueForStringParameter(this, "/InstanceScheduler-build/connection/branch")
     );
   }
 
@@ -102,44 +88,36 @@ class PipelineStack extends Stack {
     return new CodeBuildStep("Synth", {
       input: this.get_connection(),
       installCommands: [
-        'pip install tox',
-        'tox -e cdk',
-        'tox -e lambda -- --junitxml=deployment/test-reports/lambda-test-report.xml'
+        "pip install tox",
+        "tox -e cdk",
+        "tox -e lambda -- --junitxml=deployment/test-reports/lambda-test-report.xml",
       ],
-      commands: [
-        'cd source/infrastructure',
-        "npx cdk synth",
-        'cd ../../deployment',
-      ],
+      commands: ["cd source/infrastructure", "npx cdk synth", "cd ../../deployment"],
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
           cdk_test_reports: {
             files: ["cdk-test-report.xml"],
             "file-format": "JUNITXML",
-            "base-directory": "deployment/test-reports"
+            "base-directory": "deployment/test-reports",
           },
           lambda_test_reports: {
             files: ["lambda-test-report.xml"],
             "file-format": "JUNITXML",
-            "base-directory": "deployment/test-reports"
-          }
+            "base-directory": "deployment/test-reports",
+          },
         },
       }),
-      primaryOutputDirectory: 'deployment/cdk.out'
+      primaryOutputDirectory: "deployment/cdk.out",
     });
   }
 
   getIntegrationTestStep(outputs_map: {}) {
     return new CodeBuildStep("IntegrationTest", {
       installCommands: ["pip install tox"],
-      commands: [
-        "tox -e integration -- --junitxml=pytest-integration-report.xml",
-      ],
+      commands: ["tox -e integration -- --junitxml=pytest-integration-report.xml"],
       envFromCfnOutputs: outputs_map,
       rolePolicyStatements: [],
-      partialBuildSpec: this.get_reports_partial_build_spec(
-          "pytest-integration-report.xml"
-      ),
+      partialBuildSpec: this.get_reports_partial_build_spec("pytest-integration-report.xml"),
     });
   }
 

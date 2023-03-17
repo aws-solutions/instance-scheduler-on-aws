@@ -18,13 +18,7 @@ class CodeStarSource extends CodePipelineSource {
 
   private readonly connectionArn: string;
 
-  constructor(
-    name: string,
-    connectionArn: string,
-    owner: string,
-    repo: string,
-    readonly branch: string
-  ) {
+  constructor(name: string, connectionArn: string, owner: string, repo: string, readonly branch: string) {
     super(name);
     this.owner = owner;
     this.repo = repo;
@@ -32,12 +26,7 @@ class CodeStarSource extends CodePipelineSource {
     this.configurePrimaryOutput(new FileSet("Source", this));
   }
 
-  protected getAction(
-    output: Artifact,
-    actionName: string,
-    runOrder: number,
-    variablesNamespace?: string
-  ) {
+  protected getAction(output: Artifact, actionName: string, runOrder: number, variablesNamespace?: string) {
     return new cp_actions.CodeStarConnectionsSourceAction({
       output,
       actionName,
