@@ -29,12 +29,25 @@ ENV_USER_AGENT = "USER_AGENT"
 ENV_SCHEDULER_RULE = "SCHEDULER_RULE"
 
 # name of months
-MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+MONTH_NAMES = [
+    "jan",
+    "feb",
+    "mar",
+    "apr",
+    "may",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "oct",
+    "nov",
+    "dec",
+]
 # name of weekdays
 WEEKDAY_NAMES = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 # values for switching automation off or on, first value is converted to false, the second to true
-SWITCH_VALUES = ['off', 'on']
+SWITCH_VALUES = ["off", "on"]
 
 # default timezone for scheduler
 DEFAULT_TZ = "UTC"

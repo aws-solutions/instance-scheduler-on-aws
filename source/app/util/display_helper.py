@@ -17,13 +17,16 @@ def time_str(t):
 
 
 def set_str(the_set, displaynames=None, offset=0):
-    return DisplayHelper.set_as_str(the_set=the_set, display_names=displaynames, offset=offset)
+    return DisplayHelper.set_as_str(
+        the_set=the_set, display_names=displaynames, offset=offset
+    )
 
 
 class DisplayHelper:
     """
     Class that implements helper functions for displaying sets of data in a more readable form
     """
+
     def __init__(self):
         pass
 
@@ -66,9 +69,20 @@ class DisplayHelper:
                 yield current
 
         for subset in get_sub_sets():
-            s = display_names[min(subset) - offset] if display_names else str(min(subset) - offset)
+            s = (
+                display_names[min(subset) - offset]
+                if display_names
+                else str(min(subset) - offset)
+            )
             if len(subset) > 1:
-                s = "-".join([s, display_names[max(subset) - offset] if display_names else str(max(subset) - offset)])
+                s = "-".join(
+                    [
+                        s,
+                        display_names[max(subset) - offset]
+                        if display_names
+                        else str(max(subset) - offset),
+                    ]
+                )
             result.append(s)
 
         return ",".join(result)

@@ -21,4 +21,4 @@ with open(version_file, "rt") as f:
 build = int(version.split(".")[3]) + 1
 
 with open(version_file, "wt") as f:
-    f.write("{}.{}".format(version[::-1].partition('.')[2][::-1], build))
+    f.write("{}.{}".format(version[::-1].partition(".")[2][::-1], build))

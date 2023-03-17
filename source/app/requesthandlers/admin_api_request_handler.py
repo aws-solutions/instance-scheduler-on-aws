@@ -23,6 +23,7 @@ class AdminApiRequestHandler(object):
     """
     Class to handles requests from REST admin API
     """
+
     def __init__(self, event, context):
         """
         Initializes handle instance
@@ -62,9 +63,14 @@ class AdminApiRequestHandler(object):
         logstream = LOG_STREAM.format(classname, dt.year, dt.month, dt.day)
         self._logger = Logger(logstream=logstream, buffersize=20, context=self._context)
 
-        with Logger(logstream=logstream, buffersize=20, context=self._context) as logger:
-
-            logger.info("Handler {} : Received request {}", self.__class__.__name__, json.dumps(self._event))
+        with Logger(
+            logstream=logstream, buffersize=20, context=self._context
+        ) as logger:
+            logger.info(
+                "Handler {} : Received request {}",
+                self.__class__.__name__,
+                json.dumps(self._event),
+            )
 
             # get access to admin api
             admin = ConfigAdmin(logger=logger, context=self._context)
@@ -79,7 +85,7 @@ class AdminApiRequestHandler(object):
             params = {p: temp[p] for p in temp}
             if "name" in self._event:
                 params["name"] = self._event["name"]
-            logger.info("Calling \"{}\" with parameters {}", fn.__name__, params)
+            logger.info('Calling "{}" with parameters {}', fn.__name__, params)
             # call the admin API
             result = fn(**params)
             logger.info("Call result is {}", result)

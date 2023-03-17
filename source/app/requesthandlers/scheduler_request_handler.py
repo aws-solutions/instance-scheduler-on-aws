@@ -77,7 +77,9 @@ class SchedulerRequestHandler:
         """
         if self._configuration is None:
             # need to reconstruct configuration from dictionary in event
-            self._configuration = SchedulerConfigBuilder.configuration_from_dict(self._event["configuration"])
+            self._configuration = SchedulerConfigBuilder.configuration_from_dict(
+                self._event["configuration"]
+            )
             # for large configurations the schedules are not passed in the event, need to reload these here
             if len(self._configuration.schedules) == 0:
                 loaded_config = configuration.get_scheduler_configuration(self._logger)
@@ -110,27 +112,50 @@ class SchedulerRequestHandler:
             # gets the implementation that handles the actual scheduling for the service
             service_strategy = SCHEDULER_TYPES[service]()
             # create a scheduler and pass the service strategy
-            scheduler = InstanceScheduler(service=service_strategy, scheduler_configuration=self.configuration)
+            scheduler = InstanceScheduler(
+                service=service_strategy, scheduler_configuration=self.configuration
+            )
 
             # setup logging for the service/account/region
-            s = "-".join([LOG_STREAM_PREFIX, service, "-".join(account_names), "-".join(self.configuration.regions)])
-            
+            s = "-".join(
+                [
+                    LOG_STREAM_PREFIX,
+                    service,
+                    "-".join(account_names),
+                    "-".join(self.configuration.regions),
+                ]
+            )
+
             dt = datetime.now(pytz.timezone(self.configuration.default_timezone))
             logstream = LOG_STREAM.format(s, dt.year, dt.month, dt.day)
-            self._logger = Logger(logstream=logstream, buffersize=60 if self.configuration.trace else 30, context=self._context,
-                                  debug=self.configuration.trace)
+            self._logger = Logger(
+                logstream=logstream,
+                buffersize=60 if self.configuration.trace else 30,
+                context=self._context,
+                debug=self.configuration.trace,
+            )
 
             try:
-                self._logger.info(INF_HANDLER.format(
-                    self.__class__.__name__,
-                    ", ".join(self.configuration.scheduled_services),
-                    ", ".join(list(self.account_names)),
-                    ", ".join(list(self.configuration.regions)),
-                    datetime.now(pytz.timezone(self.configuration.default_timezone))))
+                self._logger.info(
+                    INF_HANDLER.format(
+                        self.__class__.__name__,
+                        ", ".join(self.configuration.scheduled_services),
+                        ", ".join(list(self.account_names)),
+                        ", ".join(list(self.configuration.regions)),
+                        datetime.now(
+                            pytz.timezone(self.configuration.default_timezone)
+                        ),
+                    )
+                )
 
                 # run the scheduler for the service
-                result[service] = scheduler.run(state_table=self.state_table, scheduler_config=self.configuration,
-                                                lambda_account=self.lambda_account, context=self._context, logger=self._logger)
+                result[service] = scheduler.run(
+                    state_table=self.state_table,
+                    scheduler_config=self.configuration,
+                    lambda_account=self.lambda_account,
+                    context=self._context,
+                    logger=self._logger,
+                )
                 self._logger.info(INF_SCHEDULER_RESULT, result[service])
 
             finally:

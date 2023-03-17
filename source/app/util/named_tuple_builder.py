@@ -24,7 +24,7 @@ def is_array(o):
 
 
 def tuple_name_func(name):
-    result = "".join([c if c.isalnum() or c == '_' else "" for c in name.strip()])
+    result = "".join([c if c.isalnum() or c == "_" else "" for c in name.strip()])
     while result.startswith("_") or result[0].isdigit():
         result = result[1:]
     return result
@@ -47,9 +47,16 @@ def as_namedtuple(name, d, deep=True, namefunc=None, excludes=None):
         for key in list(d):
             key_name = name_func(key)
             if is_dict(d[key]) and key not in excludes:
-                dest[key_name] = as_namedtuple(key, d[key], namefunc=name_func, excludes=excludes, deep=True)
+                dest[key_name] = as_namedtuple(
+                    key, d[key], namefunc=name_func, excludes=excludes, deep=True
+                )
             elif is_array(d[key]) and key not in excludes:
-                dest[key_name] = [as_namedtuple(key, i, namefunc=name_func, excludes=excludes, deep=True) for i in d[key]]
+                dest[key_name] = [
+                    as_namedtuple(
+                        key, i, namefunc=name_func, excludes=excludes, deep=True
+                    )
+                    for i in d[key]
+                ]
             else:
                 dest[key_name] = d[key]
     else:

@@ -33,7 +33,7 @@ class CustomResource:
             "Reason": "",
             "StackId": self.stack_id,
             "RequestId": self.request_id,
-            "LogicalResourceId": self.logical_resource_id
+            "LogicalResourceId": self.logical_resource_id,
         }
 
     # Returned attributes of custom resource
@@ -135,7 +135,11 @@ class CustomResource:
 
     # Handles cloudformation request
     def handle_request(self):
-        timeleft = (self.context.get_remaining_time_in_millis() / 1000.00) - 0.5 if self.context is not None else 300
+        timeleft = (
+            (self.context.get_remaining_time_in_millis() / 1000.00) - 0.5
+            if self.context is not None
+            else 300
+        )
         if self.timeout is not None:
             timeleft = min(timeleft, float(self.timeout))
         timer = threading.Timer(timeleft, self.fn_timeout)
@@ -150,13 +154,17 @@ class CustomResource:
             elif self.request_type == CustomResource.EVENT_TYPE_DELETE:
                 result = self._delete_request()
             else:
-                raise ValueError("\"{}\" is not a valid request type".format(self.request_type))
+                raise ValueError(
+                    '"{}" is not a valid request type'.format(self.request_type)
+                )
 
             # Set status based on return value of handler
             self.response["Status"] = "SUCCESS" if result else "FAILED"
 
             # set physical resource id or create new one
-            self.response["PhysicalResourceId"] = self.physical_resource_id or self.new_physical_resource_id()
+            self.response["PhysicalResourceId"] = (
+                self.physical_resource_id or self.new_physical_resource_id()
+            )
 
         except Exception as ex:
             self.response["Status"] = "FAILED"
@@ -170,20 +178,23 @@ class CustomResource:
         # Build the PUT request and the response data
         resp = json.dumps(self.response)
 
-        headers = {
-            'content-type': '',
-            'content-length': str(len(resp))
-        }
+        headers = {"content-type": "", "content-length": str(len(resp))}
 
         # PUT request to cloudformation
         try:
-            response = requests.put(self.response_url, data=json.dumps(self.response), headers=headers)
+            response = requests.put(
+                self.response_url, data=json.dumps(self.response), headers=headers
+            )
             response.raise_for_status()
             print("Status code: {}".format(response.status_code))
             print("Status message: {}".format(response.text))
             return True
         except Exception as exc:
-            print("Failed executing HTTP request to respond to CloudFormation stack {}".format(self.stack_id))
+            print(
+                "Failed executing HTTP request to respond to CloudFormation stack {}".format(
+                    self.stack_id
+                )
+            )
             print("Error code is {}".format(str(exc)))
             print("Url is {}".format(self.response_url))
             print("Response data is {}".format(resp))
