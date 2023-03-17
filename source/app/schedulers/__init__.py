@@ -12,6 +12,7 @@
 ######################################################################################################################
 from schedulers.ec2_service import Ec2Service
 from schedulers.rds_service import RdsService
+from schedulers.ecs_service import EcsService
 
 INST_ALLOW_RESIZE = "allow_resize"
 INST_RESIZED = "resized"
@@ -32,6 +33,11 @@ INST_MAINTENANCE_WINDOW = "maintenance_window"
 INST_ENGINE_TYPE = "engine_type"
 INST_DB_ARN = "db_inst_arn"
 INST_DB_IS_CLUSTER = "is_cluster"
+
+INST_ECS_CLUSTER_ARN = "cluster_arn"
+INST_ECS_DESIRED_COUNT = "desired_count"
+INST_ECS_RUNNING_COUNT = "running_count"
+INST_ECS_ORG_DESIRED_COUNT = "org_desired_count"
 
 PARAM_ACCOUNT = "account"
 PARAM_CONTEXT = "context"
@@ -55,7 +61,8 @@ PARAM_CLUSTERS = "clusters"
 
 SCHEDULER_TYPES = {
     "ec2": Ec2Service,
-    "rds": RdsService
+    "rds": RdsService,
+    "ecs": EcsService
 }
 
 
