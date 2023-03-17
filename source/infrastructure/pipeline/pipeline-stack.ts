@@ -136,7 +136,7 @@ class PipelineStack extends Stack {
 
       installCommands: ["pip install tox"],
       commands: [
-          "printenv"
+          "tox -e e2e"
       ],
       envFromCfnOutputs: outputs_map,
       rolePolicyStatements: [],
