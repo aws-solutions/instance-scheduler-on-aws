@@ -70,7 +70,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     const scheduledServices = new cdk.CfnParameter(this, 'ScheduledServices', {
       description: 'Scheduled Services.',
       type: "String",
-      allowedValues: ["EC2", "RDS", "Both"],
+      allowedValues: ["EC2", "RDS", "ECS", "ALL"],
       default: "EC2"
     });
 
@@ -191,7 +191,8 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     mappings.setValue("EnabledDisabled", "No", "DISABLED")
     mappings.setValue("Services", "EC2", "ec2")
     mappings.setValue("Services", "RDS", "rds")
-    mappings.setValue("Services", "Both", "ec2,rds")
+    mappings.setValue("Services", "ECS", "ecs")
+    mappings.setValue("Services", "ALL", "ec2,rds,ecs")
     mappings.setValue("Timeouts", "1", "cron(0/1 * * * ? *)")
     mappings.setValue("Timeouts", "2", "cron(0/2 * * * ? *)")
     mappings.setValue("Timeouts", "5", "cron(0/5 * * * ? *)")
