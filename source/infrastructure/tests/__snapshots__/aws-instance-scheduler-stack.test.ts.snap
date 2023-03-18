@@ -28,8 +28,9 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         "Yes": "ENABLED",
       },
       "Services": {
-        "Both": "ec2,rds",
+        "ALL": "ec2,rds,ecs",
         "EC2": "ec2",
+        "ECS": "ecs",
         "RDS": "rds",
       },
       "Settings": {
