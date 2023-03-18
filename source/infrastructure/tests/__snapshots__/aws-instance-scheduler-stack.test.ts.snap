@@ -752,7 +752,8 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "AllowedValues": [
         "EC2",
         "RDS",
-        "Both",
+        "ECS",
+        "ALL",
       ],
       "Default": "EC2",
       "Description": "Scheduled Services.",
