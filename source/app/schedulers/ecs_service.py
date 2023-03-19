@@ -13,19 +13,12 @@
 
 import copy
 import re
-
 import schedulers
-import re
-import copy
-import jmespath
 
 from boto_retry import get_client_with_standard_retry
 from configuration.instance_schedule import InstanceSchedule
-from configuration.running_period import RunningPeriod
-from configuration.scheduler_config_builder import SchedulerConfigBuilder
-from configuration.setbuilders.weekday_setbuilder import WeekdaySetBuilder
 
-RESTRICTED_RDS_TAG_VALUE_SET_CHARACTERS = r"[^a-zA-Z0-9\s_\.:+/=\\@-]"
+RESTRICTED_TAG_VALUE_SET_CHARACTERS = r"[^a-zA-Z0-9\s_\.:+/=\\@-]"
 
 WARN_RDS_TAG_VALUE = "Tag value \"{}\" for tag \"{}\" changed to \"{}\" because it did contain characters that are not allowed " \
     "in RDS tag values. The value can only contain only the set of Unicode letters, digits, " \
@@ -83,14 +76,9 @@ class EcsService:
         self._session = kwargs[schedulers.PARAM_SESSION]
         region = kwargs[schedulers.PARAM_REGION]
         account = kwargs[schedulers.PARAM_ACCOUNT]
-        tagname = kwargs[schedulers.PARAM_CONFIG].tag_name
-        config = kwargs[schedulers.PARAM_CONFIG]
 
         self._init_scheduler(kwargs)
         client = self._get_client()
-
-        jmes = "services[*].{clusterArn:clusterArn, serviceArn:serviceArn, serviceName:serviceName, status:status, desiredCount:desiredCount, tags:tags}[]" + \
-               "|[?tags]|[?contains(tags[*].key, '{}')]".format(tagname)
 
         number_of_ecs_services = 0
         schedulable_ecs_services = []
@@ -106,7 +94,6 @@ class EcsService:
                 response = client.describe_services(cluster=cluster_arn,
                                                     services=chunk,
                                                     include=['TAGS'])
-                # jmespath.search(jmes, response):
                 for ecs_service_raw in response['services']:
                     ecs_service = self._select_resource_data(ecs_service_raw)
                     if self._is_schedulable(ecs_service):
@@ -282,12 +269,12 @@ class EcsService:
             tagKeys=[self.DESIRED_COUNT_TAG_NAME]
         )
 
-    def _validate_rds_tag_values(self, tags):
+    def _validate_tag_values(self, tags):
         result = copy.deepcopy(tags)
         for t in result:
             original_value = t.get("Value", "")
             value = re.sub(
-                RESTRICTED_RDS_TAG_VALUE_SET_CHARACTERS, " ", original_value)
+                RESTRICTED_TAG_VALUE_SET_CHARACTERS, " ", original_value)
             value = value.replace("\n", " ")
             if value != original_value:
                 self._logger.warning(WARN_RDS_TAG_VALUE,
@@ -300,7 +287,7 @@ class EcsService:
         return result
 
     def _tag_resource(self, client, ecs_service, new_config_tags, old_config_tags):
-        new_tags = self._validate_rds_tag_values(new_config_tags)
+        new_tags = self._validate_tag_values(new_config_tags)
         if new_tags is None:
             new_tags = []
         new_tags_keys = [t["key"] for t in new_tags]
