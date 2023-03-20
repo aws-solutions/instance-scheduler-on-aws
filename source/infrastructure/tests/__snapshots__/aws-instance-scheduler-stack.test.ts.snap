@@ -1217,6 +1217,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "DependsOn": [
         "EC2DynamoDBPolicy",
         "Ec2PermissionsB6E87802",
+        "SchedulerECSPolicy6F71B3AF",
         "SchedulerPolicy",
         "SchedulerRDSPolicy2E7C328A",
         "SchedulerRoleDefaultPolicy66F774B8",
@@ -1523,6 +1524,41 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       },
       "Type": "Custom::ServiceSetup",
       "UpdateReplacePolicy": "Delete",
+    },
+    "SchedulerECSPolicy6F71B3AF": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "ecs:ListClusters",
+                "ecs:ListServices",
+                "ecs:DescribeServices",
+                "ecs:UpdateService",
+                "ecs:TagResource",
+                "ecs:UntagResource",
+              ],
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:cluster/*",
+                },
+                {
+                  "Fn::Sub": "arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:service/*",
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "SchedulerECSPolicy6F71B3AF",
+        "Roles": [
+          {
+            "Ref": "SchedulerRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",     
     },
     "SchedulerEventRuleAllowEventRulestackinstanceschedulerlambdaLambdaFunction84B79C6A71C84E7F": {
       "Properties": {

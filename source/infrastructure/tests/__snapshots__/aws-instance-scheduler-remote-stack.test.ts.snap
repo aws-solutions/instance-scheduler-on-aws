@@ -356,7 +356,20 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
                   "Effect": "Allow",
                   "Resource": "*",
                 },
-              ],
+                {
+                  "Action": [
+                    "ecs:ListClusters",
+                    "ecs:ListServices",
+                    "ecs:DescribeServices",
+                    "ecs:UpdateService",
+                    "ecs:TagResource",
+                    "ecs:UntagResource",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:rds:*:${AWS::AccountId}:cluster:*",
+                  },
+                },              ],
               "Version": "2012-10-17",
             },
             "PolicyName": "EC2InstanceSchedulerRemote",
