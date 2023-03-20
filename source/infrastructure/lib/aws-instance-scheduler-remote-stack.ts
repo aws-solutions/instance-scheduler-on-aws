@@ -146,7 +146,8 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                             ],
                             effect: Effect.ALLOW,
                             resources: [
-                                cdk.Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:cluster:*")
+                                cdk.Fn.sub("arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:cluster/*"),
+                                cdk.Fn.sub("arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:service/*")
                             ]
                         })
                     ]
