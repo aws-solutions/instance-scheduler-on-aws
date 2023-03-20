@@ -580,13 +580,18 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         schedulerPolicyStatement7
       ]
     })
+    NagSuppressions.addResourceSuppressions(schedulerRDSPolicy, [{
+      id: "AwsSolutions-IAM5",
+      reason: "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+    }])
+
     const schedulerECSPolicy  = new iam.Policy(this, "SchedulerECSPolicy", {
       roles:[schedulerRole],
       statements:[schedulerPolicyStatement8]
     })
-    NagSuppressions.addResourceSuppressions(schedulerRDSPolicy, [{
+    NagSuppressions.addResourceSuppressions(schedulerECSPolicy, [{
       id: "AwsSolutions-IAM5",
-      reason: "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
+      reason: "All policies have been scoped to be as restrictive as possible. This solution needs to access ecs resources across all regions."
     }])
 
     //Adding the EC2 and scheduling policy dependencies to the lambda. 
