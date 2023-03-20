@@ -550,6 +550,12 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       actions: [
         'ecs:ListClusters',
         'ecs:ListServices',
+      ],
+      effect: Effect.ALLOW,
+      resources: "*"
+    })
+    const schedulerPolicyStatement9 = new PolicyStatement({
+      actions: [
         'ecs:DescribeServices',
         'ecs:UpdateService',
         'ecs:TagResource',
@@ -587,7 +593,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     const schedulerECSPolicy  = new iam.Policy(this, "SchedulerECSPolicy", {
       roles:[schedulerRole],
-      statements:[schedulerPolicyStatement8]
+      statements:[schedulerPolicyStatement8, schedulerPolicyStatement9]
     })
     NagSuppressions.addResourceSuppressions(schedulerECSPolicy, [{
       id: "AwsSolutions-IAM5",
