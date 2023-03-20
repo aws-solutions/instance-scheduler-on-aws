@@ -29,6 +29,7 @@ from configuration.setbuilders.month_setbuilder import MonthSetBuilder
 from configuration.setbuilders.monthday_setbuilder import MonthdaySetBuilder
 from configuration.setbuilders.weekday_setbuilder import WeekdaySetBuilder
 from util.named_tuple_builder import as_namedtuple
+from schedulers import SCHEDULER_TYPES
 
 ERR_PERIOD_BEGIN_LATER_THAN_END = "error: period begintime {} can not be later than endtime {}"
 ERR_SCHEDULE_INVALID_OVERRIDE = "{} is not a valid value for {}, possible values are {}"
@@ -86,7 +87,7 @@ class ConfigAdmin:
     # regex for checking time formats H:MM and HH:MM
     TIME_REGEX = "^([0|1]?[0-9]|2[0-3]):[0-5][0-9]$"
 
-    SUPPORTED_SERVICES = ["ec2", "rds"]
+    SUPPORTED_SERVICES = SCHEDULER_TYPES.keys()
 
     class CustomEncoder(json.JSONEncoder):
         """
