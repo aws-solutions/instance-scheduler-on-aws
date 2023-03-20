@@ -552,7 +552,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         'ecs:ListServices',
       ],
       effect: Effect.ALLOW,
-      resources: "*"
+      resources: ["*"]
     })
     const schedulerPolicyStatement9 = new PolicyStatement({
       actions: [

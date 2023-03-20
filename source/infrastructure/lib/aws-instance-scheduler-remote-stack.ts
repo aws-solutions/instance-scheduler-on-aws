@@ -141,7 +141,7 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                                 'ecs:ListServices',
                             ],
                             effect: Effect.ALLOW,
-                            resources: "*"
+                            resources: ["*"]
                         }),
                         new PolicyStatement({
                             actions: [

@@ -1533,6 +1533,12 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
               "Action": [
                 "ecs:ListClusters",
                 "ecs:ListServices",
+              ],
+              "Effect": "Allow",
+              "Resource": ["*"],
+            },
+            {
+              "Action": [
                 "ecs:DescribeServices",
                 "ecs:UpdateService",
                 "ecs:TagResource",
