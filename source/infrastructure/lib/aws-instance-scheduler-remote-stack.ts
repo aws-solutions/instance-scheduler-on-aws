@@ -134,6 +134,20 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
                             resources:[
                                 '*'
                             ]
+                        }),
+                        new PolicyStatement({
+                            actions: [
+                                'ecs:ListClusters',
+                                'ecs:ListServices',
+                                'ecs:DescribeServices',
+                                'ecs:UpdateService',
+                                'ecs:TagResource',
+                                'ecs:UntagResource'
+                            ],
+                            effect: Effect.ALLOW,
+                            resources: [
+                                cdk.Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:cluster:*")
+                            ]
                         })
                     ]
                 })

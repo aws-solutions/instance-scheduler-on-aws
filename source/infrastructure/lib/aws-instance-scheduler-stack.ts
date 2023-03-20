@@ -546,6 +546,21 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       resources: [cdk.Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:cluster:*")]
     })
 
+    const schedulerPolicyStatement8 = new PolicyStatement({
+      actions: [
+        'ecs:ListClusters',
+        'ecs:ListServices',
+        'ecs:DescribeServices',
+        'ecs:UpdateService',
+        'ecs:TagResource',
+        'ecs:UntagResource'
+      ],
+      effect: Effect.ALLOW,
+      resources: [
+        cdk.Fn.sub("arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:cluster/*"),
+        cdk.Fn.sub("arn:${AWS::Partition}:ecs:*:${AWS::AccountId}:service/*"),
+      ]
+    })
     
     const schedulerPolicy = new iam.Policy(this, "SchedulerPolicy", {
       roles: [schedulerRole],
@@ -565,6 +580,10 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         schedulerPolicyStatement7
       ]
     })
+    const schedulerECSPolicy  = new iam.Policy(this, "SchedulerECSPolicy", {
+      roles:[schedulerRole],
+      statements:[schedulerPolicyStatement8]
+    })
     NagSuppressions.addResourceSuppressions(schedulerRDSPolicy, [{
       id: "AwsSolutions-IAM5",
       reason: "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions."
@@ -576,6 +595,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     lambdaFunction.addDependency(ec2Permissions.node.defaultChild as iam.CfnPolicy)
     lambdaFunction.addDependency(schedulerPolicy.node.defaultChild as iam.CfnPolicy)
     lambdaFunction.addDependency(schedulerRDSPolicy.node.defaultChild as iam.CfnPolicy)
+    lambdaFunction.addDependency(schedulerECSPolicy.node.defaultChild as iam.CfnPolicy)
     lambdaFunction.cfnOptions.metadata = {
       "cfn_nag": {
         "rules_to_suppress": [
