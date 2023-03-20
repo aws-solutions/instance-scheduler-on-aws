@@ -3,9 +3,9 @@
 
 import CodeStarSource from "./code-star-source";
 import { Construct } from "constructs";
-import { CodeBuildStep, CodePipeline } from "aws-cdk-lib/pipelines";
+import {CodeBuildStep, CodePipeline} from "aws-cdk-lib/pipelines";
 import { ComputeType, LinuxBuildImage } from "aws-cdk-lib/aws-codebuild";
-import { Stack, Stage } from "aws-cdk-lib";
+import {CfnOutput, Stack, Stage} from "aws-cdk-lib";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
 import { AwsInstanceSchedulerStack } from "../../instance-scheduler/lib/aws-instance-scheduler-stack";
@@ -51,15 +51,19 @@ class PipelineStack extends Stack {
       },
     });
 
-    pipeline.addStage(new DeployStage(this, DEPLOY_STAGE_NAME), {
+    const deployStage = new DeployStage(this, DEPLOY_STAGE_NAME)
+    pipeline.addStage(deployStage, {
       pre: [
         this.getUnitTestStep()
       ]
 
     });
-    pipeline.addStage(new EndToEndTestStage(this, END_TO_END_STAGE_NAME), {
+
+    const e2eTestStage = new EndToEndTestStage(this, END_TO_END_STAGE_NAME)
+    pipeline.addStage(e2eTestStage, {
       post: [
-        this.getEndToEndTestStep()
+        this.getEndToEndTestStep({...e2eTestStage.e2eTestResourcesStack.outputs,
+          "configTable": deployStage.instanceSchedulerStack.configurationTableOutput})
       ]
     })
 
@@ -150,12 +154,13 @@ class PipelineStack extends Stack {
     });
   }
 
-  getEndToEndTestStep() {
+  getEndToEndTestStep(outputs: Record<string, CfnOutput>) {
     return new CodeBuildStep("EndToEndTests", {
       installCommands: ["pip install tox"],
       commands: [
         'tox -e e2e',
       ],
+      envFromCfnOutputs: outputs,
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
           e2e_test_reports: {

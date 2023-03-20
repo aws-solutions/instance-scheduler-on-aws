@@ -15,7 +15,7 @@
  *****************************************************************************/
 
 import * as cdk from 'aws-cdk-lib';
-import {Aws, RemovalPolicy} from 'aws-cdk-lib';
+import {Aws, CfnOutput, RemovalPolicy} from 'aws-cdk-lib';
 import * as kms from 'aws-cdk-lib/aws-kms';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import {ArnPrincipal, Effect, PolicyStatement} from 'aws-cdk-lib/aws-iam';
@@ -50,6 +50,10 @@ export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
 * https://aws.amazon.com/solutions/implementations/instance-scheduler/?did=sl_card&trk=sl_card
 */
 export class AwsInstanceSchedulerStack extends cdk.Stack {
+
+  readonly configurationTableOutput: CfnOutput;
+  readonly IssueSnsTopicArn: CfnOutput;
+  readonly SchedulerRoleArn: CfnOutput;
 
   constructor(scope: Construct, id: string, props: AwsInstanceSchedulerStackProps) {
     super(scope, id, props);
@@ -379,17 +383,17 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       description: 'Account to give access to when creating cross-account access role for cross account scenario '
     })
 
-    new cdk.CfnOutput(this, 'ConfigurationTable', {
+    this.configurationTableOutput = new cdk.CfnOutput(this, 'ConfigurationTable', {
       value: (coreScheduler.configTable.node.defaultChild as dynamodb.CfnTable).attrArn,
       description: 'Name of the DynamoDB configuration table'
     })
 
-    new cdk.CfnOutput(this, 'IssueSnsTopicArn', {
+    this.IssueSnsTopicArn = new cdk.CfnOutput(this, 'IssueSnsTopicArn', {
       value: snsTopic.topicArn,
       description: 'Topic to subscribe to for notifications of errors and warnings'
     })
 
-    new cdk.CfnOutput(this, 'SchedulerRoleArn', {
+    this.SchedulerRoleArn = new cdk.CfnOutput(this, 'SchedulerRoleArn', {
       value: schedulerRole.roleArn,
       description: 'Role for the instance scheduler lambda function'
     })
