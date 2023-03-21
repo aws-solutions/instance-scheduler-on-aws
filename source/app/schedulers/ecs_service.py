@@ -180,7 +180,7 @@ class EcsService:
             schedulers.INST_TAGS: tags,
             schedulers.INST_NAME: ecs_service["serviceName"],
             schedulers.INST_SCHEDULE: schedule,
-            schedulers.INST_INSTANCE_TYPE: ecs_service["launchType"],
+            schedulers.INST_INSTANCE_TYPE: ecs_service.get("launchType","Default"),
             schedulers.INST_MAINTENANCE_WINDOW: None
         }
         return instance_data
