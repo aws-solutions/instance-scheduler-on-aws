@@ -12,22 +12,25 @@
  *  express or implied. See the License for the specific language governing   *
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
-import * as cdk from "aws-cdk-lib"
-import {Construct} from "constructs";
-import {testResourceProviders} from "../e2e-tests";
+import {AwsInstanceSchedulerStack} from "../../../instance-scheduler/lib/aws-instance-scheduler-stack";
 import {CfnOutput} from "aws-cdk-lib";
 
-export class E2eTestStack extends cdk.Stack {
+const envKeys = {
+  CONFIG_TABLE: "ConfigTable",
+  ISSUE_SNS_TOPIC_ARN: "IssueSNSTopic",
+  SCHEDULER_ROLE_ARN: "IssueSNSTopic"
+}
 
-  outputs: Record<string, CfnOutput> = {}
-  constructor(scope: Construct, id: string) {
-    super(scope, id);
+export const hubStackParams = {
+  configTableArn: process.env[envKeys.CONFIG_TABLE]!,
+  issueSnsTopicArn: process.env[envKeys.ISSUE_SNS_TOPIC_ARN]!,
+  schedulerRoleArn: process.env[envKeys.SCHEDULER_ROLE_ARN]!,
+}
 
-    for (const testResourceProvider of testResourceProviders) {
-      let output = testResourceProvider.createTestResources(this);
-      this.outputs = {...this.outputs, ...output}
-    }
-
-    cdk.Stack.of(this);
+export function extractOutputsFrom(hubStack: AwsInstanceSchedulerStack): Record<string, CfnOutput> {
+  return {
+    [envKeys.CONFIG_TABLE]: hubStack.configurationTableOutput,
+    [envKeys.ISSUE_SNS_TOPIC_ARN]: hubStack.issueSnsTopicArn,
+    [envKeys.SCHEDULER_ROLE_ARN]: hubStack.schedulerRoleArn
   }
 }

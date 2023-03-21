@@ -690,7 +690,6 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         "5",
         "7",
         "14",
-        "14",
         "30",
         "60",
         "90",
