@@ -1,17 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import * as codebuild from "aws-cdk-lib/aws-codebuild";
+import * as pipeslines from "aws-cdk-lib/pipelines"
 import CodeStarSource from "./code-star-source";
 import {Construct} from "constructs";
-import {CodeBuildStep, CodePipeline} from "aws-cdk-lib/pipelines";
-import * as codebuild from "aws-cdk-lib/aws-codebuild";
-import {ComputeType, LinuxBuildImage} from "aws-cdk-lib/aws-codebuild";
-import {CfnOutput, Stack, Stage} from "aws-cdk-lib";
+import {Stack, Stage} from "aws-cdk-lib";
 import {StringParameter} from "aws-cdk-lib/aws-ssm";
 import {AwsInstanceSchedulerStack} from "../../instance-scheduler/lib/aws-instance-scheduler-stack";
 import {NagSuppressions} from "cdk-nag";
 import {E2eTestStack} from "./e2e-test-stack";
 import {Effect, PolicyStatement} from "aws-cdk-lib/aws-iam";
+import * as hubStackUtils from "../e2e-tests/utils/hub-stack-utils";
 
 const DEPLOY_STAGE_NAME = "Deployment-Test";
 const END_TO_END_STAGE_NAME = "End-to-End-Tests"
@@ -41,12 +41,12 @@ class PipelineStack extends Stack {
   constructor(scope: Construct, construct_id: string) {
     super(scope, construct_id);
 
-    const pipeline = new CodePipeline(this, "Pipeline", {
+    const pipeline = new pipeslines.CodePipeline(this, "Pipeline", {
       synth: this.getSynthStep(),
       codeBuildDefaults: {
         buildEnvironment: {
-          buildImage: LinuxBuildImage.STANDARD_6_0,
-          computeType: ComputeType.LARGE,
+          buildImage: codebuild.LinuxBuildImage.STANDARD_6_0,
+          computeType: codebuild.ComputeType.LARGE,
           privileged: true
         },
       },
@@ -63,8 +63,7 @@ class PipelineStack extends Stack {
     const e2eTestStage = new EndToEndTestStage(this, END_TO_END_STAGE_NAME)
     pipeline.addStage(e2eTestStage, {
       post: [
-        this.getEndToEndTestStep({...e2eTestStage.e2eTestResourcesStack.outputs,
-          "configTable": deployStage.instanceSchedulerStack.configurationTableOutput})
+        this.getEndToEndTestStep(deployStage.instanceSchedulerStack, e2eTestStage.e2eTestResourcesStack)
       ]
     })
 
@@ -114,7 +113,7 @@ class PipelineStack extends Stack {
   }
 
   getSynthStep() {
-    return new CodeBuildStep("Synth", {
+    return new pipeslines.CodeBuildStep("Synth", {
       input: this.get_connection(),
       installCommands: [
         'pip install tox',
@@ -130,7 +129,7 @@ class PipelineStack extends Stack {
   }
 
   getUnitTestStep() {
-    return new CodeBuildStep("unitTests", {
+    return new pipeslines.CodeBuildStep("unitTests", {
 
       installCommands: ["pip install tox"],
       commands: [
@@ -155,13 +154,18 @@ class PipelineStack extends Stack {
     });
   }
 
-  getEndToEndTestStep(outputs: Record<string, CfnOutput>) {
-    return new CodeBuildStep("EndToEndTests", {
+  getEndToEndTestStep(mainInstanceSchedulerStack: AwsInstanceSchedulerStack, testingResourcesStack: E2eTestStack) {
+
+
+    return new pipeslines.CodeBuildStep("EndToEndTests", {
       installCommands: ["pip install tox"],
       commands: [
         'tox -e e2e',
       ],
-      envFromCfnOutputs: outputs,
+      envFromCfnOutputs: {
+        ...testingResourcesStack.outputs,
+        ...hubStackUtils.extractOutputsFrom(mainInstanceSchedulerStack)
+      },
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
           e2e_test_reports: {
@@ -195,6 +199,10 @@ class DeployStage extends Stage {
     solutionId: "",
     solutionName: "",
     solutionVersion: "",
+    paramOverrides: {
+      schedulerFrequency: "1",
+      scheduledServices: "Both",
+    }
   });
 }
 

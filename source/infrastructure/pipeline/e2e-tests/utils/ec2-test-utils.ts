@@ -12,22 +12,17 @@
  *  express or implied. See the License for the specific language governing   *
  *  permissions and limitations under the License.                            *
  *****************************************************************************/
-import * as cdk from "aws-cdk-lib"
-import {Construct} from "constructs";
-import {testResourceProviders} from "../e2e-tests";
-import {CfnOutput} from "aws-cdk-lib";
+import * as ec2 from "@aws-sdk/client-ec2";
 
-export class E2eTestStack extends cdk.Stack {
+export async function getInstanceState(client: ec2.EC2Client, instanceId: string) {
+  const result = await client.send(
+    new ec2.DescribeInstanceStatusCommand({
+      InstanceIds: [instanceId],
+      IncludeAllInstances: true
+    })
+  )
 
-  outputs: Record<string, CfnOutput> = {}
-  constructor(scope: Construct, id: string) {
-    super(scope, id);
+  if(!result.InstanceStatuses) throw new Error(`Instance with id of ${instanceId} Not Found`)
 
-    for (const testResourceProvider of testResourceProviders) {
-      let output = testResourceProvider.createTestResources(this);
-      this.outputs = {...this.outputs, ...output}
-    }
-
-    cdk.Stack.of(this);
-  }
+  return result.InstanceStatuses![0].InstanceState!.Name
 }

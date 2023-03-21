@@ -39,6 +39,28 @@ export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
   readonly solutionVersion: string,
   readonly appregApplicationName: string,
   readonly appregSolutionName: string,
+
+  readonly paramOverrides?: AwsInstanceSchedulerParameterDefaultOverrides
+}
+
+export interface AwsInstanceSchedulerParameterDefaultOverrides {
+  readonly schedulingActive?: "Yes"|"No",
+  readonly scheduledServices?: "EC2"|"RDS"|"Both",
+  readonly scheduleRdsClusters?: "Yes"|"No",
+  readonly createRdsSnapshot?: "Yes"|"No",
+  readonly memorySize?: "128"|"384"|"512"|"640"|"768"|"896"|"1024"|"1152"|"1280"|"1408"|"1536",
+  readonly useCloudWatchMetrics?: "Yes"|"No",
+  readonly logRetention?: "1"|"3"|"5"|"7"|"14"|"30"|"60"|"90"|"120"|"150"|"180"|"365"|"400"|"545"|"731"|"1827"|"3653",
+  readonly trace?: "Yes"|"No",
+  readonly enableSSMMaintenanceWindows?: "Yes"|"No",
+  readonly tagName?: string,
+  readonly defaultTimezone?: string,
+  readonly regions?: string,
+  readonly crossAccountRoles?: string,
+  readonly startedTags?: string,
+  readonly stoppedTags?: string,
+  readonly schedulerFrequency?: "1"|"2"|"5"|"10"|"15"|"30"|"60",
+  readonly scheduleLambdaAccount?: "Yes"|"No",
 }
 
 /*
@@ -51,9 +73,10 @@ export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
 */
 export class AwsInstanceSchedulerStack extends cdk.Stack {
 
+
   readonly configurationTableOutput: CfnOutput;
-  readonly IssueSnsTopicArn: CfnOutput;
-  readonly SchedulerRoleArn: CfnOutput;
+  readonly issueSnsTopicArn: CfnOutput;
+  readonly schedulerRoleArn: CfnOutput;
 
   constructor(scope: Construct, id: string, props: AwsInstanceSchedulerStackProps) {
     super(scope, id, props);
@@ -64,69 +87,69 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       description: 'Activate or deactivate scheduling.',
       type: "String",
       allowedValues: ["Yes", "No"],
-      default: "Yes"
+      default: props.paramOverrides?.schedulingActive ?? "Yes"
     });
 
     const scheduledServices = new cdk.CfnParameter(this, 'ScheduledServices', {
       description: 'Scheduled Services.',
       type: "String",
       allowedValues: ["EC2", "RDS", "Both"],
-      default: "EC2"
+      default: props.paramOverrides?.scheduledServices ?? "EC2"
     });
 
     const scheduleRdsClusters = new cdk.CfnParameter(this, 'ScheduleRdsClusters', {
       description: 'Enable scheduling of Aurora clusters for RDS Service.',
       type: "String",
       allowedValues: ["Yes", "No"],
-      default: "No"
+      default: props.paramOverrides?.scheduleRdsClusters ?? "No"
     });
 
     const createRdsSnapshot = new cdk.CfnParameter(this, 'CreateRdsSnapshot', {
       description: 'Create snapshot before stopping RDS instances (does not apply to Aurora Clusters).',
       type: "String",
       allowedValues: ["Yes", "No"],
-      default: "No"
+      default: props.paramOverrides?.createRdsSnapshot ?? "No"
     });
 
     const memorySize = new cdk.CfnParameter(this, 'MemorySize', {
       description: 'Size of the Lambda function running the scheduler, increase size when processing large numbers of instances.',
       type: "Number",
       allowedValues: ["128", "384", "512", "640", "768", "896", "1024", "1152", "1280", "1408", "1536"],
-      default: 128
+      default: props.paramOverrides?.memorySize ?? 128
     });
 
     const useCloudWatchMetrics = new cdk.CfnParameter(this, 'UseCloudWatchMetrics', {
       description: 'Collect instance scheduling data using CloudWatch metrics.',
       type: "String",
       allowedValues: ["Yes", "No"],
-      default: "No"
+      default: props.paramOverrides?.useCloudWatchMetrics ?? "No"
     });
 
     const logRetention = new cdk.CfnParameter(this, 'LogRetentionDays', {
       description: 'Retention days for scheduler logs.',
       type: "Number",
-      allowedValues: ["1", "3", "5", "7", "14", "14", "30", "60", "90", "120", "150", "180", "365", "400", "545", "731", "1827", "3653"],
-      default: 30
+      allowedValues: ["1", "3", "5", "7", "14", "30", "60", "90", "120", "150", "180", "365", "400", "545", "731", "1827", "3653"],
+      default: props.paramOverrides?.logRetention ?? 30
     });
 
     const trace = new cdk.CfnParameter(this, 'Trace', {
       description: 'Enable logging of detailed information in CloudWatch logs.',
       type: 'String',
       allowedValues: ["Yes", "No"],
-      default: "No"
+      default: props.paramOverrides?.trace ?? "No"
     });
     
     const enableSSMMaintenanceWindows = new cdk.CfnParameter(this, 'EnableSSMMaintenanceWindows', {
       description: 'Enable the solution to load SSM Maintenance Windows, so that they can be used for EC2 instance Scheduling.',
       type: 'String',
       allowedValues: ["Yes", "No"],
-      default: "No"
+      default: props.paramOverrides?.enableSSMMaintenanceWindows ?? "No"
     });
 
     const tagName = new cdk.CfnParameter(this, 'TagName', {
       description: 'Name of tag to use for associating instance schedule schemas with service instances.',
       type: 'String',
-      default: "Schedule",
+      default: props.paramOverrides?.tagName ?? "Schedule",
       minLength: 1,
       maxLength: 127
     });
@@ -134,32 +157,32 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     const defaultTimezone = new cdk.CfnParameter(this, 'DefaultTimezone', {
       description: 'Choose the default Time Zone. Default is \'UTC\'.',
       type: 'String',
-      default: 'UTC',
+      default: props.paramOverrides?.defaultTimezone ?? 'UTC',
       allowedValues: SUPPORTED_TIME_ZONES
     })
 
     const regions = new cdk.CfnParameter(this, 'Regions', {
       type: 'CommaDelimitedList',
       description: 'List of regions in which instances are scheduled, leave blank for current region only.',
-      default: ''
+      default: props.paramOverrides?.regions ?? ''
     })
 
     const crossAccountRoles = new cdk.CfnParameter(this, 'CrossAccountRoles', {
       type: 'CommaDelimitedList',
       description: 'Comma separated list of ARN\'s for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.',
-      default: ''
+      default: props.paramOverrides?.crossAccountRoles ?? ''
     })
 
     const startedTags = new cdk.CfnParameter(this, 'StartedTags', {
       type: 'String',
       description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on started instances',
-      default: ''
+      default: props.paramOverrides?.startedTags ?? ''
     })
 
     const stoppedTags = new cdk.CfnParameter(this, 'StoppedTags', {
       type: 'String',
       description: 'Comma separated list of tagname and values on the formt name=value,name=value,.. that are set on stopped instances',
-      default: ''
+      default: props.paramOverrides?.stoppedTags ??''
     })
 
     const schedulerFrequency = new cdk.CfnParameter(this, 'SchedulerFrequency', {
@@ -174,13 +197,13 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         "30",
         "60"
       ],
-      default: "5"
+      default: props.paramOverrides?.schedulerFrequency ?? "5"
     })
 
     const scheduleLambdaAccount = new cdk.CfnParameter(this, 'ScheduleLambdaAccount', {
       type: "String",
       allowedValues: ["Yes", "No"],
-      default: "Yes",
+      default: props.paramOverrides?.scheduleLambdaAccount ?? "Yes",
       description: "Schedule instances in this account."
     })
 
@@ -388,12 +411,12 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       description: 'Name of the DynamoDB configuration table'
     })
 
-    this.IssueSnsTopicArn = new cdk.CfnOutput(this, 'IssueSnsTopicArn', {
+    this.issueSnsTopicArn = new cdk.CfnOutput(this, 'IssueSnsTopicArn', {
       value: snsTopic.topicArn,
       description: 'Topic to subscribe to for notifications of errors and warnings'
     })
 
-    this.SchedulerRoleArn = new cdk.CfnOutput(this, 'SchedulerRoleArn', {
+    this.schedulerRoleArn = new cdk.CfnOutput(this, 'SchedulerRoleArn', {
       value: schedulerRole.roleArn,
       description: 'Role for the instance scheduler lambda function'
     })
