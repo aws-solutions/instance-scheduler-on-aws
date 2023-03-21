@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import CodeStarSource from "./code-star-source";
-import { Construct } from "constructs";
+import {Construct} from "constructs";
 import {CodeBuildStep, CodePipeline} from "aws-cdk-lib/pipelines";
-import { ComputeType, LinuxBuildImage } from "aws-cdk-lib/aws-codebuild";
-import {CfnOutput, Stack, Stage} from "aws-cdk-lib";
-import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
-import { AwsInstanceSchedulerStack } from "../../instance-scheduler/lib/aws-instance-scheduler-stack";
+import {ComputeType, LinuxBuildImage} from "aws-cdk-lib/aws-codebuild";
+import {CfnOutput, Stack, Stage} from "aws-cdk-lib";
+import {StringParameter} from "aws-cdk-lib/aws-ssm";
+import {AwsInstanceSchedulerStack} from "../../instance-scheduler/lib/aws-instance-scheduler-stack";
 import {NagSuppressions} from "cdk-nag";
 import {E2eTestStack} from "./e2e-test-stack";
+import {Effect, PolicyStatement} from "aws-cdk-lib/aws-iam";
 
 const DEPLOY_STAGE_NAME = "Deployment-Test";
 const END_TO_END_STAGE_NAME = "End-to-End-Tests"
@@ -170,7 +171,13 @@ class PipelineStack extends Stack {
           }
         },
       }),
-      rolePolicyStatements: [],
+      rolePolicyStatements: [
+        new PolicyStatement({
+          effect: Effect.ALLOW,
+          actions: ['*'],
+          resources: ['*']
+        })
+      ],
     });
   }
 
