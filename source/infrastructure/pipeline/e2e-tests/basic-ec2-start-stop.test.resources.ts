@@ -5,8 +5,21 @@ import {NagSuppressions} from "cdk-nag";
 import {TestResourceProvider} from "./index";
 
 
-export const START_STOP_TEST_SCHEDULE_NAME = 'basic-start-stop-test-schedule'
-export const START_STOP_TEST_INSTANCE_ID_OUT_PATH = 'basic-start-stop-instance-id'
+const startStopTestScheduleName = 'ec2_basic_start_stop_test_schedule'
+const ec2InstanceEnvKey = 'basic_start_stop_instance_id'
+export const RESOURCES = {
+  EC2InstanceID: {
+    envKey: ec2InstanceEnvKey,
+    get: ()=> {
+      return process.env[ec2InstanceEnvKey];
+    }
+  },
+  StartStopTestScheduleName: {
+    get: ()=> {
+      return startStopTestScheduleName;
+    }
+  }
+}
 export class EC2StartStopTestResources implements TestResourceProvider {
   createTestResources(scope: Construct) {
 
@@ -17,12 +30,12 @@ export class EC2StartStopTestResources implements TestResourceProvider {
     const testInstance = new ec2.Instance(scope, "basic-start-stop-instance", {
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.MICRO),
       machineImage: ec2.MachineImage.latestAmazonLinux(),
-      vpc: vpc
+      vpc: vpc,
     })
 
-    cdk.Tags.of(testInstance).add("Schedule", START_STOP_TEST_SCHEDULE_NAME)
+    cdk.Tags.of(testInstance).add("Schedule", RESOURCES.StartStopTestScheduleName.get())
 
-    const startStopOut = new cdk.CfnOutput(scope, "SOSSO", {
+    const startStopOut = new cdk.CfnOutput(scope, RESOURCES.EC2InstanceID.envKey, {
       value: testInstance.instanceId,
     })
 
@@ -45,14 +58,7 @@ export class EC2StartStopTestResources implements TestResourceProvider {
     ])
 
     return {
-      "SV_StartStop": startStopOut,
-      "SV_VPC": new cdk.CfnOutput(scope, "SV_VPC", {
-        value: vpc.vpcArn
-      }),
-      "SV_FixedTest": new cdk.CfnOutput(scope, "SV_FixedTest", {
-        value: "searchable-value1",
-        exportName: "exportName"
-      })
+      [RESOURCES.EC2InstanceID.envKey]: startStopOut,
     }
   }
 
