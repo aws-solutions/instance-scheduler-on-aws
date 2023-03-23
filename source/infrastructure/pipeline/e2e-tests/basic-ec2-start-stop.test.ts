@@ -26,7 +26,7 @@ const dynamoClient = new dynamodb.DynamoDBClient({});
 const instanceId = resourceParams.ec2InstanceId;
 
 test('instanceId exists', ()=> {
-  expect(instanceId).not.toBeNull()
+  expect(instanceId).not.toBeUndefined()
 })
 test('basic ec2 start-stop schedule',  async ()=> {
   //stop instance
