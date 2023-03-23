@@ -32,7 +32,8 @@ export class EC2StartStopTestResources implements TestResourceProvider {
   createTestResources(scope: Construct) {
 
     const vpc = new ec2.Vpc(scope, "basic-start-stop-vpc", {
-      natGateways: 0
+      natGateways: 0,
+      ipAddresses: ec2.IpAddresses.cidr("10.0.0.0/16")
     })
 
     const testInstance = new ec2.Instance(scope, "basic-start-stop-instance", {
