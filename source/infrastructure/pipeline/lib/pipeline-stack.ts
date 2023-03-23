@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
-import * as pipeslines from "aws-cdk-lib/pipelines"
+import * as pipelines from "aws-cdk-lib/pipelines"
 import CodeStarSource from "./code-star-source";
 import {Construct} from "constructs";
 import {Stack, Stage} from "aws-cdk-lib";
@@ -41,7 +41,7 @@ class PipelineStack extends Stack {
   constructor(scope: Construct, construct_id: string) {
     super(scope, construct_id);
 
-    const pipeline = new pipeslines.CodePipeline(this, "Pipeline", {
+    const pipeline = new pipelines.CodePipeline(this, "Pipeline", {
       synth: this.getSynthStep(),
       codeBuildDefaults: {
         buildEnvironment: {
@@ -113,7 +113,7 @@ class PipelineStack extends Stack {
   }
 
   getSynthStep() {
-    return new pipeslines.CodeBuildStep("Synth", {
+    return new pipelines.CodeBuildStep("Synth", {
       input: this.get_connection(),
       installCommands: [
         'pip install tox',
@@ -129,7 +129,7 @@ class PipelineStack extends Stack {
   }
 
   getUnitTestStep() {
-    return new pipeslines.CodeBuildStep("unitTests", {
+    return new pipelines.CodeBuildStep("unitTests", {
 
       installCommands: ["pip install tox"],
       commands: [
@@ -157,7 +157,7 @@ class PipelineStack extends Stack {
   getEndToEndTestStep(mainInstanceSchedulerStack: AwsInstanceSchedulerStack, testingResourcesStack: E2eTestStack) {
 
 
-    return new pipeslines.CodeBuildStep("EndToEndTests", {
+    return new pipelines.CodeBuildStep("EndToEndTests", {
       installCommands: ["pip install tox"],
       commands: [
         'tox -e e2e',
