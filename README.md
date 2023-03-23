@@ -51,7 +51,11 @@ AWS Solutions use two buckets: a bucket for global access to templates, which is
 
 **Build the solution**
 
-From the *deployment* folder in your cloned repo, run build-s3-dist.sh, passing the root name of your bucket (ex. mybucket), name of the solution i.e. aws-instance-scheduler and the version you are building (ex. v1.4.0). We recommend using a similar version based on the version downloaded from GitHub (ex. GitHub: v1.4.0, your build: v1.4.0.mybuild)
+From the *deployment* folder in your cloned repo, run build-s3-dist.sh, passing the root name of 
+your bucket(ex. mybucket), name of the solution i.e. aws-instance-scheduler 
+and the version you are building (ex. v1.5.0). 
+We recommend using a similar version based on the version downloaded from GitHub 
+(ex. GitHub: v1.5.0, your build: v1.5.0.mybuild)
 
 ```
 chmod +x build-s3-dist.sh
@@ -64,13 +68,13 @@ build-s3-dist.sh <bucketname> aws-instance-scheduler <version>
 
 Upload the template and the lambda to your bucket in the following pattern,
 ```
-s3://mybucket-us-east-1/aws-instance-scheduler/v1.4.0/instance-scheduler.zip (lambda Code)
+s3://mybucket-us-east-1/aws-instance-scheduler/v1.5.0/instance-scheduler.zip (lambda Code)
 ```
 
 Templates
 ```
-s3://mybucket/aws-instance-scheduler/v1.4.0/instance-scheduler.template
-s3://mybucket/aws-instance-scheduler/v1.4.0/instance-scheduler-remote.template
+s3://mybucket/aws-instance-scheduler/v1.5.0/instance-scheduler.template
+s3://mybucket/aws-instance-scheduler/v1.5.0/instance-scheduler-remote.template
 ```
 
 ### Deploy
@@ -141,17 +145,17 @@ branch = develop
 ### Step 3 - Deploy the Testing Pipeline
 
 ```
-cd /source/infrastructure
+cd source/infrastructure
+npm install
+cd pipeline
 cdk bootstrap
-cdk deploy testing-pipeline
+cdk deploy aws-instance-scheduler-testing-pipeline
 ```
 This will deploy the automated testing pipeline into your AWS account which will then begin running tests against your
 development fork automatically
 
 To view the results. Go to [CodePipeline](https://us-east-1.console.aws.amazon.com/codesuite/codepipeline/pipelines) and
 click on the pipeline that begins with aws-instance-scheduler-testing-pipeline
-
-(note - the final deployment stage failing is expected. this will be fixed in a later PR)
 
 # CDK Documentation
 
