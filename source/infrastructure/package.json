@@ -8,6 +8,7 @@
     "cleanup": "tsc --build ./ --clean && rm -rf node_modules && rm -f package-lock.json",
     "build": "tsc",
     "watch": "tsc -w",
+    "synth": "cd instance-scheduler && cdk synth",
     "test": "jest --config instance-scheduler/jest.config.ts",
     "e2e-tests": "jest --config pipeline/jest.config.ts",
     "cdk": "cdk"
