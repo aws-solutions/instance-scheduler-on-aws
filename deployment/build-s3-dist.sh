@@ -66,7 +66,7 @@ echo "--------------------------------------------------------------------------
 # Install the npm install in the source folder
 cd "$cdk_source_dir"
 npm ci
-node_modules/aws-cdk/bin/cdk synth --no-version-reporting
+npm run synth -- --no-version-reporting
 
 echo "------------------------------------------------------------------------------"
 echo "[Packing] Template artifacts"
