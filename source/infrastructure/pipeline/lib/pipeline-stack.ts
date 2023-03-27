@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as codebuild from "aws-cdk-lib/aws-codebuild";
-import * as pipelines from "aws-cdk-lib/pipelines"
+import * as pipelines from "aws-cdk-lib/pipelines";
 import CodeStarSource from "./code-star-source";
-import {Construct} from "constructs";
-import {Stack, Stage} from "aws-cdk-lib";
-import {StringParameter} from "aws-cdk-lib/aws-ssm";
-import {AwsInstanceSchedulerStack} from "../../instance-scheduler/lib/aws-instance-scheduler-stack";
-import {NagSuppressions} from "cdk-nag";
-import {E2eTestStack} from "./e2e-test-stack";
-import {Effect, PolicyStatement} from "aws-cdk-lib/aws-iam";
+import { Construct } from "constructs";
+import { Stack, Stage } from "aws-cdk-lib";
+import { StringParameter } from "aws-cdk-lib/aws-ssm";
+import { AwsInstanceSchedulerStack } from "../../instance-scheduler/lib/aws-instance-scheduler-stack";
+import { NagSuppressions } from "cdk-nag";
+import { E2eTestStack } from "./e2e-test-stack";
+import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import * as hubStackUtils from "../e2e-tests/utils/hub-stack-utils";
 
 const DEPLOY_STAGE_NAME = "Deployment-Test";
-const END_TO_END_STAGE_NAME = "End-to-End-Tests"
+const END_TO_END_STAGE_NAME = "End-to-End-Tests";
 const STACK_NAME = "InstanceScheduler";
 const TEST_RESOURCES_STACK_NAME = "InstanceSchedulerE2ETestResources";
 
@@ -47,107 +47,77 @@ class PipelineStack extends Stack {
         buildEnvironment: {
           buildImage: codebuild.LinuxBuildImage.STANDARD_6_0,
           computeType: codebuild.ComputeType.LARGE,
-          privileged: true
+          privileged: true,
         },
       },
     });
 
-    const deployStage = new DeployStage(this, DEPLOY_STAGE_NAME)
+    const deployStage = new DeployStage(this, DEPLOY_STAGE_NAME);
     pipeline.addStage(deployStage, {
-      pre: [
-        this.getUnitTestStep()
-      ]
-
+      pre: [this.getUnitTestStep()],
     });
 
-    const e2eTestStage = new EndToEndTestStage(this, END_TO_END_STAGE_NAME)
+    const e2eTestStage = new EndToEndTestStage(this, END_TO_END_STAGE_NAME);
     pipeline.addStage(e2eTestStage, {
-      post: [
-        this.getEndToEndTestStep(deployStage.instanceSchedulerStack, e2eTestStage.e2eTestResourcesStack)
-      ]
-    })
-
-
+      post: [this.getEndToEndTestStep(deployStage.instanceSchedulerStack, e2eTestStage.e2eTestResourcesStack)],
+    });
 
     //pipeline must be built before findings can be suppressed
     pipeline.buildPipeline();
     NagSuppressions.addStackSuppressions(this, [
       {
         id: "AwsSolutions-IAM5",
-        reason: "necessary permissions for the pipeline to build, update, and self-mutate"
+        reason: "necessary permissions for the pipeline to build, update, and self-mutate",
       },
       {
         id: "AwsSolutions-CB4",
-        reason: "Update step provided by construct"
-      }
+        reason: "Update step provided by construct",
+      },
     ]);
 
     NagSuppressions.addResourceSuppressions(pipeline.pipeline.artifactBucket, [
       {
         id: "AwsSolutions-S1",
-        reason: "Bucket is used internally by the pipeline and does not need access logging"
-      }
+        reason: "Bucket is used internally by the pipeline and does not need access logging",
+      },
     ]);
   }
 
   get_connection() {
     return new CodeStarSource(
-        "CodeStarConnection",
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/arn"
-        ),
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/owner"
-        ),
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/repo"
-        ),
-        StringParameter.valueForStringParameter(
-            this,
-            "/InstanceScheduler-build/connection/branch"
-        )
+      "CodeStarConnection",
+      StringParameter.valueForStringParameter(this, "/InstanceScheduler-build/connection/arn"),
+      StringParameter.valueForStringParameter(this, "/InstanceScheduler-build/connection/owner"),
+      StringParameter.valueForStringParameter(this, "/InstanceScheduler-build/connection/repo"),
+      StringParameter.valueForStringParameter(this, "/InstanceScheduler-build/connection/branch")
     );
   }
 
   getSynthStep() {
     return new pipelines.CodeBuildStep("Synth", {
       input: this.get_connection(),
-      installCommands: [
-        'pip install tox',
-      ],
-      commands: [
-        'cd source/infrastructure',
-        'npm ci',
-        'cd pipeline',
-        'npx cdk synth',
-      ],
-      primaryOutputDirectory: 'build/cdk.pipeline.out'
+      installCommands: ["pip install tox"],
+      commands: ["cd source/infrastructure", "npm ci", "cd pipeline", "npx cdk synth"],
+      primaryOutputDirectory: "build/cdk.pipeline.out",
     });
   }
 
   getUnitTestStep() {
     return new pipelines.CodeBuildStep("unitTests", {
-
       installCommands: ["pip install tox"],
-      commands: [
-        'tox -e cdk',
-        'tox -e lambda -- --junitxml=deployment/test-reports/lambda-test-report.xml'
-      ],
+      commands: ["tox -e cdk", "tox -e lambda -- --junitxml=deployment/test-reports/lambda-test-report.xml"],
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
           cdk_test_reports: {
             files: ["cdk-test-report.xml"],
             "file-format": "JUNITXML",
-            "base-directory": "deployment/test-reports"
+            "base-directory": "deployment/test-reports",
           },
           lambda_test_reports: {
             files: ["lambda-test-report.xml"],
             "file-format": "JUNITXML",
-            "base-directory": "deployment/test-reports"
-          }
+            "base-directory": "deployment/test-reports",
+          },
         },
       }),
       rolePolicyStatements: [],
@@ -155,36 +125,31 @@ class PipelineStack extends Stack {
   }
 
   getEndToEndTestStep(mainInstanceSchedulerStack: AwsInstanceSchedulerStack, testingResourcesStack: E2eTestStack) {
-
-
     return new pipelines.CodeBuildStep("EndToEndTests", {
       installCommands: ["pip install tox"],
-      commands: [
-        'tox -e e2e',
-      ],
+      commands: ["tox -e e2e"],
       envFromCfnOutputs: {
         ...testingResourcesStack.outputs,
-        ...hubStackUtils.extractOutputsFrom(mainInstanceSchedulerStack)
+        ...hubStackUtils.extractOutputsFrom(mainInstanceSchedulerStack),
       },
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
           e2e_test_reports: {
             files: ["e2e-test-report.xml"],
             "file-format": "JUNITXML",
-            "base-directory": "deployment/test-reports"
-          }
+            "base-directory": "deployment/test-reports",
+          },
         },
       }),
       rolePolicyStatements: [
         new PolicyStatement({
           effect: Effect.ALLOW,
-          actions: ['*'],
-          resources: ['*']
-        })
+          actions: ["*"],
+          resources: ["*"],
+        }),
       ],
     });
   }
-
 }
 
 class DeployStage extends Stage {
@@ -202,7 +167,7 @@ class DeployStage extends Stage {
     paramOverrides: {
       schedulerFrequency: "1",
       scheduledServices: "Both",
-    }
+    },
   });
 }
 
@@ -211,7 +176,7 @@ class EndToEndTestStage extends Stage {
     super(scope, construct_id);
   }
 
-  e2eTestResourcesStack = new E2eTestStack(this, TEST_RESOURCES_STACK_NAME)
+  e2eTestResourcesStack = new E2eTestStack(this, TEST_RESOURCES_STACK_NAME);
 }
 
 export default PipelineStack;

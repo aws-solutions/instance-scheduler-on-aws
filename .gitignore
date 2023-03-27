@@ -104,6 +104,9 @@ ENV/
 *.d.ts
 *.js
 
+# config
+!.eslintrc.js
+
 #ignore these in the deployment folder
 *regional-s3-assets*
 *staging*
