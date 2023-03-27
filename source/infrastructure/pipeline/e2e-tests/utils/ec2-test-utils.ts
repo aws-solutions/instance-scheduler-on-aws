@@ -1,28 +1,19 @@
-/*****************************************************************************
- *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.   *
- *                                                                            *
- *  Licensed under the Apache License, Version 2.0 (the "License"). You may   *
- *  not use this file except in compliance with the License. A copy of the    *
- *  License is located at                                                     *
- *                                                                            *
- *      http://www.apache.org/licenses/LICENSE-2.0                            *
- *                                                                            *
- *  or in the 'license' file accompanying this file. This file is distributed *
- *  on an 'AS IS' BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,        *
- *  express or implied. See the License for the specific language governing   *
- *  permissions and limitations under the License.                            *
- *****************************************************************************/
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import * as ec2 from "@aws-sdk/client-ec2";
 
 export async function getInstanceState(client: ec2.EC2Client, instanceId: string) {
   const result = await client.send(
     new ec2.DescribeInstanceStatusCommand({
       InstanceIds: [instanceId],
-      IncludeAllInstances: true
+      IncludeAllInstances: true,
     })
-  )
+  );
 
-  if(!result.InstanceStatuses) throw new Error(`Instance with id of ${instanceId} Not Found`)
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  if (!result.InstanceStatuses) throw new Error(`Instance with id of ${instanceId} Not Found`);
 
-  return result.InstanceStatuses![0].InstanceState!.Name
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return result.InstanceStatuses![0].InstanceState!.Name;
 }
