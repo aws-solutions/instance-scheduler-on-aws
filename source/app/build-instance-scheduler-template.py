@@ -31,6 +31,11 @@ def main(template_file, bucket, solution, version):
     print(json.dumps(template, indent=4))
 
 
-main(template_file=sys.argv[1], bucket=sys.argv[2], solution=sys.argv[3], version=sys.argv[4])
+main(
+    template_file=sys.argv[1],
+    bucket=sys.argv[2],
+    solution=sys.argv[3],
+    version=sys.argv[4],
+)
 
 exit(0)

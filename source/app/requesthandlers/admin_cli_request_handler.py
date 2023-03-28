@@ -42,35 +42,39 @@ class AdminCliRequestHandler(object):
 
         self.additional_parameters = {
             "delete-period": {"exception_if_not_exists": True},
-            "delete-schedule": {"exception_if_not_exists": True}
+            "delete-schedule": {"exception_if_not_exists": True},
         }
 
-        self.transform_parameters = {
-            "metrics": "use-metrics"
-        }
+        self.transform_parameters = {"metrics": "use-metrics"}
 
         self.commands = {
             "create-period": "create_period",
             "create-schedule": "create_schedule",
             "delete-period": "delete_period",
             "delete-schedule": "delete_schedule",
-            "describe-periods": "list_periods" if self.parameters.get(configuration.NAME) is None else "get_period",
+            "describe-periods": "list_periods"
+            if self.parameters.get(configuration.NAME) is None
+            else "get_period",
             "describe-schedule-usage": "get_schedule_usage",
-            "describe-schedules": "list_schedules" if self.parameters.get(configuration.NAME) is None else "get_schedule",
+            "describe-schedules": "list_schedules"
+            if self.parameters.get(configuration.NAME) is None
+            else "get_schedule",
             "update-period": "update_period",
-            "update-schedule": "update_schedule"
+            "update-schedule": "update_schedule",
         }
 
         self.transformations = {
             "get_period": "{Periods:[Period]}",
-            "get_schedule": "{Schedules:[Schedule]}"
+            "get_schedule": "{Schedules:[Schedule]}",
         }
 
         # Setup logging
         classname = self.__class__.__name__
         dt = datetime.utcnow()
         log_stream = LOG_STREAM.format(classname, dt.year, dt.month, dt.day)
-        self._logger = Logger(logstream=log_stream, buffersize=20, context=self._context)
+        self._logger = Logger(
+            logstream=log_stream, buffersize=20, context=self._context
+        )
 
     @property
     def action(self):
@@ -127,7 +131,6 @@ class AdminCliRequestHandler(object):
 
         # noinspection PyShadowingNames
         def dict_to_pascal_case(d):
-
             d_result = {}
 
             if isinstance(d, dict):
@@ -142,7 +145,11 @@ class AdminCliRequestHandler(object):
             return d
 
         try:
-            self._logger.info("Handler {} : Received CLI request {}", self.__class__.__name__, json.dumps(self._event))
+            self._logger.info(
+                "Handler {} : Received CLI request {}",
+                self.__class__.__name__,
+                json.dumps(self._event),
+            )
 
             # get access to admin api
             admin = ConfigAdmin(logger=self._logger, context=self._context)
@@ -154,7 +161,9 @@ class AdminCliRequestHandler(object):
             fn = getattr(admin, fn_name)
 
             # calling the mapped admin api method
-            self._logger.info("Calling \"{}\" with parameters {}", fn.__name__, self.parameters)
+            self._logger.info(
+                'Calling "{}" with parameters {}', fn.__name__, self.parameters
+            )
             api_result = fn(**self.parameters)
 
             # convert to awscli PascalCase output format

@@ -15,8 +15,8 @@
 import boto3
 import util
 
-class DynamoDBUtils:
 
+class DynamoDBUtils:
     @staticmethod
     def get_dynamodb_table_resource_ref(table_name):
         return boto3.resource("dynamodb", config=util.get_config()).Table(table_name)

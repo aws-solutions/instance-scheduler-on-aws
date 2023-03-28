@@ -21,6 +21,7 @@ class ConfigDynamodbAdapter:
     """
     Adapter to load configuration from a DynamoDB storage type.
     """
+
     def __init__(self, tablename):
         self._tablename = tablename
         self._config = None
@@ -36,14 +37,15 @@ class ConfigDynamodbAdapter:
         return self._config
 
     def _get_config(self):
-
         dynamodb_table = DynamoDBUtils.get_dynamodb_table_resource_ref(self._tablename)
 
-        resp = dynamodb_table.get_item(Key={"name": "scheduler", "type": "config"}, ConsistentRead=True)
+        resp = dynamodb_table.get_item(
+            Key={"name": "scheduler", "type": "config"}, ConsistentRead=True
+        )
         config = resp.get("Item", {})
-        resp = dynamodb_table.query(KeyConditionExpression=Key("type").eq('period'))
+        resp = dynamodb_table.query(KeyConditionExpression=Key("type").eq("period"))
         config[configuration.PERIODS] = resp.get("Items")
-        resp = dynamodb_table.query(KeyConditionExpression=Key("type").eq('schedule'))
+        resp = dynamodb_table.query(KeyConditionExpression=Key("type").eq("schedule"))
         config[configuration.SCHEDULES] = resp.get("Items")
 
         return config

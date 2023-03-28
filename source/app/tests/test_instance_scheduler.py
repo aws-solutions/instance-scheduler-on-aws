@@ -12,9 +12,9 @@ mock_boto_env_vars()
 def test_get_desired_state_and_type_1(mocker):
     instance = {}
     schedule = InstanceSchedule(
-        name='test-1',
+        name="test-1",
         periods={},
-        timezone='UTC',
+        timezone="UTC",
         override_status=None,
         description=None,
         use_metrics=None,
@@ -24,28 +24,28 @@ def test_get_desired_state_and_type_1(mocker):
         ssm_maintenance_window=True,
         enforced=False,
         hibernate=False,
-        retain_running=False
+        retain_running=False,
     )
-    instance['maintenance_window'] = schedule
-    instance["account"] = 'test'
-    instance["region"] = 'us-east-1'
-    instance["service"] = 'ec2'
-    instance["id"] = 'ut12y21232u'
-    inst = as_namedtuple('ec2' + "Instance", instance, excludes=["tags"])
+    instance["maintenance_window"] = schedule
+    instance["account"] = "test"
+    instance["region"] = "us-east-1"
+    instance["service"] = "ec2"
+    instance["id"] = "ut12y21232u"
+    inst = as_namedtuple("ec2" + "Instance", instance, excludes=["tags"])
     ec2_service = Ec2Service()
     scheduler_configuration = {}
     scheduler = InstanceScheduler(ec2_service, scheduler_configuration)
-    mocker.patch.object(scheduler, '_logger')
+    mocker.patch.object(scheduler, "_logger")
     inst_state, inst_type = scheduler.get_desired_state_and_type(schedule, inst)
-    assert inst_state == 'stopped'
+    assert inst_state == "stopped"
 
 
 def test_get_desired_state_and_type_2(mocker):
     instance = {}
     schedule = InstanceSchedule(
-        name='test-1',
+        name="test-1",
         periods={},
-        timezone='UTC',
+        timezone="UTC",
         override_status=None,
         description=None,
         use_metrics=None,
@@ -55,17 +55,17 @@ def test_get_desired_state_and_type_2(mocker):
         ssm_maintenance_window=True,
         enforced=False,
         hibernate=False,
-        retain_running=False
+        retain_running=False,
     )
-    instance['maintenance_window'] = None
-    instance["account"] = 'test'
-    instance["region"] = 'us-east-1'
-    instance["service"] = 'ec2'
-    instance["id"] = 'ut12y21232u'
-    inst = as_namedtuple('ec2' + "Instance", instance, excludes=["tags"])
+    instance["maintenance_window"] = None
+    instance["account"] = "test"
+    instance["region"] = "us-east-1"
+    instance["service"] = "ec2"
+    instance["id"] = "ut12y21232u"
+    inst = as_namedtuple("ec2" + "Instance", instance, excludes=["tags"])
     ec2_service = Ec2Service()
     scheduler_configuration = {}
     scheduler = InstanceScheduler(ec2_service, scheduler_configuration)
-    mocker.patch.object(scheduler, '_logger')
+    mocker.patch.object(scheduler, "_logger")
     inst_state, inst_type = scheduler.get_desired_state_and_type(schedule, inst)
-    assert inst_state == 'stopped'
+    assert inst_state == "stopped"

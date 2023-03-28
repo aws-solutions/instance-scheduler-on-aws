@@ -20,6 +20,7 @@ class MonthdaySetBuilder(SetBuilder):
     """
     Class for building sets of monthdays, 1-(28-31), ',', '-', '/", "*",  W for nearest weekday, L for last day of month
     """
+
     WILDCARD_WEEKDAY = "W"
     WILDCARD_LAST_WEEKDAY = "L"
 
@@ -33,13 +34,15 @@ class MonthdaySetBuilder(SetBuilder):
         self.month = month
         self._firstweekday, self._lastday = calendar.monthrange(year, month)
 
-        SetBuilder.__init__(self,
-                            min_value=1,
-                            max_value=self._lastday,
-                            offset=1,
-                            ignorecase=False,
-                            wrap=False,
-                            last_item_wildcard=MonthdaySetBuilder.WILDCARD_LAST_WEEKDAY)
+        SetBuilder.__init__(
+            self,
+            min_value=1,
+            max_value=self._lastday,
+            offset=1,
+            ignorecase=False,
+            wrap=False,
+            last_item_wildcard=MonthdaySetBuilder.WILDCARD_LAST_WEEKDAY,
+        )
 
         self._post_custom_parsers = [self._parse_weekday]
 

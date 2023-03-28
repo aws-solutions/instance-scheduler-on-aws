@@ -25,8 +25,12 @@ INF_PERIOD_NAME = "Creating period {}"
 INF_SCHEDULE_CREATED = "Created schedule {}"
 INF_SCHEDULE_NAME = "Creating schedule {}"
 
-ERR_INVALID_SCHEDULE_PROPERTY = "{} is not a valid property for a schedule, valid schedule properties are {}"
-ERR_INVALID_PERIOD_PROPERTY = "{} is not a valid property for a schedule period, valid period properties are {}"
+ERR_INVALID_SCHEDULE_PROPERTY = (
+    "{} is not a valid property for a schedule, valid schedule properties are {}"
+)
+ERR_INVALID_PERIOD_PROPERTY = (
+    "{} is not a valid property for a schedule period, valid period properties are {}"
+)
 
 PERIOD_DESCRIPTION = "Schedule {} period {}, do not delete or update manually"
 PERIOD_NAME = "{}-period-{:0>4d}"
@@ -69,7 +73,8 @@ VALID_SCHEDULE_PROPERTIES = [
     PROP_NO_STACK_PREFIX,
     PROP_HIBERNATE,
     "ServiceToken",
-    "Timeout"]
+    "Timeout",
+]
 
 VALID_PERIOD_PROPERTIES = [
     PROP_BEGIN_TIME,
@@ -78,7 +83,8 @@ VALID_PERIOD_PROPERTIES = [
     PROP_INSTANCE_TYPE,
     PROP_MONTH_DAYS,
     PROP_MONTHS,
-    PROP_WEEKDAYS]
+    PROP_WEEKDAYS,
+]
 
 LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
 
@@ -111,7 +117,10 @@ class ScheduleResourceHandler(CustomResource):
         :param event: Tested event
         :return: True if this is custom resource event for configuring schedule/periods
         """
-        return event.get("StackId") is not None and event.get("ResourceType") == "Custom::ServiceInstanceSchedule"
+        return (
+            event.get("StackId") is not None
+            and event.get("ResourceType") == "Custom::ServiceInstanceSchedule"
+        )
 
     @classmethod
     def _set_if_specified(cls, source, source_name, dest, dest_name=None, default=None):
@@ -121,41 +130,58 @@ class ScheduleResourceHandler(CustomResource):
 
     @property
     def _schedule_resource_name(self):
-        name = self.resource_properties.get(PROP_NAME,None)
+        name = self.resource_properties.get(PROP_NAME, None)
         if name is None:
             name = self.logical_resource_id
-        if str(self.resource_properties.get(PROP_NO_STACK_PREFIX, "False")).lower() == "true":
+        if (
+            str(self.resource_properties.get(PROP_NO_STACK_PREFIX, "False")).lower()
+            == "true"
+        ):
             return name
         return "{}-{}".format(self.stack_name, name)
 
     def _create_period(self, period):
-
         self.number_of_periods += 1
 
-        period_name = PERIOD_NAME.format(self._schedule_resource_name, self.number_of_periods)
+        period_name = PERIOD_NAME.format(
+            self._schedule_resource_name, self.number_of_periods
+        )
         self._logger.info(INF_PERIOD_NAME, period_name)
 
         for p in period:
             if p not in VALID_PERIOD_PROPERTIES:
-                raise ValueError(ERR_INVALID_PERIOD_PROPERTY.format(p, ", ".join(VALID_PERIOD_PROPERTIES)))
+                raise ValueError(
+                    ERR_INVALID_PERIOD_PROPERTY.format(
+                        p, ", ".join(VALID_PERIOD_PROPERTIES)
+                    )
+                )
 
-        create_period_args = {
+        create_period_args = {configuration.NAME: period_name}
 
-            configuration.NAME: period_name
-        }
+        self._set_if_specified(
+            period, PROP_BEGIN_TIME, create_period_args, configuration.BEGINTIME
+        )
+        self._set_if_specified(
+            period, PROP_END_TIME, create_period_args, configuration.ENDTIME
+        )
+        self._set_if_specified(
+            period, PROP_MONTH_DAYS, create_period_args, configuration.MONTHDAYS
+        )
+        self._set_if_specified(
+            period, PROP_MONTHS, create_period_args, configuration.MONTHS
+        )
+        self._set_if_specified(
+            period, PROP_WEEKDAYS, create_period_args, configuration.WEEKDAYS
+        )
 
-        self._set_if_specified(period, PROP_BEGIN_TIME, create_period_args, configuration.BEGINTIME)
-        self._set_if_specified(period, PROP_END_TIME, create_period_args, configuration.ENDTIME)
-        self._set_if_specified(period, PROP_MONTH_DAYS, create_period_args, configuration.MONTHDAYS)
-        self._set_if_specified(period, PROP_MONTHS, create_period_args, configuration.MONTHS)
-        self._set_if_specified(period, PROP_WEEKDAYS, create_period_args, configuration.WEEKDAYS)
-
-        create_period_args[configuration.DESCRIPTION] = PERIOD_DESCRIPTION.format(self._schedule_resource_name,
-                                                                                  self.number_of_periods)
+        create_period_args[configuration.DESCRIPTION] = PERIOD_DESCRIPTION.format(
+            self._schedule_resource_name, self.number_of_periods
+        )
         description_config = period.get(PROP_DESCRIPTION, None)
         if description_config is not None:
-            create_period_args[configuration.DESCRIPTION] = "{}, {}".format(description_config,
-                                                                            create_period_args[configuration.DESCRIPTION])
+            create_period_args[configuration.DESCRIPTION] = "{}, {}".format(
+                description_config, create_period_args[configuration.DESCRIPTION]
+            )
         period = self._admin.create_period(**create_period_args)
         instance_type = period.get(PROP_INSTANCE_TYPE, None)
 
@@ -175,37 +201,89 @@ class ScheduleResourceHandler(CustomResource):
                 self._logger.info(INF_DELETED_PERIOD, name)
 
     def _create_schedule(self):
-
         self._logger.info(INF_SCHEDULE_NAME, self._schedule_resource_name)
 
-        create_schedule_args = {
-            configuration.NAME: self._schedule_resource_name
-        }
+        create_schedule_args = {configuration.NAME: self._schedule_resource_name}
 
         ps = self.resource_properties
 
         for pr in ps:
-
             # fix for typo in older release, fix parameter if old version with typo is used for compatibility
             if pr == "UseMaintenaceWindow":
                 pr = PROP_USE_MAINTENANCE_WINDOW
 
             if pr not in VALID_SCHEDULE_PROPERTIES:
-                raise ValueError(ERR_INVALID_SCHEDULE_PROPERTY.format(pr, ", ".join(VALID_SCHEDULE_PROPERTIES)))
+                raise ValueError(
+                    ERR_INVALID_SCHEDULE_PROPERTY.format(
+                        pr, ", ".join(VALID_SCHEDULE_PROPERTIES)
+                    )
+                )
 
-        self._set_if_specified(ps, PROP_METRICS, create_schedule_args, dest_name=configuration.METRICS)
-        self._set_if_specified(ps, PROP_OVERWRITE, create_schedule_args, dest_name=configuration.OVERWRITE)
-        self._set_if_specified(ps, PROP_OVERRIDE_STATUS, create_schedule_args, dest_name=configuration.OVERRIDE_STATUS)
-        self._set_if_specified(ps, PROP_USE_MAINTENANCE_WINDOW, create_schedule_args,
-                               dest_name=configuration.USE_MAINTENANCE_WINDOW)
-        self._set_if_specified(ps, PROP_ENFORCED, create_schedule_args, dest_name=configuration.ENFORCED, default=False)
-        self._set_if_specified(ps, PROP_HIBERNATE, create_schedule_args, dest_name=configuration.HIBERNATE, default=False)
-        self._set_if_specified(ps, PROP_RETAIN_RUNNING, create_schedule_args, dest_name=configuration.RETAINED_RUNNING,
-                               default=False)
-        self._set_if_specified(ps, PROP_STOP_NEW, create_schedule_args, dest_name=configuration.STOP_NEW_INSTANCES, default=True)
-        self._set_if_specified(ps, PROP_TIMEZONE, create_schedule_args, dest_name=configuration.TIMEZONE, default="UTC")
-        self._set_if_specified(ps, PROP_DESCRIPTION, create_schedule_args, dest_name=configuration.DESCRIPTION)
-        self._set_if_specified(ps, PROP_SSM_MAINTENANCE_WINDOW, create_schedule_args, dest_name=configuration.SSM_MAINTENANCE_WINDOW)
+        self._set_if_specified(
+            ps, PROP_METRICS, create_schedule_args, dest_name=configuration.METRICS
+        )
+        self._set_if_specified(
+            ps, PROP_OVERWRITE, create_schedule_args, dest_name=configuration.OVERWRITE
+        )
+        self._set_if_specified(
+            ps,
+            PROP_OVERRIDE_STATUS,
+            create_schedule_args,
+            dest_name=configuration.OVERRIDE_STATUS,
+        )
+        self._set_if_specified(
+            ps,
+            PROP_USE_MAINTENANCE_WINDOW,
+            create_schedule_args,
+            dest_name=configuration.USE_MAINTENANCE_WINDOW,
+        )
+        self._set_if_specified(
+            ps,
+            PROP_ENFORCED,
+            create_schedule_args,
+            dest_name=configuration.ENFORCED,
+            default=False,
+        )
+        self._set_if_specified(
+            ps,
+            PROP_HIBERNATE,
+            create_schedule_args,
+            dest_name=configuration.HIBERNATE,
+            default=False,
+        )
+        self._set_if_specified(
+            ps,
+            PROP_RETAIN_RUNNING,
+            create_schedule_args,
+            dest_name=configuration.RETAINED_RUNNING,
+            default=False,
+        )
+        self._set_if_specified(
+            ps,
+            PROP_STOP_NEW,
+            create_schedule_args,
+            dest_name=configuration.STOP_NEW_INSTANCES,
+            default=True,
+        )
+        self._set_if_specified(
+            ps,
+            PROP_TIMEZONE,
+            create_schedule_args,
+            dest_name=configuration.TIMEZONE,
+            default="UTC",
+        )
+        self._set_if_specified(
+            ps,
+            PROP_DESCRIPTION,
+            create_schedule_args,
+            dest_name=configuration.DESCRIPTION,
+        )
+        self._set_if_specified(
+            ps,
+            PROP_SSM_MAINTENANCE_WINDOW,
+            create_schedule_args,
+            dest_name=configuration.SSM_MAINTENANCE_WINDOW,
+        )
 
         create_schedule_args[configuration.SCHEDULE_CONFIG_STACK] = self.stack_id
 
@@ -215,7 +293,9 @@ class ScheduleResourceHandler(CustomResource):
             for period in ps.get(PROP_PERIODS, []):
                 period_name, instance_type = self._create_period(period)
                 if instance_type is not None:
-                    period_name = "{}{}{}".format(period_name, configuration.INSTANCE_TYPE_SEP, instance_type)
+                    period_name = "{}{}{}".format(
+                        period_name, configuration.INSTANCE_TYPE_SEP, instance_type
+                    )
                 periods.append(period_name)
 
             create_schedule_args[configuration.PERIODS] = periods
@@ -228,7 +308,9 @@ class ScheduleResourceHandler(CustomResource):
             raise ex
 
     def _delete_schedule(self):
-        schedule = self._admin.delete_schedule(name=self._schedule_resource_name, exception_if_not_exists=False)
+        schedule = self._admin.delete_schedule(
+            name=self._schedule_resource_name, exception_if_not_exists=False
+        )
         if schedule is not None:
             self._delete_periods()
             self._logger.info(INF_DELETE_SCHEDULE, self._schedule_resource_name)

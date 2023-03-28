@@ -38,7 +38,6 @@ class Logger:
     """
 
     def __init__(self, logstream, context, loggroup=None, buffersize=10, debug=False):
-
         def get_loggroup(lambda_context):
             group = os.getenv(ENV_LOG_GROUP, None)
             if group is None:
@@ -55,7 +54,9 @@ class Logger:
         self._cached_size = 0
         self._client = None
         self._log_sequence_token = None
-        self._loggroup = loggroup if loggroup is not None else get_loggroup(self._context)
+        self._loggroup = (
+            loggroup if loggroup is not None else get_loggroup(self._context)
+        )
 
         self._sns = None
 
@@ -77,7 +78,6 @@ class Logger:
         self.flush()
 
     def _emit(self, level, msg, *args):
-
         s = msg if len(args) == 0 else msg.format(*args)
         t = time.time()
         s = LOG_FORMAT.format(level, s)
@@ -87,7 +87,10 @@ class Logger:
 
         self._cached_size += len(s) + LOG_ENTRY_ADDITIONAL
 
-        if self._context is None and str(os.getenv(ENV_SUPPRESS_LOG_STDOUT, False)).lower() != "true":
+        if (
+            self._context is None
+            and str(os.getenv(ENV_SUPPRESS_LOG_STDOUT, False)).lower() != "true"
+        ):
             print("> " + s)
         self._buffer.append((int(t * 1000), s))
 
@@ -128,7 +131,9 @@ class Logger:
         """
         sns_arn = os.getenv(ENV_ISSUES_TOPIC_ARN, None)
         if sns_arn is not None:
-            message = "Loggroup: {}\nLogstream {}\n{} : {}".format(self._loggroup, self._logstream, level, msg)
+            message = "Loggroup: {}\nLogstream {}\n{} : {}".format(
+                self._loggroup, self._logstream, level, msg
+            )
             self.sns.publish(TopicArn=sns_arn, Message=message)
 
     def info(self, msg, *args):
@@ -165,7 +170,7 @@ class Logger:
         Conditionally logs debug message, does not log if debugging is disabled
         :param msg: Debug message format string
         :param args: parameters
-        :return: 
+        :return:
         """
         if self._debug:
             self._emit(LOG_LEVEL_DEBUG, msg, *args)
@@ -196,7 +201,7 @@ class Logger:
         put_event_args = {
             "logGroupName": self._loggroup,
             "logStreamName": self._logstream,
-            "logEvents": [{"timestamp": r[0], "message": r[1]} for r in self._buffer]
+            "logEvents": [{"timestamp": r[0], "message": r[1]} for r in self._buffer],
         }
 
         retries = 5
@@ -208,9 +213,13 @@ class Logger:
                 return
             except self.client.exceptions.ResourceNotFoundException:
                 retries -= 1
-                self.client.create_log_stream(logGroupName=self._loggroup, logStreamName=self._logstream)
+                self.client.create_log_stream(
+                    logGroupName=self._loggroup, logStreamName=self._logstream
+                )
             except self.client.exceptions.InvalidSequenceTokenException as ex:
                 retries -= 1
-                put_event_args["sequenceToken"] = ex.response.get("expectedSequenceToken")
+                put_event_args["sequenceToken"] = ex.response.get(
+                    "expectedSequenceToken"
+                )
             except Exception:
                 return

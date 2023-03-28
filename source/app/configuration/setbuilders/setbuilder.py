@@ -32,13 +32,21 @@ class SetBuilder:
     INCREMENT_CHARACTER = "/"
 
     # range operator
-    RANGE_CHARACTER = '-'
+    RANGE_CHARACTER = "-"
 
-    def __init__(self, names=None, min_value=None, max_value=None, offset=None, wrap=False,
-                 ignorecase=True, significant_name_characters=None,
-                 first_item_wildcard=WILDCARD_FIRST,
-                 all_items_wildcards=WILDCARD_ALL,
-                 last_item_wildcard=WILDCARD_LAST):
+    def __init__(
+        self,
+        names=None,
+        min_value=None,
+        max_value=None,
+        offset=None,
+        wrap=False,
+        ignorecase=True,
+        significant_name_characters=None,
+        first_item_wildcard=WILDCARD_FIRST,
+        all_items_wildcards=WILDCARD_ALL,
+        last_item_wildcard=WILDCARD_LAST,
+    ):
         """
 
         :param names: Names for values
@@ -57,12 +65,18 @@ class SetBuilder:
         if names is not None:
             # min-value and max_value are not allowed
             if min_value is not None or max_value is not None:
-                raise ValueError("min_value and max_value parameters can not be used with names parameter")
+                raise ValueError(
+                    "min_value and max_value parameters can not be used with names parameter"
+                )
 
             # names to display for values
             self._displaynames = [str(i) for i in names]
             # names to identify values, use only the specified number of significant characters
-            self._names = names if significant_name_characters == 0 else [name[0:significant_name_characters] for name in names]
+            self._names = (
+                names
+                if significant_name_characters == 0
+                else [name[0:significant_name_characters] for name in names]
+            )
             # convert to lowercase if case is ignored
             if ignorecase:
                 self._names = [name.lower() for name in self._names]
@@ -71,18 +85,24 @@ class SetBuilder:
             self._min_value = self._offset
             self._max_value = len(names) - 1 + self._offset
             # build list to identify values by their numeric string value
-            self._values = self.values = [str(i + self._offset) for i in range(0, len(self._names))]
+            self._values = self.values = [
+                str(i + self._offset) for i in range(0, len(self._names))
+            ]
 
         else:
             # setup builder with min and max values instead if names
 
             # both must be present
             if min_value is None or max_value is None:
-                raise ValueError("min_value or max_value may not be None if names parameter is None")
+                raise ValueError(
+                    "min_value or max_value may not be None if names parameter is None"
+                )
 
             # min must be less or equal than max
             if min_value > max_value:
-                raise ValueError("min_value parameter should be less or equal to max_value parameter")
+                raise ValueError(
+                    "min_value parameter should be less or equal to max_value parameter"
+                )
 
             # build names to identify values
             self._names = [str(i) for i in range(min_value, max_value + 1)]
@@ -93,7 +113,9 @@ class SetBuilder:
             self._displaynames = self._values
             # offset may not conflict with min value
             if offset is not None and offset != min_value:
-                raise ValueError("offset parameter should not be used or have the same value as min_value")
+                raise ValueError(
+                    "offset parameter should not be used or have the same value as min_value"
+                )
             self._offset = min_value
 
         self._logging = logging.getLogger("SetBuilder")
@@ -103,8 +125,11 @@ class SetBuilder:
         self._all_items_wildcard_characters = all_items_wildcards
         self._first_item_wildcard = first_item_wildcard
         self._last_item_wildcard_character = last_item_wildcard
-        self._significant_name_characters = significant_name_characters \
-            if names is not None and significant_name_characters is not None else 0
+        self._significant_name_characters = (
+            significant_name_characters
+            if names is not None and significant_name_characters is not None
+            else 0
+        )
 
         # custom parsers to be executed before standard parsers
         self._pre_custom_parsers = []
@@ -120,7 +145,8 @@ class SetBuilder:
             self._parse_name_incr,  # name/incr
             self._parse_value_incr,  # value/incr
             self._parse_name_range_incr,  # name-name/incr
-            self._parse_value_range_incr]  # value-value/incr
+            self._parse_value_range_incr,
+        ]  # value-value/incr
 
     def build(self, set_spec):
         """
@@ -128,7 +154,7 @@ class SetBuilder:
         :param set_spec: Sets as comma separated string or list of strings
         :return:
         """
-        if isinstance(set_spec, str) or isinstance(set_spec, type(u"")):
+        if isinstance(set_spec, str) or isinstance(set_spec, type("")):
             set_string_list = set_spec.split(",")
             return self._get_set_items(set_string_list)
         elif isinstance(set_spec, list) or isinstance(set_spec, set):
@@ -233,7 +259,10 @@ class SetBuilder:
 
     def _parse_all(self, all_wildcard_str):
         # wildcards
-        if len(all_wildcard_str) == 1 and all_wildcard_str in self._all_items_wildcard_characters:
+        if (
+            len(all_wildcard_str) == 1
+            and all_wildcard_str in self._all_items_wildcard_characters
+        ):
             return self._all
 
     def _parse_unknown(self, _):
@@ -243,15 +272,25 @@ class SetBuilder:
     @property
     def _parsers(self):
         # flattened list of all parsers
-        return [parser
-                for parsers in [self._pre_custom_parsers, self._standard_parsers, self._post_custom_parsers]
-                for parser in parsers]
+        return [
+            parser
+            for parsers in [
+                self._pre_custom_parsers,
+                self._standard_parsers,
+                self._post_custom_parsers,
+            ]
+            for parser in parsers
+        ]
 
     def _special_items(self):
         # special items that do not need pre-formatting or must be excluded from formatting
-        return "".join([self._all_items_wildcard_characters,
-                        self._first_item_wildcard,
-                        self._last_item_wildcard_character])
+        return "".join(
+            [
+                self._all_items_wildcard_characters,
+                self._first_item_wildcard,
+                self._last_item_wildcard_character,
+            ]
+        )
 
     def _seperator_characters(self):
         # character that separates name from instructions like increments
@@ -271,7 +310,11 @@ class SetBuilder:
                 value = parser(s)
                 # did it return a value
                 if value is not None:
-                    self._logging.debug("Parser : {}(\"{}\") returns {}".format(parser.__name__, set_str, value))
+                    self._logging.debug(
+                        'Parser : {}("{}") returns {}'.format(
+                            parser.__name__, set_str, value
+                        )
+                    )
                     # add result from parser to result set
                     if len(value) > 0:
                         set_items.update(set(value))
@@ -283,12 +326,16 @@ class SetBuilder:
                 # if this point is reached none of the parsers returned one or more items, try _parse_unknown
                 value = self._parse_unknown(s)
                 if value is not None:
-                    self._logging.debug("{}(\"{}\") returns {}".format(self._parse_unknown.__name__, set_str, value))
+                    self._logging.debug(
+                        '{}("{}") returns {}'.format(
+                            self._parse_unknown.__name__, set_str, value
+                        )
+                    )
                     # noinspection PyTypeChecker
                     set_items.update(set(value))
                 else:
                     # if it does not return a value then raise an exception because of an unknown item
-                    raise ValueError("\"{}\" is an unknown value".format(set_str))
+                    raise ValueError('"{}" is an unknown value'.format(set_str))
 
         return set_items
 
@@ -313,7 +360,11 @@ class SetBuilder:
         # truncate to significant characters
         if self._significant_name_characters > 0:
             s = SetBuilder.RANGE_CHARACTER.join(
-                [t[0:self._significant_name_characters] for t in s.split(self.RANGE_CHARACTER)])
+                [
+                    t[0 : self._significant_name_characters]
+                    for t in s.split(self.RANGE_CHARACTER)
+                ]
+            )
 
         # case sensitivity, to lowercase if case is ignored
         if self._ignorecase:
@@ -373,13 +424,19 @@ class SetBuilder:
 
     def _get_last_value(self, last_wildcard_str):
         # returns the last possible value if the str is the last wildcard character
-        if len(last_wildcard_str) == 1 and last_wildcard_str == self._last_item_wildcard_character:
+        if (
+            len(last_wildcard_str) == 1
+            and last_wildcard_str == self._last_item_wildcard_character
+        ):
             return self.last
         return None
 
     def _get_first_value(self, first_wildcard_str):
         # returns the first possible value if the str is the first item wildcard character
-        if len(first_wildcard_str) == 1 and first_wildcard_str == self._first_item_wildcard:
+        if (
+            len(first_wildcard_str) == 1
+            and first_wildcard_str == self._first_item_wildcard
+        ):
             return self.first
         return None
 
@@ -388,7 +445,11 @@ class SetBuilder:
 
         # check if wrapping is needed and allowed
         if not self._wrap and start > end:
-            raise ValueError("start ({}) must be less or equal to end ({}) if wrap is false".format(start, end))
+            raise ValueError(
+                "start ({}) must be less or equal to end ({}) if wrap is false".format(
+                    start, end
+                )
+            )
 
         # this is the start
         result = [start]
@@ -418,7 +479,9 @@ class SetBuilder:
             try:
                 incr = int(temp[1])
             except ValueError:
-                raise ValueError("Increment value must be an integer value ({})".format(temp[1]))
+                raise ValueError(
+                    "Increment value must be an integer value ({})".format(temp[1])
+                )
 
             if incr <= 0:
                 raise ValueError("Increment value must be > 0 ({})".format(incr))
@@ -436,11 +499,15 @@ class SetBuilder:
 
     def _get_name_incr(self, name_incr_str, incr):
         # get increment items for start value retrieved by its name
-        return self._get_increment_by_string(name_incr_str, self._get_value_by_name, incr)
+        return self._get_increment_by_string(
+            name_incr_str, self._get_value_by_name, incr
+        )
 
     def _get_value_incr(self, value_incr_str, incr):
         # get increment items for start value retrieved by its value string
-        return self._get_increment_by_string(value_incr_str, self._get_value_by_str, incr)
+        return self._get_increment_by_string(
+            value_incr_str, self._get_value_by_str, incr
+        )
 
     def _get_range_increment(self, incr_str, fn, incr):
         # gets increment values from a range specified by the name of the start and end value retrieved by function fn
@@ -451,8 +518,12 @@ class SetBuilder:
 
     def _get_name_range_incr(self, name_range_incr_str, incr):
         # gets increment values from a range specified by the name of the start and end value retrieved by their names
-        return self._get_range_increment(name_range_incr_str, self._get_value_by_name, incr)
+        return self._get_range_increment(
+            name_range_incr_str, self._get_value_by_name, incr
+        )
 
     def _get_value_range_incr(self, value_range_incr_str, incr):
         # gets increment values from a range specified by the name of the start and end value retrieved by their value strings
-        return self._get_range_increment(value_range_incr_str, self._get_value_by_str, incr)
+        return self._get_range_increment(
+            value_range_incr_str, self._get_value_by_str, incr
+        )

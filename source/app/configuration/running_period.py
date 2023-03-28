@@ -19,16 +19,24 @@ from util.display_helper import set_str, time_str
 
 DEBUG_CHECK_DT_START_TIME = "{} Time {} is {} starttime {}, returned state is {}"
 DEBUG_CHECK_DT_START_AND_STOP = "{} Time {} is {} {}-{}, returned state is {}"
-DEBUG_CHECK_DT = "Checking conditions for period \"{}\""
+DEBUG_CHECK_DT = 'Checking conditions for period "{}"'
 DEBUG_CHECK_DT_STOP_TIME = "{} Time {} is {} stoptime {}, returned state is {}"
 DEBUG_CHECK_DT_UNDEFINED_START_STOP = "{} No start or stop time, returned state is {}"
-DEBUG_CHECK_MONTH = "{} Month \"{}\" {}in months ({})"
+DEBUG_CHECK_MONTH = '{} Month "{}" {}in months ({})'
 DEBUG_CHECK_MONTH_DAY = "{} Day of month {} {}in month days ({})"
-DEBUG_CHECK_WEEKDAYS = "{} Weekday \"{}\" {}in weekdays ({})"
+DEBUG_CHECK_WEEKDAYS = '{} Weekday "{}" {}in weekdays ({})'
 
 
 class RunningPeriod:
-    def __init__(self, name, begintime=None, endtime=None, weekdays=None, months=None, monthdays=None):
+    def __init__(
+        self,
+        name,
+        begintime=None,
+        endtime=None,
+        weekdays=None,
+        months=None,
+        monthdays=None,
+    ):
         """
         Defines a period in which an instance should be running
         :param name: name of the period
@@ -47,18 +55,26 @@ class RunningPeriod:
         self._logger = None
 
     def __str__(self):
-        s = "Period \"{}\": ".format(self.name)
+        s = 'Period "{}": '.format(self.name)
         conditions = []
         if self.begintime:
             conditions.append("starts at {}".format(time_str(self.begintime)))
         if self.endtime:
             conditions.append("ends at {}".format(time_str(self.endtime)))
         if self.weekdays is not None:
-            conditions.append("on weekdays ({})".format(set_str(self.weekdays, configuration.WEEKDAY_NAMES)))
+            conditions.append(
+                "on weekdays ({})".format(
+                    set_str(self.weekdays, configuration.WEEKDAY_NAMES)
+                )
+            )
         if self.monthdays:
             conditions.append("on monthdays ({})".format(set_str(self.monthdays)))
         if self.months:
-            conditions.append("in months ({})".format(set_str(self.months, configuration.MONTH_NAMES, offset=1)))
+            conditions.append(
+                "in months ({})".format(
+                    set_str(self.months, configuration.MONTH_NAMES, offset=1)
+                )
+            )
         s += ", ".join(conditions)
 
         return s
@@ -92,63 +108,111 @@ class RunningPeriod:
         def check_monthday(dt):
             result = self.monthdays is None or dt.day in self.monthdays
             if self.monthdays:
-                self._log_debug(DEBUG_CHECK_MONTH_DAY, state_str(result), dt.day, "" if result else "not ", set_str(self.monthdays))
+                self._log_debug(
+                    DEBUG_CHECK_MONTH_DAY,
+                    state_str(result),
+                    dt.day,
+                    "" if result else "not ",
+                    set_str(self.monthdays),
+                )
             return result
 
         # check month
         def check_month(dt):
             result = self.months is None or dt.month in self.months
             if self.months:
-                self._log_debug(DEBUG_CHECK_MONTH, state_str(result), configuration.MONTH_NAMES[dt.month - 1], not_str(result),
-                                set_str(self.months, displaynames=configuration.MONTH_NAMES, offset=1))
+                self._log_debug(
+                    DEBUG_CHECK_MONTH,
+                    state_str(result),
+                    configuration.MONTH_NAMES[dt.month - 1],
+                    not_str(result),
+                    set_str(
+                        self.months, displaynames=configuration.MONTH_NAMES, offset=1
+                    ),
+                )
             return result
 
         # check weekday
         def check_weekday(dt):
             result = self.weekdays is None or dt.weekday() in self.weekdays
             if self.weekdays is not None:
-                self._log_debug(DEBUG_CHECK_WEEKDAYS, state_str(result), configuration.WEEKDAY_NAMES[dt.weekday()], not_str(result),
-                                set_str(self.weekdays, displaynames=configuration.WEEKDAY_NAMES))
+                self._log_debug(
+                    DEBUG_CHECK_WEEKDAYS,
+                    state_str(result),
+                    configuration.WEEKDAY_NAMES[dt.weekday()],
+                    not_str(result),
+                    set_str(self.weekdays, displaynames=configuration.WEEKDAY_NAMES),
+                )
             return result
 
         # check time
         def check_time(dt):
-
             t = datetime.time(dt.hour, dt.minute, dt.second)
             ts = time_str(t)
 
             # no start and stop time, means running all day
             if self.begintime is None and self.endtime is None:
                 desired_state = InstanceSchedule.STATE_RUNNING
-                self._log_debug(DEBUG_CHECK_DT_UNDEFINED_START_STOP, state_str(True), desired_state)
+                self._log_debug(
+                    DEBUG_CHECK_DT_UNDEFINED_START_STOP, state_str(True), desired_state
+                )
                 return desired_state
             elif self.begintime is None:
                 # just the end time, stopped if later than that time
-                desired_state = InstanceSchedule.STATE_STOPPED if t >= self.endtime else InstanceSchedule.STATE_ANY
-                self._log_debug(DEBUG_CHECK_DT_STOP_TIME,
-                                check_running_state_str(desired_state), ts,
-                                "before" if desired_state == InstanceSchedule.STATE_ANY else "after",
-                                time_str(self.endtime), desired_state)
+                desired_state = (
+                    InstanceSchedule.STATE_STOPPED
+                    if t >= self.endtime
+                    else InstanceSchedule.STATE_ANY
+                )
+                self._log_debug(
+                    DEBUG_CHECK_DT_STOP_TIME,
+                    check_running_state_str(desired_state),
+                    ts,
+                    "before"
+                    if desired_state == InstanceSchedule.STATE_ANY
+                    else "after",
+                    time_str(self.endtime),
+                    desired_state,
+                )
                 return desired_state
 
             elif self.begintime is not None and self.endtime is None:
                 # just the start time, running if later that that time
-                desired_state = InstanceSchedule.STATE_RUNNING if t >= self.begintime else InstanceSchedule.STATE_ANY
-                self._log_debug(DEBUG_CHECK_DT_START_TIME,
-                                check_running_state_str(desired_state), ts,
-                                "before" if desired_state == InstanceSchedule.STATE_ANY else "after",
-                                time_str(self.begintime), desired_state)
+                desired_state = (
+                    InstanceSchedule.STATE_RUNNING
+                    if t >= self.begintime
+                    else InstanceSchedule.STATE_ANY
+                )
+                self._log_debug(
+                    DEBUG_CHECK_DT_START_TIME,
+                    check_running_state_str(desired_state),
+                    ts,
+                    "before"
+                    if desired_state == InstanceSchedule.STATE_ANY
+                    else "after",
+                    time_str(self.begintime),
+                    desired_state,
+                )
                 return desired_state
             else:
                 # start and stop time, test if time falls in the period defined by these times
-                desired_state = InstanceSchedule.STATE_RUNNING \
-                    if self.begintime <= t < self.endtime else InstanceSchedule.STATE_STOPPED
+                desired_state = (
+                    InstanceSchedule.STATE_RUNNING
+                    if self.begintime <= t < self.endtime
+                    else InstanceSchedule.STATE_STOPPED
+                )
 
-                self._log_debug(DEBUG_CHECK_DT_START_AND_STOP,
-                                check_running_state_str(desired_state), ts,
-                                "within" if desired_state == InstanceSchedule.STATE_RUNNING
-                                else "outside",
-                                time_str(self.begintime), time_str(self.endtime), desired_state)
+                self._log_debug(
+                    DEBUG_CHECK_DT_START_AND_STOP,
+                    check_running_state_str(desired_state),
+                    ts,
+                    "within"
+                    if desired_state == InstanceSchedule.STATE_RUNNING
+                    else "outside",
+                    time_str(self.begintime),
+                    time_str(self.endtime),
+                    desired_state,
+                )
 
             return desired_state
 

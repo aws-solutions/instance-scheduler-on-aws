@@ -53,10 +53,7 @@ PARAM_CLUSTERS = "clusters"
 # Services handled by the scheduler, the class that handles the logic for scheduling instances for each know service
 # must be registered here
 
-SCHEDULER_TYPES = {
-    "ec2": Ec2Service,
-    "rds": RdsService
-}
+SCHEDULER_TYPES = {"ec2": Ec2Service, "rds": RdsService}
 
 
 def account_from_role(role_str):
@@ -64,4 +61,3 @@ def account_from_role(role_str):
     if len(role_elements) < 5:
         return ""
     return role_elements[4]
-

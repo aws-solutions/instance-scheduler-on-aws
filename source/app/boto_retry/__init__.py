@@ -15,6 +15,7 @@ import os
 import boto3
 import botocore.config
 
+
 def get_client_with_standard_retry(service_name, region=None, session=None):
     """
     Creates a bot3 client for the specified service name and region. The return client will have additional method for the
@@ -35,13 +36,13 @@ def get_client_with_standard_retry(service_name, region=None, session=None):
 
     user_agent_extra_string = os.getenv("USER_AGENT_EXTRA", None)
 
-    retries = {
-        'max_attempts': 5,
-        'mode': 'standard'
-    }
+    retries = {"max_attempts": 5, "mode": "standard"}
     if user_agent_extra_string is not None:
-        solution_config = {"user_agent_extra": user_agent_extra_string, "retries": retries}
-        config = botocore.config.Config(**solution_config) 
+        solution_config = {
+            "user_agent_extra": user_agent_extra_string,
+            "retries": retries,
+        }
+        config = botocore.config.Config(**solution_config)
         args["config"] = config
 
     aws_session = session if session is not None else boto3.Session()

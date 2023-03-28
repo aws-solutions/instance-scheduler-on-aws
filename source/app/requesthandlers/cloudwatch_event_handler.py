@@ -28,9 +28,13 @@ ERR_STARTING_LAMBDA = "Error executing {}, version {} with configuration {}"
 
 INF_CONFIG_TABLE = "Configuration table is {}"
 INF_HANDLER = "Handler {} : Received request {} at {}"
-INF_RUN_SCHEDULER_LOCAL = "Running scheduling request for service(s) {}, account(s) {}, region(s) {}"
+INF_RUN_SCHEDULER_LOCAL = (
+    "Running scheduling request for service(s) {}, account(s) {}, region(s) {}"
+)
 INF_SCHEDULER_RESULT = "Scheduler result is {}"
-INF_STARTING_LAMBDA = "Starting lambda function for scheduling {} instances for account {} in region {}"
+INF_STARTING_LAMBDA = (
+    "Starting lambda function for scheduling {} instances for account {} in region {}"
+)
 
 LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
 LOG_STREAM_PREFIX = "Scheduler"
@@ -42,13 +46,13 @@ class CloudWatchEventHandler:
     """
     Handles event from cloudwatch rule time
     """
+
     TOP_LEVEL = 0
     SERVICE_LEVEL = 1
     ACCOUNT_LEVEL = 2
     REGION_LEVEL = 3
 
     def __init__(self, event, context):
-
         self._context = context
         self._event = event
         self._configuration = None
@@ -91,7 +95,9 @@ class CloudWatchEventHandler:
         :return: scheduler configuration
         """
         if self._configuration is None:
-            self._configuration = configuration.get_scheduler_configuration(self._logger)
+            self._configuration = configuration.get_scheduler_configuration(
+                self._logger
+            )
         return self._configuration
 
     def account_from_role(self, role_str):
@@ -150,7 +156,6 @@ class CloudWatchEventHandler:
         return event.get("detail-type", "") == "Scheduled Event"
 
     def _configuration_level_partitions(self, level=TOP_LEVEL):
-
         def service_level_configs(config):
             for service in config.scheduled_services:
                 service_level_config = copy(config)
@@ -195,7 +200,11 @@ class CloudWatchEventHandler:
         """
 
         def number_of_accounts():
-            return len(self.configuration.cross_account_roles) + 1 if self.configuration.schedule_lambda_account else 0
+            return (
+                len(self.configuration.cross_account_roles) + 1
+                if self.configuration.schedule_lambda_account
+                else 0
+            )
 
         def running_as_lambda():
             return self._context is not None and not self._event.get("no_lambda", False)
@@ -207,18 +216,26 @@ class CloudWatchEventHandler:
             return len(self.configuration.scheduled_services)
 
         try:
-            self._logger.info(INF_HANDLER, self.__class__.__name__, json.dumps(self._event), datetime.now())
+            self._logger.info(
+                INF_HANDLER,
+                self.__class__.__name__,
+                json.dumps(self._event),
+                datetime.now(),
+            )
             if running_as_lambda():
                 # running as Lambda function
-                return self._run_schedulers_as_lambda(number_of_accounts, number_of_regions, number_of_services)
+                return self._run_schedulers_as_lambda(
+                    number_of_accounts, number_of_regions, number_of_services
+                )
             else:
                 # this is used to run the handler in process from an IDE
                 return self._run_schedulers_in_process()
         finally:
             self._logger.flush()
 
-    def _run_schedulers_as_lambda(self, number_of_accounts, number_of_regions, number_of_services):
-
+    def _run_schedulers_as_lambda(
+        self, number_of_accounts, number_of_regions, number_of_services
+    ):
         # each service/account/region combination is executed in it's own lambda instance
         level = CloudWatchEventHandler.TOP_LEVEL
         # multiple services, lambda per service
@@ -244,59 +261,100 @@ class CloudWatchEventHandler:
 
         # noinspection PyTypeChecker
         account_names = list(self.account_names(self.configuration))
-        self._logger.info(INF_RUN_SCHEDULER_LOCAL.format(
-            ", ".join(self.configuration.scheduled_services), ", ".join(account_names),
-            ", ".join(self.configuration.regions)))
+        self._logger.info(
+            INF_RUN_SCHEDULER_LOCAL.format(
+                ", ".join(self.configuration.scheduled_services),
+                ", ".join(account_names),
+                ", ".join(self.configuration.regions),
+            )
+        )
 
         for service in self.configuration.scheduled_services:
             service_strategy = SCHEDULER_TYPES[service]()
-            scheduler = InstanceScheduler(service=service_strategy, scheduler_configuration=self.configuration)
-            s = "-".join([LOG_STREAM_PREFIX, "-".join(account_names), service, "-".join(self.configuration.regions)])
+            scheduler = InstanceScheduler(
+                service=service_strategy, scheduler_configuration=self.configuration
+            )
+            s = "-".join(
+                [
+                    LOG_STREAM_PREFIX,
+                    "-".join(account_names),
+                    service,
+                    "-".join(self.configuration.regions),
+                ]
+            )
             dt = datetime.utcnow()
             logstream = LOG_STREAM.format(s, dt.year, dt.month, dt.day)
-            with Logger(logstream=logstream, buffersize=60 if self.configuration.trace else 30, context=self._context,
-                        debug=self.configuration.trace) as logger:
-                result[service] = scheduler.run(state_table=self.state_table, scheduler_config=self.configuration,
-                                                lambda_account=self.lambda_account, logger=logger, context=self._context)
-        self._logger.info(INF_SCHEDULER_RESULT, json.dumps(result,indent=3))
+            with Logger(
+                logstream=logstream,
+                buffersize=60 if self.configuration.trace else 30,
+                context=self._context,
+                debug=self.configuration.trace,
+            ) as logger:
+                result[service] = scheduler.run(
+                    state_table=self.state_table,
+                    scheduler_config=self.configuration,
+                    lambda_account=self.lambda_account,
+                    logger=logger,
+                    context=self._context,
+                )
+        self._logger.info(INF_SCHEDULER_RESULT, json.dumps(result, indent=3))
         return result
 
     def _execute_as_lambda(self, conf):
         # runs a service/account/region subset of the configuration as a new lambda function
-        self._logger.info(INF_STARTING_LAMBDA,
-                          "-".join(conf.scheduled_services),
-                          "-".join(self.account_names(conf)),
-                          "-".join(conf.regions))
+        self._logger.info(
+            INF_STARTING_LAMBDA,
+            "-".join(conf.scheduled_services),
+            "-".join(self.account_names(conf)),
+            "-".join(conf.regions),
+        )
 
         # need to convert configuration to dictionary to allow it to be passed in event
         config = SchedulerConfigBuilder.configuration_as_dict(conf)
 
-        payload = str.encode(json.dumps({
-            "action": "scheduler:run",
-            "configuration": config,
-            "dispatch_time": str(datetime.now())
-        }))
+        payload = str.encode(
+            json.dumps(
+                {
+                    "action": "scheduler:run",
+                    "configuration": config,
+                    "dispatch_time": str(datetime.now()),
+                }
+            )
+        )
 
         if len(payload) > 200000:
             config["schedules"] = {}
             config["periods"] = {}
-            payload = str.encode(json.dumps({
-                "action": "scheduler:run",
-                "configuration": config,
-                "dispatch_time": str(datetime.now())
-            }))
+            payload = str.encode(
+                json.dumps(
+                    {
+                        "action": "scheduler:run",
+                        "configuration": config,
+                        "dispatch_time": str(datetime.now()),
+                    }
+                )
+            )
 
         # start the lambda function
-        resp = self.lambda_client.invoke(FunctionName=self._context.function_name,
-                                                      InvocationType="Event", LogType="None", Payload=payload)
+        resp = self.lambda_client.invoke(
+            FunctionName=self._context.function_name,
+            InvocationType="Event",
+            LogType="None",
+            Payload=payload,
+        )
         if resp["StatusCode"] != 202:
-            self._logger.error(ERR_STARTING_LAMBDA, self._context.function_name, self._context.function_version, config)
+            self._logger.error(
+                ERR_STARTING_LAMBDA,
+                self._context.function_name,
+                self._context.function_version,
+                config,
+            )
 
         result = {
             "services": list(conf.scheduled_services),
             "accounts": list(self.account_names(conf)),
             "regions": list(conf.regions),
             "lambda_invoke_result": resp["StatusCode"],
-            "lambda_request_id": resp["ResponseMetadata"]["RequestId"]
+            "lambda_request_id": resp["ResponseMetadata"]["RequestId"],
         }
         return result

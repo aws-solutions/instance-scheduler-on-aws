@@ -30,13 +30,19 @@ from configuration.setbuilders.monthday_setbuilder import MonthdaySetBuilder
 from configuration.setbuilders.weekday_setbuilder import WeekdaySetBuilder
 from util.named_tuple_builder import as_namedtuple
 
-ERR_PERIOD_BEGIN_LATER_THAN_END = "error: period begintime {} can not be later than endtime {}"
+ERR_PERIOD_BEGIN_LATER_THAN_END = (
+    "error: period begintime {} can not be later than endtime {}"
+)
 ERR_SCHEDULE_INVALID_OVERRIDE = "{} is not a valid value for {}, possible values are {}"
-ERR_SCHEDULE_OVERWRITE_OVERRIDE_EXCLUSIVE = "{} option is mutually exclusive with {} option"
+ERR_SCHEDULE_OVERWRITE_OVERRIDE_EXCLUSIVE = (
+    "{} option is mutually exclusive with {} option"
+)
 ERR_CREATE_PERIOD_EXISTS = "error: period {} already exists"
 ERR_CREATE_SCHEDULE_EXISTS = "error: schedule {} already exists"
 ERR_DEL_PERIOD_EMPTY = "error: period name parameter can not be empty"
-ERR_DEL_PERIOD_IN_USE = "error: period {} can not be deleted because it is still used in schedule(s) {}"
+ERR_DEL_PERIOD_IN_USE = (
+    "error: period {} can not be deleted because it is still used in schedule(s) {}"
+)
 ERR_DEL_PERIOD_NOT_FOUND = "not found: period {} does not exist"
 ERR_DEL_SCHEDULE_NAME_EMPTY = "error: schedule name parameter can not be empty"
 ERR_DEL_SCHEDULE_NOT_FOUND = "not found: schedule {} does not exist"
@@ -44,25 +50,39 @@ ERR_GET_EMPTY_PERIOD_NAME = "error: period name parameter can not be empty"
 ERR_GET_PERIOD_NOT_FOUND = "not found: period {} does not exist"
 ERR_GET_SCHEDULE_NAME_EMPTY = "error: error schedule name parameter can not be empty"
 ERR_GET_SCHEDULE_NOT_FOUND = "not found: schedule {} does not exist"
-ERR_GET_USAGE_INVALID_END_DATE = "error: invalid enddate {}, must be a valid date in format yyyymmdd {}"
-ERR_GET_USAGE_INVALID_START_DATE = "error: invalid startdate {}, must be a valid date in format yyyymmdd {}"
-ERR_GET_USAGE_SCHEDULE_NAME_EMPTY = "error: error schedule name parameter can not be empty"
+ERR_GET_USAGE_INVALID_END_DATE = (
+    "error: invalid enddate {}, must be a valid date in format yyyymmdd {}"
+)
+ERR_GET_USAGE_INVALID_START_DATE = (
+    "error: invalid startdate {}, must be a valid date in format yyyymmdd {}"
+)
+ERR_GET_USAGE_SCHEDULE_NAME_EMPTY = (
+    "error: error schedule name parameter can not be empty"
+)
 ERR_GET_USAGE_SCHEDULE_NOT_FOUND = "not found: schedule {} does not exist"
-ERR_GET_USAGE_START_MUST_BE_LESS_OR_EQUAL_STOP = "stop_date must be equal or later than start_date"
+ERR_GET_USAGE_START_MUST_BE_LESS_OR_EQUAL_STOP = (
+    "stop_date must be equal or later than start_date"
+)
 ERR_NAME_PARAM_MISSING = "error: name parameter is missing"
 ERR_NO_PERIODS = "error: at least one period condition must be specified"
 ERR_PERIOD_INVALID_MONTHDAYS = "error: {} is not a valid month days specification"
 ERR_PERIOD_INVALID_MONTHS = "error: {} is not a valid months specification"
 ERR_PERIOD_INVALID_TIME = "error: {} {} is not a valid time"
 ERR_PERIOD_INVALID_WEEKDAYS = "error: {} is not a valid weekdays specification {}"
-ERR_PERIOD_UNKNOWN_PARAMETER = "error: {} is not a valid parameter, valid parameters are {}"
+ERR_PERIOD_UNKNOWN_PARAMETER = (
+    "error: {} is not a valid parameter, valid parameters are {}"
+)
 ERR_SCHEDULE_INVALID_BOOLEAN = "error: {} for parameter {} is not a valid boolean value"
 ERR_SCHEDULE_INVALID_TIMEZONE = "error: {} is not a valid time zone for parameter {}"
 ERR_SCHEDULE_NAME_MISSING = "error: name parameter is missing"
 ERR_SCHEDULE_NO_PERIOD = "error: at least one period must be specified for a schedule"
 ERR_SCHEDULE_PERIOD_DOES_NOT_EXISTS = "error: not found: period {} does not exist"
-ERR_SCHEDULE_UNKNOWN_PARAMETER = "error: {} is not a valid parameter, valid parameters are {}"
-ERR_UPDATE_INVALID_BOOL_PARAM = "error: {} for parameter {} is not a valid boolean value"
+ERR_SCHEDULE_UNKNOWN_PARAMETER = (
+    "error: {} is not a valid parameter, valid parameters are {}"
+)
+ERR_UPDATE_INVALID_BOOL_PARAM = (
+    "error: {} for parameter {} is not a valid boolean value"
+)
 ERR_UPDATE_INVALID_TZ_PARAMETER = "error: {} is not a valid time zone for parameter {}"
 ERR_UPDATE_PERIOD_NAME_EMPTY = "error: period name parameter can not be empty"
 ERR_UPDATE_PERIOD_NOT_FOUND = "not found: period {} does not exist"
@@ -71,10 +91,16 @@ ERR_UPDATE_SCHEDULE_NOT_FOUND = "not found: schedule {} does not exist"
 ERR_UPDATE_TAGNAME_EMPTY = "error: tagname parameter must be specified"
 ERR_UPDATE_UNKNOWN_PARAMETER = "error: {} is not a valid parameter"
 ERR_UPDATE_UNKNOWN_SERVICE = "{} is not a supported service"
-ERR_STOP_MUST_BE_LATER_OR_EQUAL_TO_START = "stop_date must be equal or later than start_date"
+ERR_STOP_MUST_BE_LATER_OR_EQUAL_TO_START = (
+    "stop_date must be equal or later than start_date"
+)
 
-INF_ADD_ACCOUNT_EVENT_PERMISSION = "Add permission for account {} to put events on message bus, sid is {}"
-INF_REMOVE_EVENT_PERMISSION = "Remove permission for account {} to put events on event bus, sid = {}"
+INF_ADD_ACCOUNT_EVENT_PERMISSION = (
+    "Add permission for account {} to put events on message bus, sid is {}"
+)
+INF_REMOVE_EVENT_PERMISSION = (
+    "Remove permission for account {} to put events on event bus, sid = {}"
+)
 
 
 class ConfigAdmin:
@@ -121,7 +147,9 @@ class ConfigAdmin:
         """
         if self._configuration is None:
             configdata = ConfigDynamodbAdapter(self._table.name).config
-            self._configuration = SchedulerConfigBuilder(logger=self._logger).build(configdata)
+            self._configuration = SchedulerConfigBuilder(logger=self._logger).build(
+                configdata
+            )
         return self._configuration
 
     @property
@@ -137,7 +165,9 @@ class ConfigAdmin:
         Gets the configuration as json
         :return:
         """
-        resp = self._table.get_item_with_rerties(Key={"name": "scheduler", "type": "config"}, ConsistentRead=True)
+        resp = self._table.get_item_with_rerties(
+            Key={"name": "scheduler", "type": "config"}, ConsistentRead=True
+        )
         item = resp.get("Item", {})
         return self._for_output(item)
 
@@ -147,25 +177,26 @@ class ConfigAdmin:
         :param settings: settings values
         :return: updated values
         """
-        valid_attributes = [configuration.METRICS,
-                            configuration.CROSS_ACCOUNT_ROLES,
-                            configuration.DEFAULT_TIMEZONE,
-                            configuration.REGIONS,
-                            configuration.SCHEDULE_LAMBDA_ACCOUNT,
-                            configuration.TAGNAME,
-                            configuration.TRACE,
-                            configuration.ENABLE_SSM_MAINTENANCE_WINDOWS,
-                            ConfigAdmin.TYPE_ATTR,
-                            configuration.SCHEDULED_SERVICES,
-                            configuration.SCHEDULE_CLUSTERS,
-                            configuration.CREATE_RDS_SNAPSHOT,
-                            configuration.STARTED_TAGS,
-                            configuration.STOPPED_TAGS]
+        valid_attributes = [
+            configuration.METRICS,
+            configuration.CROSS_ACCOUNT_ROLES,
+            configuration.DEFAULT_TIMEZONE,
+            configuration.REGIONS,
+            configuration.SCHEDULE_LAMBDA_ACCOUNT,
+            configuration.TAGNAME,
+            configuration.TRACE,
+            configuration.ENABLE_SSM_MAINTENANCE_WINDOWS,
+            ConfigAdmin.TYPE_ATTR,
+            configuration.SCHEDULED_SERVICES,
+            configuration.SCHEDULE_CLUSTERS,
+            configuration.CREATE_RDS_SNAPSHOT,
+            configuration.STARTED_TAGS,
+            configuration.STOPPED_TAGS,
+        ]
 
         checked_settings = {}
 
         for attr in settings:
-
             if attr in [ConfigAdmin.TYPE_ATTR, configuration.NAME]:
                 continue
 
@@ -182,7 +213,11 @@ class ConfigAdmin:
                 continue
 
             # make sure these fields are set as sets
-            if attr in [configuration.REGIONS, configuration.CROSS_ACCOUNT_ROLES, configuration.SCHEDULED_SERVICES]:
+            if attr in [
+                configuration.REGIONS,
+                configuration.CROSS_ACCOUNT_ROLES,
+                configuration.SCHEDULED_SERVICES,
+            ]:
                 temp = self._ensure_set(settings[attr])
                 if len(settings[attr]) > 0:
                     checked_settings[attr] = temp
@@ -190,15 +225,19 @@ class ConfigAdmin:
                 continue
 
             # make sure these fields are valid booleans
-            if attr in [configuration.METRICS,
-                        configuration.TRACE,
-                        configuration.ENABLE_SSM_MAINTENANCE_WINDOWS,
-                        configuration.SCHEDULE_LAMBDA_ACCOUNT,
-                        configuration.CREATE_RDS_SNAPSHOT,
-                        configuration.SCHEDULE_CLUSTERS]:
+            if attr in [
+                configuration.METRICS,
+                configuration.TRACE,
+                configuration.ENABLE_SSM_MAINTENANCE_WINDOWS,
+                configuration.SCHEDULE_LAMBDA_ACCOUNT,
+                configuration.CREATE_RDS_SNAPSHOT,
+                configuration.SCHEDULE_CLUSTERS,
+            ]:
                 bool_value = self._ensure_bool(settings[attr])
                 if bool_value is None:
-                    raise ValueError(ERR_UPDATE_INVALID_BOOL_PARAM.format(settings[attr], attr))
+                    raise ValueError(
+                        ERR_UPDATE_INVALID_BOOL_PARAM.format(settings[attr], attr)
+                    )
                 checked_settings[attr] = bool_value
                 continue
 
@@ -207,7 +246,10 @@ class ConfigAdmin:
                 default_tz = settings[configuration.DEFAULT_TIMEZONE]
                 if not SchedulerConfigBuilder.is_valid_timezone(default_tz):
                     raise ValueError(
-                        ERR_UPDATE_INVALID_TZ_PARAMETER.format(default_tz, configuration.DEFAULT_TIMEZONE))
+                        ERR_UPDATE_INVALID_TZ_PARAMETER.format(
+                            default_tz, configuration.DEFAULT_TIMEZONE
+                        )
+                    )
                 checked_settings[attr] = default_tz
                 continue
 
@@ -301,7 +343,9 @@ class ConfigAdmin:
                     schedules_using_period.append(s[configuration.NAME])
 
         if len(schedules_using_period) > 0:
-            raise ValueError(ERR_DEL_PERIOD_IN_USE.format(name, ", ".join(schedules_using_period)))
+            raise ValueError(
+                ERR_DEL_PERIOD_IN_USE.format(name, ", ".join(schedules_using_period))
+            )
 
         if self._get_period(name) is not None:
             self._table.delete_item(Key={"name": name, "type": "period"})
@@ -390,7 +434,7 @@ class ConfigAdmin:
         """
         if name is None or len(name) == 0:
             raise ValueError(ERR_GET_USAGE_SCHEDULE_NAME_EMPTY)
-        
+
         schedule = self.configuration.get_schedule(name)
         if schedule is None:
             raise ValueError(ERR_GET_USAGE_SCHEDULE_NOT_FOUND.format(name))
@@ -398,10 +442,13 @@ class ConfigAdmin:
         if startdate:
             if not isinstance(startdate, datetime):
                 try:
-                    start = datetime.strptime(startdate, "%Y%m%d").replace(tzinfo=pytz.timezone(schedule.timezone))
+                    start = datetime.strptime(startdate, "%Y%m%d").replace(
+                        tzinfo=pytz.timezone(schedule.timezone)
+                    )
                 except ValueError as ex:
                     raise ValueError(
-                        ERR_GET_USAGE_INVALID_START_DATE.format(startdate, str(ex)))
+                        ERR_GET_USAGE_INVALID_START_DATE.format(startdate, str(ex))
+                    )
             else:
                 start = startdate
         else:
@@ -411,10 +458,13 @@ class ConfigAdmin:
         if enddate:
             if not isinstance(enddate, datetime):
                 try:
-                    end = datetime.strptime(enddate, "%Y%m%d").replace(tzinfo=pytz.timezone(schedule.timezone))
+                    end = datetime.strptime(enddate, "%Y%m%d").replace(
+                        tzinfo=pytz.timezone(schedule.timezone)
+                    )
                 except ValueError as ex:
                     raise ValueError(
-                        ERR_GET_USAGE_INVALID_END_DATE.format(enddate, str(ex)))
+                        ERR_GET_USAGE_INVALID_END_DATE.format(enddate, str(ex))
+                    )
             else:
                 end = enddate
         else:
@@ -423,7 +473,9 @@ class ConfigAdmin:
         if start > end:
             raise ValueError(ERR_GET_USAGE_START_MUST_BE_LESS_OR_EQUAL_STOP)
 
-        periods = self.calculate_schedule_usage_for_period(name, start_dt=start, stop_dt=end)
+        periods = self.calculate_schedule_usage_for_period(
+            name, start_dt=start, stop_dt=end
+        )
 
         # to json and back again using custom encoder to convert datetimes
         return ConfigAdmin._for_output(periods)
@@ -457,20 +509,21 @@ class ConfigAdmin:
         return None
 
     def _validate_period(self, **period):
-
         result = {}
 
         def is_valid_time(s):
             return re.match(ConfigAdmin.TIME_REGEX, s) is not None
 
         # allowed and validated parameters
-        valid_parameters = [configuration.BEGINTIME,
-                            configuration.ENDTIME,
-                            configuration.WEEKDAYS,
-                            configuration.MONTHDAYS,
-                            configuration.MONTHS,
-                            configuration.NAME,
-                            configuration.DESCRIPTION]
+        valid_parameters = [
+            configuration.BEGINTIME,
+            configuration.ENDTIME,
+            configuration.WEEKDAYS,
+            configuration.MONTHDAYS,
+            configuration.MONTHS,
+            configuration.NAME,
+            configuration.DESCRIPTION,
+        ]
 
         for attr in period:
             # indicates type for config entry
@@ -479,7 +532,9 @@ class ConfigAdmin:
 
             # parameter is allowed?
             if attr not in valid_parameters:
-                raise ValueError(ERR_PERIOD_UNKNOWN_PARAMETER.format(attr, str(valid_parameters)))
+                raise ValueError(
+                    ERR_PERIOD_UNKNOWN_PARAMETER.format(attr, str(valid_parameters))
+                )
 
             # remove None values
             if period[attr] is None or len(str(period[attr])) == 0:
@@ -500,19 +555,36 @@ class ConfigAdmin:
                 time_str = period[attr]
                 if not is_valid_time(time_str):
                     raise ValueError(ERR_PERIOD_INVALID_TIME.format(attr, time_str))
-                result[attr] = str(datetime.strptime(time_str, configuration.TIME_FORMAT_STRING).time())[
-                               0:len(configuration.TIME_FORMAT_STRING)]
-                if configuration.BEGINTIME in result and configuration.ENDTIME in result:
-                    begintime = datetime.strptime(result[configuration.BEGINTIME], configuration.TIME_FORMAT_STRING).time()
-                    endtime = datetime.strptime(result[configuration.ENDTIME], configuration.TIME_FORMAT_STRING).time()
+                result[attr] = str(
+                    datetime.strptime(time_str, configuration.TIME_FORMAT_STRING).time()
+                )[0 : len(configuration.TIME_FORMAT_STRING)]
+                if (
+                    configuration.BEGINTIME in result
+                    and configuration.ENDTIME in result
+                ):
+                    begintime = datetime.strptime(
+                        result[configuration.BEGINTIME],
+                        configuration.TIME_FORMAT_STRING,
+                    ).time()
+                    endtime = datetime.strptime(
+                        result[configuration.ENDTIME], configuration.TIME_FORMAT_STRING
+                    ).time()
                     if begintime > endtime:
                         raise ValueError(
-                            ERR_PERIOD_BEGIN_LATER_THAN_END.format(result[configuration.BEGINTIME], result[configuration.ENDTIME]))
+                            ERR_PERIOD_BEGIN_LATER_THAN_END.format(
+                                result[configuration.BEGINTIME],
+                                result[configuration.ENDTIME],
+                            )
+                        )
 
                 continue
 
             # check weekdays, monthdays and month sets
-            if attr in [configuration.WEEKDAYS, configuration.MONTHDAYS, configuration.MONTHS]:
+            if attr in [
+                configuration.WEEKDAYS,
+                configuration.MONTHDAYS,
+                configuration.MONTHS,
+            ]:
                 temp = self._ensure_set(period[attr])
 
                 if len(temp) == 0:
@@ -526,7 +598,9 @@ class ConfigAdmin:
                         result[attr] = temp
                         continue
                     except:
-                        raise ValueError(ERR_PERIOD_INVALID_MONTHS.format(str(period[attr])))
+                        raise ValueError(
+                            ERR_PERIOD_INVALID_MONTHS.format(str(period[attr]))
+                        )
 
                 # validate weekdays
                 if attr == configuration.WEEKDAYS:
@@ -536,7 +610,9 @@ class ConfigAdmin:
                         result[attr] = temp
                         continue
                     except Exception as ex:
-                        raise ValueError(ERR_PERIOD_INVALID_WEEKDAYS.format(str(period[attr]), ex))
+                        raise ValueError(
+                            ERR_PERIOD_INVALID_WEEKDAYS.format(str(period[attr]), ex)
+                        )
 
                 # validate monthdays
                 if attr == configuration.MONTHDAYS:
@@ -546,16 +622,20 @@ class ConfigAdmin:
                         result[attr] = temp
                         continue
                     except:
-                        raise ValueError(ERR_PERIOD_INVALID_MONTHDAYS.format(str(period[attr])))
+                        raise ValueError(
+                            ERR_PERIOD_INVALID_MONTHDAYS.format(str(period[attr]))
+                        )
 
         if configuration.NAME not in result:
             raise ValueError(ERR_NAME_PARAM_MISSING)
 
-        for condition in [configuration.BEGINTIME,
-                          configuration.ENDTIME,
-                          configuration.WEEKDAYS,
-                          configuration.MONTHS,
-                          configuration.MONTHDAYS]:
+        for condition in [
+            configuration.BEGINTIME,
+            configuration.ENDTIME,
+            configuration.WEEKDAYS,
+            configuration.MONTHS,
+            configuration.MONTHDAYS,
+        ]:
             if condition in result:
                 break
         else:
@@ -567,32 +647,34 @@ class ConfigAdmin:
 
     # check schedule before writing it to the database
     def _validate_schedule(self, **schedule):
-
         result = {}
 
         # allowed parameters
-        valid_parameters = [configuration.TIMEZONE,
-                            configuration.PERIODS,
-                            configuration.NAME,
-                            configuration.DESCRIPTION,
-                            configuration.OVERWRITE,
-                            configuration.METRICS,
-                            configuration.STOP_NEW_INSTANCES,
-                            configuration.USE_MAINTENANCE_WINDOW,
-                            configuration.SSM_MAINTENANCE_WINDOW,
-                            configuration.RETAINED_RUNNING,
-                            configuration.ENFORCED,
-                            configuration.HIBERNATE,
-                            configuration.OVERRIDE_STATUS,
-                            configuration.SCHEDULE_CONFIG_STACK]
+        valid_parameters = [
+            configuration.TIMEZONE,
+            configuration.PERIODS,
+            configuration.NAME,
+            configuration.DESCRIPTION,
+            configuration.OVERWRITE,
+            configuration.METRICS,
+            configuration.STOP_NEW_INSTANCES,
+            configuration.USE_MAINTENANCE_WINDOW,
+            configuration.SSM_MAINTENANCE_WINDOW,
+            configuration.RETAINED_RUNNING,
+            configuration.ENFORCED,
+            configuration.HIBERNATE,
+            configuration.OVERRIDE_STATUS,
+            configuration.SCHEDULE_CONFIG_STACK,
+        ]
 
         for attr in schedule:
-
             if attr == ConfigAdmin.TYPE_ATTR:
                 continue
 
             if attr not in valid_parameters:
-                raise ValueError(ERR_SCHEDULE_UNKNOWN_PARAMETER.format(attr, valid_parameters))
+                raise ValueError(
+                    ERR_SCHEDULE_UNKNOWN_PARAMETER.format(attr, valid_parameters)
+                )
 
             # skip None values
             if schedule[attr] is None or len(str(schedule[attr])) == 0:
@@ -610,41 +692,58 @@ class ConfigAdmin:
                 continue
 
             # make sure these fields are valid booleans
-            if attr in [configuration.METRICS,
-                        configuration.STOP_NEW_INSTANCES,
-                        configuration.USE_MAINTENANCE_WINDOW,
-                        configuration.RETAINED_RUNNING,
-                        configuration.HIBERNATE,
-                        configuration.ENFORCED]:
+            if attr in [
+                configuration.METRICS,
+                configuration.STOP_NEW_INSTANCES,
+                configuration.USE_MAINTENANCE_WINDOW,
+                configuration.RETAINED_RUNNING,
+                configuration.HIBERNATE,
+                configuration.ENFORCED,
+            ]:
                 bool_value = self._ensure_bool(schedule[attr])
                 if bool_value is None:
-                    raise ValueError(ERR_SCHEDULE_INVALID_BOOLEAN.format(schedule[attr], attr))
+                    raise ValueError(
+                        ERR_SCHEDULE_INVALID_BOOLEAN.format(schedule[attr], attr)
+                    )
                 result[attr] = bool_value
                 continue
 
             # overwrite status, now deprecated, use PROP_OVERRIDE_STATUS instead
             if attr == configuration.OVERWRITE:
-
                 if configuration.OVERRIDE_STATUS in schedule:
                     raise ValueError(
-                        ERR_SCHEDULE_OVERWRITE_OVERRIDE_EXCLUSIVE.format(configuration.OVERWRITE, configuration.OVERRIDE_STATUS))
+                        ERR_SCHEDULE_OVERWRITE_OVERRIDE_EXCLUSIVE.format(
+                            configuration.OVERWRITE, configuration.OVERRIDE_STATUS
+                        )
+                    )
 
                 bool_value = self._ensure_bool(schedule[attr])
                 if bool_value is None:
-                    raise ValueError(ERR_SCHEDULE_INVALID_BOOLEAN.format(schedule[attr], attr))
-                result[
-                    configuration.OVERRIDE_STATUS] = configuration.OVERRIDE_STATUS_RUNNING if bool_value \
+                    raise ValueError(
+                        ERR_SCHEDULE_INVALID_BOOLEAN.format(schedule[attr], attr)
+                    )
+                result[configuration.OVERRIDE_STATUS] = (
+                    configuration.OVERRIDE_STATUS_RUNNING
+                    if bool_value
                     else configuration.OVERRIDE_STATUS_STOPPED
+                )
                 continue
 
             if attr == configuration.OVERRIDE_STATUS:
-
                 if configuration.OVERWRITE in schedule:
                     raise ValueError(
-                        ERR_SCHEDULE_OVERWRITE_OVERRIDE_EXCLUSIVE.format(configuration.OVERWRITE, configuration.OVERRIDE_STATUS))
+                        ERR_SCHEDULE_OVERWRITE_OVERRIDE_EXCLUSIVE.format(
+                            configuration.OVERWRITE, configuration.OVERRIDE_STATUS
+                        )
+                    )
                 if schedule[attr] not in configuration.OVERRIDE_STATUS_VALUES:
                     raise ValueError(
-                        ERR_SCHEDULE_INVALID_OVERRIDE.format(schedule[attr], attr, ",".join(configuration.OVERRIDE_STATUS_VALUES)))
+                        ERR_SCHEDULE_INVALID_OVERRIDE.format(
+                            schedule[attr],
+                            attr,
+                            ",".join(configuration.OVERRIDE_STATUS_VALUES),
+                        )
+                    )
                 result[attr] = schedule[attr]
                 continue
 
@@ -658,7 +757,10 @@ class ConfigAdmin:
                 timezone = schedule[configuration.TIMEZONE]
                 if not SchedulerConfigBuilder.is_valid_timezone(timezone):
                     raise ValueError(
-                        ERR_SCHEDULE_INVALID_TIMEZONE.format(timezone, configuration.TIMEZONE))
+                        ERR_SCHEDULE_INVALID_TIMEZONE.format(
+                            timezone, configuration.TIMEZONE
+                        )
+                    )
                 result[attr] = timezone
 
         # name is mandatory
@@ -667,7 +769,10 @@ class ConfigAdmin:
 
         # if there is no overwrite there must be at least one period
         if configuration.OVERRIDE_STATUS not in schedule:
-            if configuration.PERIODS not in schedule or len(schedule[configuration.PERIODS]) == 0:
+            if (
+                configuration.PERIODS not in schedule
+                or len(schedule[configuration.PERIODS]) == 0
+            ):
                 raise ValueError(ERR_SCHEDULE_NO_PERIOD)
 
         # validate if periods are in configuration
@@ -684,13 +789,9 @@ class ConfigAdmin:
         return result
 
     def _items_of_type(self, config_type):
-
         result = []
 
-        args = {
-            "FilterExpression": Key("type").eq(config_type),
-            "ConsistentRead": True
-        }
+        args = {"FilterExpression": Key("type").eq(config_type), "ConsistentRead": True}
 
         while True:
             resp = self._table.scan(**args)
@@ -709,15 +810,20 @@ class ConfigAdmin:
         return self._items_of_type("period")
 
     def _get_schedule(self, schedule_name):
-        resp = self._table.get_item(Key={"name": schedule_name, "type": "schedule"}, ConsistentRead=True)
+        resp = self._table.get_item(
+            Key={"name": schedule_name, "type": "schedule"}, ConsistentRead=True
+        )
         return resp.get("Item", None)
 
     def _get_period(self, period_name):
-        resp = self._table.get_item(Key={"name": period_name, "type": "period"}, ConsistentRead=True)
+        resp = self._table.get_item(
+            Key={"name": period_name, "type": "period"}, ConsistentRead=True
+        )
         return resp.get("Item", None)
 
-    def calculate_schedule_usage_for_period(self, schedule_name, start_dt, stop_dt=None, logger=None):
-
+    def calculate_schedule_usage_for_period(
+        self, schedule_name, start_dt, stop_dt=None, logger=None
+    ):
         result = {}
 
         def running_seconds(startdt, stopdt):
@@ -727,12 +833,12 @@ class ConfigAdmin:
             return int(((stopdt - startdt).total_seconds() - 1) / 3600) + 1
 
         def make_period(started_dt, stopped_dt):
-            running_period = ({
+            running_period = {
                 "begin": started_dt,
                 "end": stopped_dt,
                 "billing_hours": running_hours(started_dt, stopped_dt),
-                "billing_seconds": running_seconds(started_dt, stopped_dt)
-            })
+                "billing_seconds": running_seconds(started_dt, stopped_dt),
+            }
             return running_period
 
         self._logger = logger
@@ -741,14 +847,21 @@ class ConfigAdmin:
         if start_dt > stop:
             raise ValueError(ERR_STOP_MUST_BE_LATER_OR_EQUAL_TO_START)
 
-        dt = start_dt if isinstance(start_dt, datetime) else datetime(start_dt.year, start_dt.month, start_dt.day)
+        dt = (
+            start_dt
+            if isinstance(start_dt, datetime)
+            else datetime(start_dt.year, start_dt.month, start_dt.day)
+        )
 
         config_data = ConfigDynamodbAdapter(self._table.name).config
 
         while dt <= stop:
-
-            self._configuration = SchedulerConfigBuilder(logger=self._logger).build(config_data)
-            conf = configuration.SchedulerConfigBuilder(self._logger).build(config=config_data, dt=dt)
+            self._configuration = SchedulerConfigBuilder(logger=self._logger).build(
+                config_data
+            )
+            conf = configuration.SchedulerConfigBuilder(self._logger).build(
+                config=config_data, dt=dt
+            )
             schedule = conf.get_schedule(schedule_name)
 
             timeline = {dt.replace(hour=0, minute=0)}
@@ -760,17 +873,25 @@ class ConfigAdmin:
                     timeline.add(dt.replace(hour=23, minute=59))
                 else:
                     if begintime:
-                        timeline.add(dt.replace(hour=begintime.hour, minute=begintime.minute))
+                        timeline.add(
+                            dt.replace(hour=begintime.hour, minute=begintime.minute)
+                        )
                     if endtime:
-                        timeline.add(dt.replace(hour=endtime.hour, minute=endtime.minute))
+                        timeline.add(
+                            dt.replace(hour=endtime.hour, minute=endtime.minute)
+                        )
 
             running_periods = {}
             started = None
             starting_period = None
             current_state = None
-            inst = as_namedtuple("Instance", {"instance_str": "instance", "allow_resize": False})
+            inst = as_namedtuple(
+                "Instance", {"instance_str": "instance", "allow_resize": False}
+            )
             for tm in sorted(list(timeline)):
-                desired_state, instance_type, period = schedule.get_desired_state(inst, self._logger, tm, False)
+                desired_state, instance_type, period = schedule.get_desired_state(
+                    inst, self._logger, tm, False
+                )
 
                 if current_state != desired_state:
                     if desired_state == InstanceSchedule.STATE_RUNNING:
@@ -779,21 +900,34 @@ class ConfigAdmin:
                         starting_period = period
                     elif desired_state == InstanceSchedule.STATE_STOPPED:
                         stopped = tm
-                        desired_state_with_adj_check, _, __ = schedule.get_desired_state(inst, self._logger, tm, True)
-                        if desired_state_with_adj_check == InstanceSchedule.STATE_RUNNING:
+                        (
+                            desired_state_with_adj_check,
+                            _,
+                            __,
+                        ) = schedule.get_desired_state(inst, self._logger, tm, True)
+                        if (
+                            desired_state_with_adj_check
+                            == InstanceSchedule.STATE_RUNNING
+                        ):
                             stopped += timedelta(minutes=1)
                         if current_state == InstanceSchedule.STATE_RUNNING:
                             current_state = InstanceSchedule.STATE_STOPPED
-                            running_periods[starting_period] = (make_period(started, stopped))
+                            running_periods[starting_period] = make_period(
+                                started, stopped
+                            )
 
             if current_state == InstanceSchedule.STATE_RUNNING:
                 stopped = dt.replace(hour=23, minute=59) + timedelta(minutes=1)
-                running_periods[starting_period] = (make_period(started, stopped))
+                running_periods[starting_period] = make_period(started, stopped)
 
             result[str(dt.date())] = {
                 "running_periods": running_periods,
-                "billing_seconds": sum([running_periods[ps]["billing_seconds"] for ps in running_periods]),
-                "billing_hours": sum([running_periods[ph]["billing_hours"] for ph in running_periods])
+                "billing_seconds": sum(
+                    [running_periods[ps]["billing_seconds"] for ps in running_periods]
+                ),
+                "billing_hours": sum(
+                    [running_periods[ph]["billing_hours"] for ph in running_periods]
+                ),
             }
 
             dt += timedelta(days=1)
