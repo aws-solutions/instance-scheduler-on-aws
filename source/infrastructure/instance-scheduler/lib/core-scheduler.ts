@@ -25,6 +25,7 @@ export interface InstanceSchedulerLambdaProps {
   };
 }
 export class CoreScheduler {
+
   public readonly lambdaFunction: lambda.Function;
   public readonly configTable: dynamodb.Table;
   private readonly stateTable: dynamodb.Table;
@@ -34,7 +35,7 @@ export class CoreScheduler {
     this.lambdaFunction = new python.PythonFunction(scope, "scheduler-lambda", {
       functionName: Aws.STACK_NAME + "-InstanceSchedulerMain",
       description: "EC2 and RDS instance scheduler, version " + props.solutionVersion,
-      entry: `${__dirname}/../../../app`,
+      entry: `${__dirname}/../../../app/instance_scheduler`,
       index: "main.py",
       handler: "lambda_handler",
       runtime: lambda.Runtime.PYTHON_3_9,

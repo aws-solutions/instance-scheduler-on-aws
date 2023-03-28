@@ -1,17 +1,13 @@
 from unittest import mock
 import os
-from configuration.instance_schedule import InstanceSchedule
-import configuration
+from instance_scheduler import configuration
 
 mock.patch.dict(os.environ, {configuration.ENV_SCHEDULE_FREQUENCY: "10"}).start()
 mock.patch.dict(os.environ, {"MAINTENANCE_WINDOW_TABLE": "test_table"}).start()
 
-from schedulers import Ec2Service
-from util.named_tuple_builder import as_namedtuple
-from schedulers.instance_scheduler import InstanceScheduler
+from instance_scheduler.schedulers import Ec2Service
 import datetime
 from freezegun import freeze_time
-from mock import patch
 
 
 def test_ssm_maintenance_windows_1(mocker):

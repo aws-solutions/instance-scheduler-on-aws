@@ -1,13 +1,10 @@
 from unittest import mock
 import os
-from unittest.mock import patch, PropertyMock, MagicMock, ANY
-
-import pytest
-
-from configuration.instance_schedule import InstanceSchedule
-from schedulers import Ec2Service
-from util.named_tuple_builder import as_namedtuple
-from schedulers.instance_scheduler import InstanceScheduler
+from instance_scheduler.configuration.instance_schedule import InstanceSchedule
+from instance_scheduler.schedulers import Ec2Service
+from instance_scheduler.util.named_tuple_builder import as_namedtuple
+from instance_scheduler.schedulers.instance_scheduler import InstanceScheduler
+from unittest.mock import patch, MagicMock, ANY
 
 
 @patch("boto3.Session")
