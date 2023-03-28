@@ -39,24 +39,38 @@ STOP_BATCH_SIZE = 50
 
 ERR_STARTING_INSTANCES = "Error starting instances {}, ({})"
 ERR_STOPPING_INSTANCES = "Error stopping instances {}, ({})"
-ERR_MAINT_WINDOW_NOT_FOUND_OR_DISABLED = "SSM maintenance window {} used in schedule {} not found or disabled"
+ERR_MAINT_WINDOW_NOT_FOUND_OR_DISABLED = (
+    "SSM maintenance window {} used in schedule {} not found or disabled"
+)
 
 INF_FETCHED_INSTANCES = "Number of fetched ec2 instances is {}, number of instances in a schedulable state is {}"
 INF_FETCHING_INSTANCES = "Fetching ec2 instances for account {} in region {}"
 INF_SETTING_SIZE = "Setting size for ec2 instance {} to {}"
 INF_ADD_KEYS = "Adding {} key(s) {} to instance(s) {}"
 INFO_REMOVING_KEYS = "Removing {} key(s) {} from instance(s) {}"
-INF_MAINT_WINDOW = "Created schedule {} from SSM maintence window, start is {}, end is {}"
+INF_MAINT_WINDOW = (
+    "Created schedule {} from SSM maintence window, start is {}, end is {}"
+)
 INF_MAINT_WINDOW_DISABLED = "SSM maintenance window {} ({}) is disabled"
 
-WARN_STARTED_INSTANCES_TAGGING = "Error deleting or creating tags for started instances {} ({})"
-WARN_STOPPED_INSTANCES_TAGGING = "Error deleting or creating tags for stopped instances {} ({})"
+WARN_STARTED_INSTANCES_TAGGING = (
+    "Error deleting or creating tags for started instances {} ({})"
+)
+WARN_STOPPED_INSTANCES_TAGGING = (
+    "Error deleting or creating tags for stopped instances {} ({})"
+)
 WARNING_INSTANCE_NOT_STARTING = "Ec2 instance {} is not started"
 WARNING_INSTANCE_NOT_STOPPING = "Ec2 instance {} is not stopped"
-WARN_NOT_HIBERNATED = "Instance {} could not be hibernated, retry to stop without hibernation, {}"
-WARN_NO_HIBERNATE_RESIZED = "Instance {} is not hibernated because it is stopped for resizing the instance"
+WARN_NOT_HIBERNATED = (
+    "Instance {} could not be hibernated, retry to stop without hibernation, {}"
+)
+WARN_NO_HIBERNATE_RESIZED = (
+    "Instance {} is not hibernated because it is stopped for resizing the instance"
+)
 
-DEBUG_SKIPPED_INSTANCE = "Skipping ec2 instance {} because it it not in a schedulable state ({})"
+DEBUG_SKIPPED_INSTANCE = (
+    "Skipping ec2 instance {} because it it not in a schedulable state ({})"
+)
 DEBUG_SELECTED_INSTANCE = "Selected ec2 instance {} in state ({})"
 
 
@@ -64,6 +78,7 @@ class Ec2Service:
     """
     Implements service start/stop/resize functions for EC2 service
     """
+
     EC2_STATE_PENDING = 0
     EC2_STATE_RUNNING = 16
     EC2_STATE_SHUTTING_DOWN = 32
@@ -72,7 +87,11 @@ class Ec2Service:
     EC2_STATE_STOPPED = 80
 
     EC2_SCHEDULABLE_STATES = {EC2_STATE_RUNNING, EC2_STATE_STOPPED}
-    EC2_STOPPING_STATES = {EC2_STATE_SHUTTING_DOWN, EC2_STATE_STOPPING, EC2_STATE_STOPPED}
+    EC2_STOPPING_STATES = {
+        EC2_STATE_SHUTTING_DOWN,
+        EC2_STATE_STOPPING,
+        EC2_STATE_STOPPED,
+    }
     EC2_STARTING_STATES = {EC2_STATE_PENDING, EC2_STATE_RUNNING}
 
     def __init__(self):
@@ -82,8 +101,10 @@ class Ec2Service:
         self._ssm_maintenance_windows = None
         self._session = None
         self._logger = None
-        self._dynamodb = boto3.resource('dynamodb')
-        self._maintenance_table = self._dynamodb.Table(os.environ['MAINTENANCE_WINDOW_TABLE'])
+        self._dynamodb = boto3.resource("dynamodb")
+        self._maintenance_table = self._dynamodb.Table(
+            os.environ["MAINTENANCE_WINDOW_TABLE"]
+        )
 
     def _init_scheduler(self, args):
         self._session = args.get(schedulers.PARAM_SESSION)
@@ -111,40 +132,50 @@ class Ec2Service:
         Returns:
             list of ssm windows
         """
-        ssm_client = get_client_with_standard_retry("ssm", session=session, region=region)
+        ssm_client = get_client_with_standard_retry(
+            "ssm", session=session, region=region
+        )
         resp_maintenance_windows = {}
         try:
             resp_maintenance_windows = ssm_client.describe_maintenance_windows(
                 Filters=[
                     {
-                        'Key': 'Enabled',
-                        'Values': [
-                            'true',
-                        ]
+                        "Key": "Enabled",
+                        "Values": [
+                            "true",
+                        ],
                     },
                 ]
             )
         except Exception as error:
-            self._logger.error("Caught Exception while getting the maintenance window: {}".format(error))
-        ssm_window_list = resp_maintenance_windows.get('WindowIdentities', [])
-        next_token = resp_maintenance_windows.get('NextToken', None)
+            self._logger.error(
+                "Caught Exception while getting the maintenance window: {}".format(
+                    error
+                )
+            )
+        ssm_window_list = resp_maintenance_windows.get("WindowIdentities", [])
+        next_token = resp_maintenance_windows.get("NextToken", None)
         while next_token is not None:
             try:
                 resp_maintenance_windows = ssm_client.describe_maintenance_windows(
                     Filters=[
                         {
-                            'Key': 'Enabled',
-                            'Values': [
-                                'true',
-                            ]
+                            "Key": "Enabled",
+                            "Values": [
+                                "true",
+                            ],
                         },
                     ],
-                    NextToken=next_token
+                    NextToken=next_token,
                 )
             except Exception as error:
-                self._logger.error("Caught Exception while getting the maintenance window: {}".format(error))
-            next_token = resp_maintenance_windows.get('NextToken', None)
-            ssm_window_list.extend(resp_maintenance_windows.get('WindowIdentities', []))
+                self._logger.error(
+                    "Caught Exception while getting the maintenance window: {}".format(
+                        error
+                    )
+                )
+            next_token = resp_maintenance_windows.get("NextToken", None)
+            ssm_window_list.extend(resp_maintenance_windows.get("WindowIdentities", []))
         return ssm_window_list
 
     def get_ssm_windows_db(self, account, region):
@@ -155,25 +186,33 @@ class Ec2Service:
         accountRegionString = account + ":" + region
         try:
             scan_kwargs = {
-                'FilterExpression': Key('account-region').eq(accountRegionString),
+                "FilterExpression": Key("account-region").eq(accountRegionString),
             }
             maintenance_windows = self._maintenance_table.scan(**scan_kwargs)
         except Exception as error:
-            self._logger.error("Caught Exception while getting maintenance windows from Dynamodb: {}".format(error))
-        window_list = maintenance_windows.get('Items', [])
-        last_evaluated_key = maintenance_windows.get('LastEvaluatedKey', None)
+            self._logger.error(
+                "Caught Exception while getting maintenance windows from Dynamodb: {}".format(
+                    error
+                )
+            )
+        window_list = maintenance_windows.get("Items", [])
+        last_evaluated_key = maintenance_windows.get("LastEvaluatedKey", None)
         while last_evaluated_key is not None:
-            self._logger.debug(maintenance_windows['LastEvaluatedKey'])
+            self._logger.debug(maintenance_windows["LastEvaluatedKey"])
             try:
                 scan_kwargs = {
-                    'FilterExpression': Key('account-region').eq(accountRegionString),
-                    'ExclusiveStartKey': last_evaluated_key
+                    "FilterExpression": Key("account-region").eq(accountRegionString),
+                    "ExclusiveStartKey": last_evaluated_key,
                 }
                 maintenance_windows = self._maintenance_table.scan(**scan_kwargs)
             except Exception as error:
-                self._logger.error("Caught Exception while getting maintenance windows from Dynamodb: {}".format(error))
-            last_evaluated_key = maintenance_windows.get('LastEvaluatedKey', None)
-            window_list.extend(maintenance_windows.get('Items', []))
+                self._logger.error(
+                    "Caught Exception while getting maintenance windows from Dynamodb: {}".format(
+                        error
+                    )
+                )
+            last_evaluated_key = maintenance_windows.get("LastEvaluatedKey", None)
+            window_list.extend(maintenance_windows.get("Items", []))
         return window_list
 
     def process_ssm_window(self, window, ssm_windows_db, account, region):
@@ -187,10 +226,10 @@ class Ec2Service:
         new_ssm_window = {}
         current_window = {}
         for window_db in ssm_windows_db:
-            if window_db['Name'] == window['Name']:
+            if window_db["Name"] == window["Name"]:
                 current_window = window_db  # get the window from the db with the same name as the window from service
                 break
-        if current_window.get('Name') is None:
+        if current_window.get("Name") is None:
             self.put_window_dynamodb(window, account, region)
             new_ssm_window = window
         else:
@@ -207,16 +246,22 @@ class Ec2Service:
             SSM window object
         """
         try:
-            duration = window['Duration']
-            if 'ScheduleTimezone' in window:
-                execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%M%z")
+            duration = window["Duration"]
+            if "ScheduleTimezone" in window:
+                execution_time = datetime.strptime(
+                    window["NextExecutionTime"], "%Y-%m-%dT%H:%M%z"
+                )
             else:
-                execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%MZ")
-                window['ScheduleTimezone'] = "UTC"
+                execution_time = datetime.strptime(
+                    window["NextExecutionTime"], "%Y-%m-%dT%H:%MZ"
+                )
+                window["ScheduleTimezone"] = "UTC"
 
-            tz = pytz.timezone(window['ScheduleTimezone'])    
+            tz = pytz.timezone(window["ScheduleTimezone"])
             window_begin_time = execution_time.replace(tzinfo=tz)
-            window_end_time = execution_time.replace(tzinfo=tz) + timedelta(hours=int(duration))
+            window_end_time = execution_time.replace(tzinfo=tz) + timedelta(
+                hours=int(duration)
+            )
             current_time = datetime.now(tz).replace(tzinfo=tz)
             return window_begin_time < current_time < window_end_time
         except Exception as ex:
@@ -231,28 +276,36 @@ class Ec2Service:
             SSM window object
         """
         try:
-            duration = window['Duration']
-            if 'ScheduleTimezone' in window:
-                execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%M%z")
+            duration = window["Duration"]
+            if "ScheduleTimezone" in window:
+                execution_time = datetime.strptime(
+                    window["NextExecutionTime"], "%Y-%m-%dT%H:%M%z"
+                )
             else:
-                execution_time = datetime.strptime(window['NextExecutionTime'], "%Y-%m-%dT%H:%MZ")
-                window['ScheduleTimezone'] = "UTC"
+                execution_time = datetime.strptime(
+                    window["NextExecutionTime"], "%Y-%m-%dT%H:%MZ"
+                )
+                window["ScheduleTimezone"] = "UTC"
 
             ttl = execution_time + timedelta(hours=int(duration))
-            epoch_time_to_live = int(datetime(ttl.year, ttl.month, ttl.day, ttl.hour, ttl.minute).timestamp())
+            epoch_time_to_live = int(
+                datetime(ttl.year, ttl.month, ttl.day, ttl.hour, ttl.minute).timestamp()
+            )
             self._maintenance_table.put_item(
                 Item={
-                    'Name': window['Name'],
-                    'NextExecutionTime': window['NextExecutionTime'],
-                    'Duration': window['Duration'],
-                    'WindowId': window['WindowId'],
-                    'TimeToLive': epoch_time_to_live,
-                    'account-region': account + ":" + region,
-                    'ScheduleTimezone': window['ScheduleTimezone']
+                    "Name": window["Name"],
+                    "NextExecutionTime": window["NextExecutionTime"],
+                    "Duration": window["Duration"],
+                    "WindowId": window["WindowId"],
+                    "TimeToLive": epoch_time_to_live,
+                    "account-region": account + ":" + region,
+                    "ScheduleTimezone": window["ScheduleTimezone"],
                 }
             )
         except Exception as error:
-            self._logger.info("Unable to put maintenance window in Dynamodb: {}".format(error))
+            self._logger.info(
+                "Unable to put maintenance window in Dynamodb: {}".format(error)
+            )
 
     def remove_unused_windows(self, window_db, ssm_windows_service):
         """
@@ -260,15 +313,23 @@ class Ec2Service:
         """
         window_found = False
         for window_service in ssm_windows_service:
-            if window_service['Name'] == window_db['Name']:
+            if window_service["Name"] == window_db["Name"]:
                 window_found = True
                 break
         if not window_found:
             try:  # if window from db is not found in the SSM response delete the entry from db
-                self._maintenance_table.delete_item(Key={'Name': window_db['Name'], 'account-region': window_db['account-region']})
+                self._maintenance_table.delete_item(
+                    Key={
+                        "Name": window_db["Name"],
+                        "account-region": window_db["account-region"],
+                    }
+                )
             except Exception as error:
-                self._logger.error\
-                    ("Caught Exception while deleting maintenance windows from Dynamodb: {}".format(error))
+                self._logger.error(
+                    "Caught Exception while deleting maintenance windows from Dynamodb: {}".format(
+                        error
+                    )
+                )
 
     def get_ssm_windows(self, session, context, account, region):
         """
@@ -278,7 +339,9 @@ class Ec2Service:
         ssm_windows_service = self.get_ssm_windows_service(session, region)
         ssm_windows_db = self.get_ssm_windows_db(account, region)
         for window_service in ssm_windows_service:
-            new_maintenance_window = self.process_ssm_window(window_service, ssm_windows_db, account, region)
+            new_maintenance_window = self.process_ssm_window(
+                window_service, ssm_windows_db, account, region
+            )
             if new_maintenance_window:
                 new_ssm_windows_list.append(new_maintenance_window)
         for window_db in ssm_windows_db:
@@ -286,7 +349,6 @@ class Ec2Service:
         for window in new_ssm_windows_list:
             ssm_windows_db.append(window)
         return ssm_windows_db
-
 
     def ssm_maintenance_windows(self, session, context, account, region):
         if self._ssm_maintenance_windows is None:
@@ -296,15 +358,21 @@ class Ec2Service:
                 for window in window_list:
                     start = dateutil.parser.parse(window["NextExecutionTime"])
                     scheduler_timezone = window.get("ScheduleTimezone", "UTC")
-                    scheduler_interval = max(10, int(os.getenv(configuration.ENV_SCHEDULE_FREQUENCY)))
-                    maintenance_schedule = self._schedule_from_maint_window(name=window["Name"],
-                                                                            start=start,
-                                                                            interval=scheduler_interval,
-                                                                            hours=int(window["Duration"]),
-                                                                            timezone=scheduler_timezone)
+                    scheduler_interval = max(
+                        10, int(os.getenv(configuration.ENV_SCHEDULE_FREQUENCY))
+                    )
+                    maintenance_schedule = self._schedule_from_maint_window(
+                        name=window["Name"],
+                        start=start,
+                        interval=scheduler_interval,
+                        hours=int(window["Duration"]),
+                        timezone=scheduler_timezone,
+                    )
                     self._ssm_maintenance_windows[window["Name"]] = maintenance_schedule
             except Exception as ex:
-                self._logger.error("Error loading ssm maintenace windows, ({})".format(ex))
+                self._logger.error(
+                    "Error loading ssm maintenace windows, ({})".format(ex)
+                )
 
         return self._ssm_maintenance_windows
 
@@ -318,24 +386,39 @@ class Ec2Service:
         tagname = kwargs[schedulers.PARAM_CONFIG].tag_name
         config = kwargs[schedulers.PARAM_CONFIG]
 
-        self.schedules_with_hibernation = [s.name for s in config.schedules.values() if s.hibernate]
+        self.schedules_with_hibernation = [
+            s.name for s in config.schedules.values() if s.hibernate
+        ]
 
-        self._logger.info("Enable SSM Maintenance window is set to {}", config.enable_SSM_maintenance_windows)
-        if config.enable_SSM_maintenance_windows: 
+        self._logger.info(
+            "Enable SSM Maintenance window is set to {}",
+            config.enable_SSM_maintenance_windows,
+        )
+        if config.enable_SSM_maintenance_windows:
             # calling the get maintenance window for this account and region.
-            self._logger.debug("load the ssm maintenance windows for account {}, and region {}", account, region)
-            self._ssm_maintenance_windows = self.ssm_maintenance_windows(self._session, context, account, region)
+            self._logger.debug(
+                "load the ssm maintenance windows for account {}, and region {}",
+                account,
+                region,
+            )
+            self._ssm_maintenance_windows = self.ssm_maintenance_windows(
+                self._session, context, account, region
+            )
             self._logger.debug("finish loading the ssm maintenance windows")
 
-        client = get_client_with_standard_retry("ec2", session=self._session, region=region)
+        client = get_client_with_standard_retry(
+            "ec2", session=self._session, region=region
+        )
 
         def is_in_schedulable_state(ec2_inst):
             state = ec2_inst["state"] & 0xFF
             return state in Ec2Service.EC2_SCHEDULABLE_STATES
 
-        jmes = "Reservations[*].Instances[*].{InstanceId:InstanceId, EbsOptimized:EbsOptimized, Tags:Tags, " \
-               "InstanceType:InstanceType,State:State}[]" + \
-               "|[?Tags]|[?contains(Tags[*].Key, '{}')]".format(tagname)
+        jmes = (
+            "Reservations[*].Instances[*].{InstanceId:InstanceId, EbsOptimized:EbsOptimized, Tags:Tags, "
+            "InstanceType:InstanceType,State:State}[]"
+            + "|[?Tags]|[?contains(Tags[*].Key, '{}')]".format(tagname)
+        )
 
         args = {}
         number_of_instances = 0
@@ -345,18 +428,25 @@ class Ec2Service:
         self._logger.info(INF_FETCHING_INSTANCES, account, region)
 
         while not done:
-
             ec2_resp = client.describe_instances(**args)
             for reservation_inst in jmespath.search(jmes, ec2_resp):
-                inst = self._select_instance_data(instance=reservation_inst, tagname=tagname, config=config)
+                inst = self._select_instance_data(
+                    instance=reservation_inst, tagname=tagname, config=config
+                )
                 number_of_instances += 1
                 if is_in_schedulable_state(inst):
                     instances.append(inst)
-                    self._logger.debug(DEBUG_SELECTED_INSTANCE, inst[schedulers.INST_ID],
-                                       inst[schedulers.INST_STATE_NAME])
+                    self._logger.debug(
+                        DEBUG_SELECTED_INSTANCE,
+                        inst[schedulers.INST_ID],
+                        inst[schedulers.INST_STATE_NAME],
+                    )
                 else:
-                    self._logger.debug(DEBUG_SKIPPED_INSTANCE, inst[schedulers.INST_ID],
-                                       inst[schedulers.INST_STATE_NAME])
+                    self._logger.debug(
+                        DEBUG_SKIPPED_INSTANCE,
+                        inst[schedulers.INST_ID],
+                        inst[schedulers.INST_STATE_NAME],
+                    )
             if "NextToken" in ec2_resp:
                 args["NextToken"] = ec2_resp["NextToken"]
             else:
@@ -372,97 +462,98 @@ class Ec2Service:
         if begin_dt.day == end_dt.day:
             periods = [
                 {
-                    "period":
-                        RunningPeriod(
-                            name="{}-period".format(name),
-                            begintime=begin_dt.time(),
-                            endtime=end_dt.time(),
-                            monthdays={begin_dt.day},
-                            months={begin_dt.month}
-                        ),
-                    "instancetype": None
+                    "period": RunningPeriod(
+                        name="{}-period".format(name),
+                        begintime=begin_dt.time(),
+                        endtime=end_dt.time(),
+                        monthdays={begin_dt.day},
+                        months={begin_dt.month},
+                    ),
+                    "instancetype": None,
                 }
             ]
         elif end_dt - begin_dt <= timedelta(hours=24):
             periods = [
                 {
-                    "period":
-                        RunningPeriod(
-                            name="{}-period-1".format(name),
-                            begintime=begin_dt.time(),
-                            endtime=SchedulerConfigBuilder.get_time_from_string("23:59"),
-                            monthdays={begin_dt.day},
-                            months={begin_dt.month}
-                        ),
-                    "instancetype": None
+                    "period": RunningPeriod(
+                        name="{}-period-1".format(name),
+                        begintime=begin_dt.time(),
+                        endtime=SchedulerConfigBuilder.get_time_from_string("23:59"),
+                        monthdays={begin_dt.day},
+                        months={begin_dt.month},
+                    ),
+                    "instancetype": None,
                 },
                 {
-                    "period":
-                        RunningPeriod(
-                            name="{}-period-2".format(name),
-                            begintime=SchedulerConfigBuilder.get_time_from_string("00:00"),
-                            endtime=end_dt.time(),
-                            monthdays={end_dt.day},
-                            months={end_dt.month}
-                        ),
-                    "instancetype": None
-                }
+                    "period": RunningPeriod(
+                        name="{}-period-2".format(name),
+                        begintime=SchedulerConfigBuilder.get_time_from_string("00:00"),
+                        endtime=end_dt.time(),
+                        monthdays={end_dt.day},
+                        months={end_dt.month},
+                    ),
+                    "instancetype": None,
+                },
             ]
         else:
             periods = [
                 {
-                    "period":
-                        RunningPeriod(
-                            name="{}-period-1".format(name),
-                            begintime=begin_dt.time(),
-                            endtime=SchedulerConfigBuilder.get_time_from_string("23:59"),
-                            monthdays={begin_dt.day},
-                            months={begin_dt.month}
-                        ),
-                    "instancetype": None
+                    "period": RunningPeriod(
+                        name="{}-period-1".format(name),
+                        begintime=begin_dt.time(),
+                        endtime=SchedulerConfigBuilder.get_time_from_string("23:59"),
+                        monthdays={begin_dt.day},
+                        months={begin_dt.month},
+                    ),
+                    "instancetype": None,
                 },
                 {
-                    "period":
-                        RunningPeriod(
-                            name="{}-period-2".format(name),
-                            monthdays={(end_dt - timedelta(days=1)).day},
-                            months={(end_dt - timedelta(days=1)).month}
-                        ),
-                    "instancetype": None
+                    "period": RunningPeriod(
+                        name="{}-period-2".format(name),
+                        monthdays={(end_dt - timedelta(days=1)).day},
+                        months={(end_dt - timedelta(days=1)).month},
+                    ),
+                    "instancetype": None,
                 },
                 {
-                    "period":
-                        RunningPeriod(
-                            name="{}-period-3".format(name),
-                            begintime=SchedulerConfigBuilder.get_time_from_string("00:00"),
-                            endtime=end_dt.time(),
-                            monthdays={end_dt.day},
-                            months={end_dt.month}
-                        ),
-                    "instancetype": None
-                }
+                    "period": RunningPeriod(
+                        name="{}-period-3".format(name),
+                        begintime=SchedulerConfigBuilder.get_time_from_string("00:00"),
+                        endtime=end_dt.time(),
+                        monthdays={end_dt.day},
+                        months={end_dt.month},
+                    ),
+                    "instancetype": None,
+                },
             ]
 
-        schedule = InstanceSchedule(name=name,
-                                    timezone=timezone,
-                                    description="{} maintenance window".format(name),
-                                    enforced=True,
-                                    periods=periods)
+        schedule = InstanceSchedule(
+            name=name,
+            timezone=timezone,
+            description="{} maintenance window".format(name),
+            enforced=True,
+            periods=periods,
+        )
 
-        self._logger.info(INF_MAINT_WINDOW, name, begin_dt.isoformat(), end_dt.isoformat())
+        self._logger.info(
+            INF_MAINT_WINDOW, name, begin_dt.isoformat(), end_dt.isoformat()
+        )
 
         return schedule
 
     # selects and builds a named tuple for the instance data
     def _select_instance_data(self, instance, tagname, config):
-
         def get_tags(inst):
-            return {tag["Key"]: tag["Value"] for tag in inst["Tags"]} if "Tags" in inst else {}
+            return (
+                {tag["Key"]: tag["Value"] for tag in inst["Tags"]}
+                if "Tags" in inst
+                else {}
+            )
 
         tags = get_tags(instance)
         name = tags.get("Name", "")
         instance_id = instance["InstanceId"]
-        state = instance["State"]["Code"] & 0XFF
+        state = instance["State"]["Code"] & 0xFF
         is_running = self.EC2_STATE_RUNNING == state
         is_terminated = state == Ec2Service.EC2_STATE_TERMINATED
         schedule_name = tags.get(tagname)
@@ -470,12 +561,22 @@ class Ec2Service:
         maintenance_window_schedule = None
         schedule = config.schedules.get(schedule_name, None)
         if schedule is not None:
-            if schedule.use_maintenance_window and schedule.ssm_maintenance_window not in [None, ""]:
-                maintenance_window_schedule = self._ssm_maintenance_windows.get(schedule.ssm_maintenance_window, None)
+            if (
+                schedule.use_maintenance_window
+                and schedule.ssm_maintenance_window not in [None, ""]
+            ):
+                maintenance_window_schedule = self._ssm_maintenance_windows.get(
+                    schedule.ssm_maintenance_window, None
+                )
                 if maintenance_window_schedule is None:
-                    self._logger.error(ERR_MAINT_WINDOW_NOT_FOUND_OR_DISABLED, schedule.ssm_maintenance_window,
-                                       schedule.name)
-                    self._ssm_maintenance_windows[schedule.ssm_maintenance_window] = "NOT-FOUND"
+                    self._logger.error(
+                        ERR_MAINT_WINDOW_NOT_FOUND_OR_DISABLED,
+                        schedule.ssm_maintenance_window,
+                        schedule.name,
+                    )
+                    self._ssm_maintenance_windows[
+                        schedule.ssm_maintenance_window
+                    ] = "NOT-FOUND"
                 if maintenance_window_schedule == "NOT-FOUND":
                     maintenance_window_schedule = None
 
@@ -490,26 +591,31 @@ class Ec2Service:
             schedulers.INST_RESIZED: False,
             schedulers.INST_IS_RUNNING: is_running,
             schedulers.INST_IS_TERMINATED: is_terminated,
-            schedulers.INST_CURRENT_STATE: InstanceSchedule.STATE_RUNNING if is_running else InstanceSchedule.STATE_STOPPED,
+            schedulers.INST_CURRENT_STATE: InstanceSchedule.STATE_RUNNING
+            if is_running
+            else InstanceSchedule.STATE_STOPPED,
             schedulers.INST_INSTANCE_TYPE: instance["InstanceType"],
             schedulers.INST_TAGS: tags,
-            schedulers.INST_MAINTENANCE_WINDOW: maintenance_window_schedule
+            schedulers.INST_MAINTENANCE_WINDOW: maintenance_window_schedule,
         }
         return instance_data
 
     # noinspection PyMethodMayBeStatic
     def resize_instance(self, kwargs):
-
         self._init_scheduler(kwargs)
         instance = kwargs[schedulers.PARAM_INSTANCE]
         instance_type = kwargs[schedulers.PARAM_DESIRED_TYPE]
 
-        client = get_client_with_standard_retry("ec2", session=self._session, region=self._region)
+        client = get_client_with_standard_retry(
+            "ec2", session=self._session, region=self._region
+        )
 
         self._logger.info(INF_SETTING_SIZE, instance.id, instance_type)
 
         try:
-            client.modify_instance_attribute(InstanceId=instance.id, InstanceType={"Value": instance_type})
+            client.modify_instance_attribute(
+                InstanceId=instance.id, InstanceType={"Value": instance_type}
+            )
         except Exception as ex:
             self._logger.error(ERR_RESIZING_INSTANCE_, ",".join(instance.id), str(ex))
 
@@ -521,7 +627,6 @@ class Ec2Service:
 
     # noinspection PyMethodMayBeStatic
     def stop_instances(self, kwargs):
-
         def is_in_stopping_state(state):
             return (state & 0xFF) in Ec2Service.EC2_STOPPING_STATES
 
@@ -533,14 +638,20 @@ class Ec2Service:
             stop_tags = []
         stop_tags_key_names = [t["Key"] for t in stop_tags]
 
-        start_tags_keys = [{"Key": t["Key"]} for t in kwargs[schedulers.PARAM_CONFIG].started_tags if
-                           t["Key"] not in stop_tags_key_names]
+        start_tags_keys = [
+            {"Key": t["Key"]}
+            for t in kwargs[schedulers.PARAM_CONFIG].started_tags
+            if t["Key"] not in stop_tags_key_names
+        ]
 
         methods = ["stop_instances", "create_tags", "delete_tags", "describe_instances"]
-        client = get_client_with_standard_retry("ec2", session=self._session, region=self._region)
+        client = get_client_with_standard_retry(
+            "ec2", session=self._session, region=self._region
+        )
 
-        for instance_batch in list(self.instance_batches(stopped_instances, STOP_BATCH_SIZE)):
-
+        for instance_batch in list(
+            self.instance_batches(stopped_instances, STOP_BATCH_SIZE)
+        ):
             instance_ids = [i.id for i in instance_batch]
 
             # split in hibernated and non hibernated, instanced that are stopped for resizing cannot be hibernated
@@ -555,37 +666,68 @@ class Ec2Service:
             try:
                 while len(hibernated) > 0:
                     try:
-                        stop_resp = client.stop_instances(InstanceIds=hibernated, Hibernate=True)
-                        instances_stopping += [i["InstanceId"] for i in stop_resp.get("StoppingInstances", []) if
-                                               is_in_stopping_state(i.get("CurrentState", {}).get("Code", ""))]
+                        stop_resp = client.stop_instances(
+                            InstanceIds=hibernated, Hibernate=True
+                        )
+                        instances_stopping += [
+                            i["InstanceId"]
+                            for i in stop_resp.get("StoppingInstances", [])
+                            if is_in_stopping_state(
+                                i.get("CurrentState", {}).get("Code", "")
+                            )
+                        ]
                         break
                     except ClientError as ex:
                         instance_id = None
-                        if ex.response.get("Error", {}).get("Code") == "UnsupportedHibernationConfiguration":
-                            instance_id = ex.response["Error"]["Message"].split(":")[-1].strip()
-                        elif ex.response.get("Error", {}).get("Code") == "UnsupportedOperation":
-                            instance_id = ex.response["Error"]["Message"].split(" ")[1].strip()
+                        if (
+                            ex.response.get("Error", {}).get("Code")
+                            == "UnsupportedHibernationConfiguration"
+                        ):
+                            instance_id = (
+                                ex.response["Error"]["Message"].split(":")[-1].strip()
+                            )
+                        elif (
+                            ex.response.get("Error", {}).get("Code")
+                            == "UnsupportedOperation"
+                        ):
+                            instance_id = (
+                                ex.response["Error"]["Message"].split(" ")[1].strip()
+                            )
                         if instance_id in hibernated:
                             self._logger.warning(WARN_NOT_HIBERNATED, instance_id, ex)
                             hibernated.remove(instance_id)
                             not_hibernated.append(instance_id)
                         else:
-                            self._logger.error(ERR_STOPPING_INSTANCES, ",".join(hibernated), str(ex))
+                            self._logger.error(
+                                ERR_STOPPING_INSTANCES, ",".join(hibernated), str(ex)
+                            )
 
                 if len(not_hibernated) > 0:
                     try:
-                        stop_resp = client.stop_instances(InstanceIds=not_hibernated, Hibernate=False)
-                        instances_stopping += [i["InstanceId"] for i in stop_resp.get("StoppingInstances", []) if
-                                               is_in_stopping_state(i.get("CurrentState", {}).get("Code", ""))]
+                        stop_resp = client.stop_instances(
+                            InstanceIds=not_hibernated, Hibernate=False
+                        )
+                        instances_stopping += [
+                            i["InstanceId"]
+                            for i in stop_resp.get("StoppingInstances", [])
+                            if is_in_stopping_state(
+                                i.get("CurrentState", {}).get("Code", "")
+                            )
+                        ]
                     except Exception as ex:
-                        self._logger.error(ERR_STOPPING_INSTANCES, ",".join(not_hibernated), str(ex))
+                        self._logger.error(
+                            ERR_STOPPING_INSTANCES, ",".join(not_hibernated), str(ex)
+                        )
 
                 get_status_count = 0
                 if len(instances_stopping) < len(instance_ids):
                     time.sleep(5)
 
-                    instances_stopping = [i["InstanceId"] for i in self.get_instance_status(client, instance_ids) if
-                                          is_in_stopping_state(i.get("State", {}).get("Code", ""))]
+                    instances_stopping = [
+                        i["InstanceId"]
+                        for i in self.get_instance_status(client, instance_ids)
+                        if is_in_stopping_state(i.get("State", {}).get("Code", ""))
+                    ]
 
                     if len(instances_stopping) == len(instance_ids):
                         break
@@ -600,25 +742,44 @@ class Ec2Service:
                 if len(instances_stopping) > 0:
                     try:
                         if start_tags_keys is not None and len(start_tags_keys):
-                            self._logger.info(INFO_REMOVING_KEYS, "start",
-                                              ",".join(["\"{}\"".format(k["Key"]) for k in start_tags_keys]),
-                                              ",".join(instances_stopping))
-                            client.delete_tags(Resources=instances_stopping, Tags=start_tags_keys)
+                            self._logger.info(
+                                INFO_REMOVING_KEYS,
+                                "start",
+                                ",".join(
+                                    ['"{}"'.format(k["Key"]) for k in start_tags_keys]
+                                ),
+                                ",".join(instances_stopping),
+                            )
+                            client.delete_tags(
+                                Resources=instances_stopping, Tags=start_tags_keys
+                            )
                         if len(stop_tags) > 0:
-                            self._logger.info(INF_ADD_KEYS, "stop", str(stop_tags), ",".join(instances_stopping))
-                            client.create_tags(Resources=instances_stopping, Tags=stop_tags)
+                            self._logger.info(
+                                INF_ADD_KEYS,
+                                "stop",
+                                str(stop_tags),
+                                ",".join(instances_stopping),
+                            )
+                            client.create_tags(
+                                Resources=instances_stopping, Tags=stop_tags
+                            )
                     except Exception as ex:
-                        self._logger.warning(WARN_STOPPED_INSTANCES_TAGGING, ','.join(instances_stopping), str(ex))
+                        self._logger.warning(
+                            WARN_STOPPED_INSTANCES_TAGGING,
+                            ",".join(instances_stopping),
+                            str(ex),
+                        )
 
                 for i in instances_stopping:
                     yield i, InstanceSchedule.STATE_STOPPED
 
             except Exception as ex:
-                self._logger.error(ERR_STOPPING_INSTANCES, ",".join(instance_ids), str(ex))
+                self._logger.error(
+                    ERR_STOPPING_INSTANCES, ",".join(instance_ids), str(ex)
+                )
 
     # noinspection PyMethodMayBeStatic
     def start_instances(self, kwargs):
-
         def is_in_starting_state(state):
             return (state & 0xFF) in Ec2Service.EC2_STARTING_STATES
 
@@ -629,30 +790,42 @@ class Ec2Service:
         if start_tags is None:
             start_tags = []
         start_tags_key_names = [t["Key"] for t in start_tags]
-        stop_tags_keys = [{"Key": t["Key"]} for t in kwargs[schedulers.PARAM_CONFIG].stopped_tags if
-                          t["Key"] not in start_tags_key_names]
-        client = get_client_with_standard_retry("ec2", session=self._session, region=self._region)
+        stop_tags_keys = [
+            {"Key": t["Key"]}
+            for t in kwargs[schedulers.PARAM_CONFIG].stopped_tags
+            if t["Key"] not in start_tags_key_names
+        ]
+        client = get_client_with_standard_retry(
+            "ec2", session=self._session, region=self._region
+        )
 
-        if os.environ['START_EC2_BATCH_SIZE'] is not None:
+        if os.environ["START_EC2_BATCH_SIZE"] is not None:
             try:
-                START_BATCH_SIZE = int(os.environ['START_EC2_BATCH_SIZE'])
+                START_BATCH_SIZE = int(os.environ["START_EC2_BATCH_SIZE"])
             except Exception as ex:
                 self._logger.info(ex)
 
-        for instance_batch in self.instance_batches(instances_to_start, START_BATCH_SIZE):
-
+        for instance_batch in self.instance_batches(
+            instances_to_start, START_BATCH_SIZE
+        ):
             instance_ids = [i.id for i in list(instance_batch)]
             try:
                 start_resp = client.start_instances(InstanceIds=instance_ids)
-                instances_starting = [i["InstanceId"] for i in start_resp.get("StartingInstances", []) if
-                                      is_in_starting_state(i.get("CurrentState", {}).get("Code", ""))]
+                instances_starting = [
+                    i["InstanceId"]
+                    for i in start_resp.get("StartingInstances", [])
+                    if is_in_starting_state(i.get("CurrentState", {}).get("Code", ""))
+                ]
 
                 get_status_count = 0
                 if len(instances_starting) < len(instance_ids):
                     time.sleep(5)
 
-                    instances_starting = [i["InstanceId"] for i in self.get_instance_status(client, instance_ids) if
-                                          is_in_starting_state(i.get("State", {}).get("Code", ""))]
+                    instances_starting = [
+                        i["InstanceId"]
+                        for i in self.get_instance_status(client, instance_ids)
+                        if is_in_starting_state(i.get("State", {}).get("Code", ""))
+                    ]
 
                     if len(instances_starting) == len(instance_ids):
                         break
@@ -667,18 +840,38 @@ class Ec2Service:
                 if len(instances_starting) > 0:
                     try:
                         if stop_tags_keys is not None and len(stop_tags_keys) > 0:
-                            self._logger.info(INFO_REMOVING_KEYS, "stop",
-                                              ",".join(["\"{}\"".format(k["Key"]) for k in stop_tags_keys]),
-                                              ",".join(instances_starting))
-                            client.delete_tags(Resources=instances_starting, Tags=stop_tags_keys)
+                            self._logger.info(
+                                INFO_REMOVING_KEYS,
+                                "stop",
+                                ",".join(
+                                    ['"{}"'.format(k["Key"]) for k in stop_tags_keys]
+                                ),
+                                ",".join(instances_starting),
+                            )
+                            client.delete_tags(
+                                Resources=instances_starting, Tags=stop_tags_keys
+                            )
                         if len(start_tags) > 0:
-                            self._logger.info(INF_ADD_KEYS, "start", str(start_tags), ",".join(instances_starting))
-                            client.create_tags(Resources=instances_starting, Tags=start_tags)
+                            self._logger.info(
+                                INF_ADD_KEYS,
+                                "start",
+                                str(start_tags),
+                                ",".join(instances_starting),
+                            )
+                            client.create_tags(
+                                Resources=instances_starting, Tags=start_tags
+                            )
                     except Exception as ex:
-                        self._logger.warning(WARN_STARTED_INSTANCES_TAGGING, ','.join(instances_starting), str(ex))
+                        self._logger.warning(
+                            WARN_STARTED_INSTANCES_TAGGING,
+                            ",".join(instances_starting),
+                            str(ex),
+                        )
 
                 for i in instances_starting:
                     yield i, InstanceSchedule.STATE_RUNNING
 
             except Exception as ex:
-                self._logger.error(ERR_STARTING_INSTANCES, ",".join(instance_ids), str(ex))
+                self._logger.error(
+                    ERR_STARTING_INSTANCES, ",".join(instance_ids), str(ex)
+                )

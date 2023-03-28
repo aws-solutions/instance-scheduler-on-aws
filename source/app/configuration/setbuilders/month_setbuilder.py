@@ -26,9 +26,11 @@ class MonthSetBuilder(SetBuilder):
         :param wrap: Set to True to allow wrapping at last month of the year
         :param ignorecase: Set to True to ignore case when mapping month names
         """
-        SetBuilder.__init__(self,
-                            names=calendar.month_abbr[1:],
-                            significant_name_characters=3,
-                            offset=1,
-                            ignorecase=ignorecase,
-                            wrap=wrap)
+        SetBuilder.__init__(
+            self,
+            names=calendar.month_abbr[1:],
+            significant_name_characters=3,
+            offset=1,
+            ignorecase=ignorecase,
+            wrap=wrap,
+        )

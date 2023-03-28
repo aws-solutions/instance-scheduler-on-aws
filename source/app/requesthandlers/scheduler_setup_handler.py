@@ -27,11 +27,17 @@ from util.logger import Logger
 from util.metrics import allow_send_metrics, send_metrics_data
 
 ERR_SETTING_CONFIG = "Error setting scheduler configuration {} "
-ERR_SETTING_RETENTION_LAMBDA_LOGGROUP = "Error setting or deleting retention period for log group {} ({})"
+ERR_SETTING_RETENTION_LAMBDA_LOGGROUP = (
+    "Error setting or deleting retention period for log group {} ({})"
+)
 
 INF_CONFIG_SET = "Scheduler configuration set to {}"
-INFO_DELETE_LOG_RETENTION_POLICY = "Deleting log retention policy for Lambda CloudWatch loggroup {}"
-INFO_SET_LOG_RETENTION_POLICY = "Setting log retention policy for Lambda CloudWatch loggroup {} to {} days"
+INFO_DELETE_LOG_RETENTION_POLICY = (
+    "Deleting log retention policy for Lambda CloudWatch loggroup {}"
+)
+INFO_SET_LOG_RETENTION_POLICY = (
+    "Setting log retention policy for Lambda CloudWatch loggroup {} to {} days"
+)
 
 LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
 
@@ -42,7 +48,6 @@ class SchedulerSetupHandler(CustomResource):
     """
 
     def __init__(self, event, context):
-
         CustomResource.__init__(self, event, context)
         # Setup logging
         classname = self.__class__.__name__
@@ -51,14 +56,20 @@ class SchedulerSetupHandler(CustomResource):
         self._logger = Logger(logstream=log_stream, buffersize=1, context=context)
 
         self.arguments = copy(self.resource_properties)
-        self.arguments = {a: self.resource_properties[a] for a in self.resource_properties if a not in ["ServiceToken",
-                                                                                                        "Timeout"]}
+        self.arguments = {
+            a: self.resource_properties[a]
+            for a in self.resource_properties
+            if a not in ["ServiceToken", "Timeout"]
+        }
 
         self._stack_version = self.arguments["stack_version"]
 
     @staticmethod
     def is_handling_request(event):
-        return event.get("StackId") is not None and event.get("ResourceType") == "Custom::ServiceSetup"
+        return (
+            event.get("StackId") is not None
+            and event.get("ResourceType") == "Custom::ServiceSetup"
+        )
 
     @property
     def tagname(self):
@@ -66,7 +77,9 @@ class SchedulerSetupHandler(CustomResource):
         Name of the tag to mark scheduled instances
         :return: tag name
         """
-        return self.resource_properties.get(configuration.TAGNAME, configuration.DEFAULT_TAGNAME)
+        return self.resource_properties.get(
+            configuration.TAGNAME, configuration.DEFAULT_TAGNAME
+        )
 
     @property
     def default_timezone(self):
@@ -74,7 +87,9 @@ class SchedulerSetupHandler(CustomResource):
         Returns default time zone
         :return: default timezone
         """
-        return self.resource_properties.get(configuration.DEFAULT_TIMEZONE, configuration.DEFAULT_TZ)
+        return self.resource_properties.get(
+            configuration.DEFAULT_TIMEZONE, configuration.DEFAULT_TZ
+        )
 
     @property
     def use_metrics(self):
@@ -91,14 +106,16 @@ class SchedulerSetupHandler(CustomResource):
         :return: trace flag
         """
         return self.resource_properties.get(configuration.TRACE, "True")
-    
+
     @property
     def enable_SSM_maintenance_windows(self):
         """
         Returns global enable SSM Maintenance Windows flag
         :return: ssm_enable_SSM_maintenance_windows flag
         """
-        return self.resource_properties.get(configuration.ENABLE_SSM_MAINTENANCE_WINDOWS, "False")
+        return self.resource_properties.get(
+            configuration.ENABLE_SSM_MAINTENANCE_WINDOWS, "False"
+        )
 
     @property
     def regions(self):
@@ -107,7 +124,11 @@ class SchedulerSetupHandler(CustomResource):
         :return: regions
         """
         result = set(self.resource_properties.get(configuration.REGIONS))
-        if result is None or result == set() or len([i for i in result if i.strip() != ""]) == 0:
+        if (
+            result is None
+            or result == set()
+            or len([i for i in result if i.strip() != ""]) == 0
+        ):
             result = [boto3.Session().region_name]
         return result
 
@@ -134,7 +155,11 @@ class SchedulerSetupHandler(CustomResource):
         :return: cross account roles
         """
         result = set(self.resource_properties.get(configuration.CROSS_ACCOUNT_ROLES))
-        if result is None or result == set() or len([i for i in result if i.strip() != ""]) == 0:
+        if (
+            result is None
+            or result == set()
+            or len([i for i in result if i.strip() != ""]) == 0
+        ):
             return None
 
         return result
@@ -146,7 +171,11 @@ class SchedulerSetupHandler(CustomResource):
         :return: services to schedule
         """
         result = set(self.resource_properties.get(configuration.SCHEDULED_SERVICES))
-        if result is None or result == set() or len([i for i in result if i.strip() != ""]) == 0:
+        if (
+            result is None
+            or result == set()
+            or len([i for i in result if i.strip() != ""]) == 0
+        ):
             return None
 
         return result
@@ -173,7 +202,9 @@ class SchedulerSetupHandler(CustomResource):
         Returns flag for processing lambda account switch
         :return: lambda account process switch
         """
-        return self.resource_properties.get(configuration.SCHEDULE_LAMBDA_ACCOUNT, "True")
+        return self.resource_properties.get(
+            configuration.SCHEDULE_LAMBDA_ACCOUNT, "True"
+        )
 
     def handle_request(self):
         """
@@ -182,7 +213,11 @@ class SchedulerSetupHandler(CustomResource):
         """
 
         try:
-            self._logger.info("Handler {} : Received request {}", self.__class__.__name__, json.dumps(self.event))
+            self._logger.info(
+                "Handler {} : Received request {}",
+                self.__class__.__name__,
+                json.dumps(self.event),
+            )
             CustomResource.handle_request(self)
         finally:
             self._logger.flush()
@@ -190,19 +225,22 @@ class SchedulerSetupHandler(CustomResource):
     def _update_settings(self):
         try:
             admin = ConfigAdmin(logger=self._logger, context=self.context)
-            settings = admin.update_config(default_timezone=self.default_timezone,
-                                           scheduled_services=self.scheduled_services,
-                                           schedule_clusters=self.schedule_clusters,
-                                           create_rds_snapshot = self.create_rds_snapshot,
-                                           tagname=self.tagname,
-                                           regions=self.regions,
-                                           cross_account_roles=self.cross_account_roles,
-                                           schedule_lambda_account=self.schedule_lambda_account.lower() == "true",
-                                           use_metrics=self.use_metrics.lower() == "true",
-                                           trace=self.trace.lower() == "true",
-                                           enable_SSM_maintenance_windows=self.enable_SSM_maintenance_windows.lower() == "true",
-                                           started_tags=self.started_tags,
-                                           stopped_tags=self.stopped_tags)
+            settings = admin.update_config(
+                default_timezone=self.default_timezone,
+                scheduled_services=self.scheduled_services,
+                schedule_clusters=self.schedule_clusters,
+                create_rds_snapshot=self.create_rds_snapshot,
+                tagname=self.tagname,
+                regions=self.regions,
+                cross_account_roles=self.cross_account_roles,
+                schedule_lambda_account=self.schedule_lambda_account.lower() == "true",
+                use_metrics=self.use_metrics.lower() == "true",
+                trace=self.trace.lower() == "true",
+                enable_SSM_maintenance_windows=self.enable_SSM_maintenance_windows.lower()
+                == "true",
+                started_tags=self.started_tags,
+                stopped_tags=self.stopped_tags,
+            )
 
             self._logger.info(INF_CONFIG_SET, str(settings))
 
@@ -230,15 +268,22 @@ class SchedulerSetupHandler(CustomResource):
                 log_client.delete_retention_policy(loggroup)
                 return True
             else:
-                self._logger.info(INFO_SET_LOG_RETENTION_POLICY, loggroup, retention_days)
-                log_client.put_retention_policy(logGroupName=loggroup, retentionInDays=int(retention_days))
+                self._logger.info(
+                    INFO_SET_LOG_RETENTION_POLICY, loggroup, retention_days
+                )
+                log_client.put_retention_policy(
+                    logGroupName=loggroup, retentionInDays=int(retention_days)
+                )
                 return True
         except Exception as ex:
-            self._logger.warning(ERR_SETTING_RETENTION_LAMBDA_LOGGROUP, self.context.log_group_name, str(ex))
+            self._logger.warning(
+                ERR_SETTING_RETENTION_LAMBDA_LOGGROUP,
+                self.context.log_group_name,
+                str(ex),
+            )
             return True
 
     def _create_sample_schemas(self):
-
         try:
             admin: ConfigAdmin = ConfigAdmin(logger=self._logger, context=self.context)
 
@@ -254,31 +299,26 @@ class SchedulerSetupHandler(CustomResource):
             admin.create_schedule(**demo_data.SCHEDULE_SCALING)
 
         except Exception as ex:
-            self._logger.error("Error creating sample schedules and periods {}".format(ex))
+            self._logger.error(
+                "Error creating sample schedules and periods {}".format(ex)
+            )
 
     def _send_create_metrics(self):
         metrics_data = {
             "Type": "stack",
             "Version": self._stack_version,
-            "StackHash": sha256(self.stack_id.encode('utf-8')).hexdigest(),
-            "Data": {
-                "Status": "stack_create",
-                "Region": self.region
-            }
+            "StackHash": sha256(self.stack_id.encode("utf-8")).hexdigest(),
+            "Data": {"Status": "stack_create", "Region": self.region},
         }
 
         send_metrics_data(metrics=metrics_data, logger=self._logger)
 
     def _send_delete_metrics(self):
-
         metrics_data = {
             "Type": "stack",
             "Version": self._stack_version,
-            "StackHash": sha256(self.stack_id.encode('utf-8')).hexdigest(),
-            "Data": {
-                "Status": "stack_delete",
-                "Region": self.region
-            }
+            "StackHash": sha256(self.stack_id.encode("utf-8")).hexdigest(),
+            "Data": {"Status": "stack_delete", "Region": self.region},
         }
 
         send_metrics_data(metrics=metrics_data, logger=self._logger)

@@ -31,6 +31,7 @@ class InstanceStates:
     """
     Implements store for last desired state for service instances
     """
+
     INSTANCE_TABLE_TIMESTAMP = "timestamp"
     INSTANCE_TABLE_PURGE = "purge_in_next_cleanup"
     INSTANCE_TABLE_ACCOUNT_REGION = "account-region"
@@ -65,7 +66,9 @@ class InstanceStates:
         :return:
         """
         if self._state_table is None:
-            self._state_table = DynamoDBUtils.get_dynamodb_table_resource_ref(self._table_name)
+            self._state_table = DynamoDBUtils.get_dynamodb_table_resource_ref(
+                self._table_name
+            )
         return self._state_table
 
     def load(self, account, region):
@@ -81,10 +84,13 @@ class InstanceStates:
 
         # get single row from dynamoDB
         try:
-            resp = self.state_table.get_item(Key={
-                InstanceStates.INSTANCE_TABLE_NAME: self._service,
-                InstanceStates.INSTANCE_TABLE_ACCOUNT_REGION: self._current_account_region
-            }, ConsistentRead=True)
+            resp = self.state_table.get_item(
+                Key={
+                    InstanceStates.INSTANCE_TABLE_NAME: self._service,
+                    InstanceStates.INSTANCE_TABLE_ACCOUNT_REGION: self._current_account_region,
+                },
+                ConsistentRead=True,
+            )
             item = resp.get("Item", {})
         except ClientError as ex:
             self._logger.warning(WARN_LOADING_STATE, str(ex))
@@ -97,9 +103,17 @@ class InstanceStates:
             self._timestamp = Decimal(time.time())
 
         # instance states, one column per instance
-        self._state_info = {i: item[i] for i in item if
-                            i not in [InstanceStates.INSTANCE_TABLE_TIMESTAMP, InstanceStates.INSTANCE_TABLE_NAME,
-                                      InstanceStates.INSTANCE_TABLE_ACCOUNT_REGION, InstanceStates.INSTANCE_TABLE_PURGE]}
+        self._state_info = {
+            i: item[i]
+            for i in item
+            if i
+            not in [
+                InstanceStates.INSTANCE_TABLE_TIMESTAMP,
+                InstanceStates.INSTANCE_TABLE_NAME,
+                InstanceStates.INSTANCE_TABLE_ACCOUNT_REGION,
+                InstanceStates.INSTANCE_TABLE_PURGE,
+            ]
+        }
 
         # items to purge
         if InstanceStates.INSTANCE_TABLE_PURGE in item:
@@ -150,7 +164,7 @@ class InstanceStates:
             data = {
                 InstanceStates.INSTANCE_TABLE_NAME: self._service,
                 InstanceStates.INSTANCE_TABLE_ACCOUNT_REGION: self._current_account_region,
-                InstanceStates.INSTANCE_TABLE_TIMESTAMP: Decimal(time.time())
+                InstanceStates.INSTANCE_TABLE_TIMESTAMP: Decimal(time.time()),
             }
 
             # store instance states as one column per instance
@@ -164,7 +178,6 @@ class InstanceStates:
             self.state_table.put_item(Item=data)
             self._dirty = False
 
-
     def cleanup(self, instances):
         """
         Removes instance id's from the table that have been terminated or not being processed by the scheduler.
@@ -174,7 +187,9 @@ class InstanceStates:
         :return:
         """
         # cleanup only if the last cleanup was more than a the configured interval ago
-        if (Decimal(time.time()) - Decimal(self._timestamp)) > InstanceStates.cleanup_interval:
+        if (
+            Decimal(time.time()) - Decimal(self._timestamp)
+        ) > InstanceStates.cleanup_interval:
             self._logger.info(INF_CLEANING)
             self._timestamp = time.time()
             self._dirty = True
@@ -199,4 +214,3 @@ class InstanceStates:
                 elif i in self._instances_to_purge:
                     # the instance was not returned by describe instances at last cleanup but it is this time
                     self._instances_to_purge.remove(i)
-

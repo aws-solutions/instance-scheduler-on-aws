@@ -21,7 +21,7 @@ class CustomEncoder(json.JSONEncoder):
     Internal class used for serialization of types not supported in json.
     """
 
-    def default(self, o): # pylint: disable=E0202
+    def default(self, o):  # pylint: disable=E0202
         # sets become lists
         if isinstance(o, set):
             return list(o)
@@ -34,5 +34,3 @@ class CustomEncoder(json.JSONEncoder):
             return str(o)
 
         return json.JSONEncoder.default(self, o)
-
-

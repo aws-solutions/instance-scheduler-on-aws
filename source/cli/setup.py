@@ -17,7 +17,7 @@ setup(
     name="scheduler-cli",
     packages=["scheduler_cli"],
     entry_points={
-        "console_scripts": ['scheduler-cli = scheduler_cli.scheduler_cli:main']
+        "console_scripts": ["scheduler-cli = scheduler_cli.scheduler_cli:main"]
     },
     version="#version#",
     description="AWS Instance Scheduler CLI",
@@ -25,6 +25,6 @@ setup(
         "argparse",
         "requests>=2.28.1",
         "jmespath>=1.0.1",
-        "boto3>=1.26.48"]
+        "boto3>=1.26.48",
+    ],
 )
-

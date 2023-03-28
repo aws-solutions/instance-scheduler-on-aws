@@ -21,6 +21,7 @@ class SchedulerMetrics:
     """
     Implements wrapper to write metrics data
     """
+
     NAMESPACE = "InstanceScheduler"
     RUNNING_INSTANCES = "RunningInstances"
     MANAGED_INSTANCES = "ManagedInstances"
@@ -61,9 +62,14 @@ class SchedulerMetrics:
             if service not in self._metrics_managed:
                 self._metrics_managed[service] = {}
                 self._metrics_running[service] = {}
-            self._metrics_managed[service][schedule.name] = self._metrics_managed[service].get(schedule.name, 0) + 1
-            self._metrics_running[service][schedule.name] = self._metrics_running[service].get(schedule.name,
-                                                                                               0) + 1 if instance.is_running else 0
+            self._metrics_managed[service][schedule.name] = (
+                self._metrics_managed[service].get(schedule.name, 0) + 1
+            )
+            self._metrics_running[service][schedule.name] = (
+                self._metrics_running[service].get(schedule.name, 0) + 1
+                if instance.is_running
+                else 0
+            )
 
     def put_schedule_metrics(self):
         """
@@ -74,11 +80,16 @@ class SchedulerMetrics:
         def build_metric(service_name, schedule_name, metric_name, data):
             return {
                 "MetricName": metric_name,
-                "Dimensions": [{"Name": SchedulerMetrics.DIMENSION_SERVICE, "Value": service_name},
-                               {"Name": SchedulerMetrics.DIMENSION_SCHEDULE, "Value": schedule_name}],
+                "Dimensions": [
+                    {"Name": SchedulerMetrics.DIMENSION_SERVICE, "Value": service_name},
+                    {
+                        "Name": SchedulerMetrics.DIMENSION_SCHEDULE,
+                        "Value": schedule_name,
+                    },
+                ],
                 "Timestamp": self._dt,
                 "Value": data[schedule_name],
-                "Unit": "Count"
+                "Unit": "Count",
             }
 
         if len(self._metrics_managed) > 0:
@@ -86,8 +97,22 @@ class SchedulerMetrics:
             for service in list(self._metrics_managed):
                 for name in list(self._metrics_managed[service]):
                     metric_data.append(
-                        build_metric(service, name, SchedulerMetrics.MANAGED_INSTANCES, self._metrics_managed[service]))
+                        build_metric(
+                            service,
+                            name,
+                            SchedulerMetrics.MANAGED_INSTANCES,
+                            self._metrics_managed[service],
+                        )
+                    )
                     metric_data.append(
-                        build_metric(service, name, SchedulerMetrics.RUNNING_INSTANCES, self._metrics_running[service]))
+                        build_metric(
+                            service,
+                            name,
+                            SchedulerMetrics.RUNNING_INSTANCES,
+                            self._metrics_running[service],
+                        )
+                    )
 
-            self.metrics_client.put_metric_data(Namespace=self._namespace, MetricData=metric_data)
+            self.metrics_client.put_metric_data(
+                Namespace=self._namespace, MetricData=metric_data
+            )
