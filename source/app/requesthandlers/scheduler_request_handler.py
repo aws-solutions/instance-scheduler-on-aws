@@ -96,9 +96,8 @@ class SchedulerRequestHandler:
         if self.configuration.schedule_lambda_account:
             yield self.lambda_account
 
-        for role in self.configuration.cross_account_roles:
-            account_name = schedulers.account_from_role(role)
-            yield account_name
+        for remote_account_id in self.configuration.remote_account_ids:
+            yield remote_account_id
 
     def handle_request(self):
         """

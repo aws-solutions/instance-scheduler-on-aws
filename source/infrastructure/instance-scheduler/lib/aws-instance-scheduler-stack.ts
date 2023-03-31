@@ -18,6 +18,7 @@ import { SUPPORTED_TIME_ZONES } from "./time-zones";
 import { AppRegistryForInstanceScheduler } from "./app-registry";
 import { NagSuppressions } from "cdk-nag";
 import { CoreScheduler } from "./core-scheduler";
+import { SchedulerEventBusResources, SchedulerEventBusProps } from "./event-bus-stack";
 
 export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
   readonly description: string;
@@ -60,7 +61,7 @@ export interface AwsInstanceSchedulerParameterDefaultOverrides {
   readonly tagName?: string;
   readonly defaultTimezone?: string;
   readonly regions?: string;
-  readonly crossAccountRoles?: string;
+  readonly principals?: string;
   readonly startedTags?: string;
   readonly stoppedTags?: string;
   readonly schedulerFrequency?: "1" | "2" | "5" | "10" | "15" | "30" | "60";
@@ -154,7 +155,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     });
 
     const trace = new cdk.CfnParameter(this, "Trace", {
-      description: "Enable logging of detailed information in CloudWatch logs.",
+      description: "Allow 'debug' level logging in CloudWatch logs.",
       type: "String",
       allowedValues: ["Yes", "No"],
       default: props.paramOverrides?.trace ?? "No",
@@ -189,11 +190,24 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       default: props.paramOverrides?.regions ?? "",
     });
 
-    const crossAccountRoles = new cdk.CfnParameter(this, "CrossAccountRoles", {
+    const usingAWSOrganizations = new cdk.CfnParameter(this, "UsingAWSOrganizations", {
+      type: "String",
+      description: "Is the hub account member of the AWS Organizations?",
+      allowedValues: ["Yes", "No"],
+      default: "No",
+    });
+
+    const principals = new cdk.CfnParameter(this, "Principals", {
       type: "CommaDelimitedList",
       description:
-        "Comma separated list of ARN's for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.",
-      default: props.paramOverrides?.crossAccountRoles ?? "",
+        "(Required) If using AWS Organizations, provide Organization ID. Eg. o-xxxxyyy. Else, comma separated list of remote account ids. Eg.: 1111111111, 2222222222 or {param: ssm-param-name}",
+      default: props.paramOverrides?.principals ?? "",
+    });
+
+    const namespace = new cdk.CfnParameter(this, "Namespace", {
+      type: "String",
+      description:
+        "Provide unique identifier to differentiate between multiple solution deployments (No Spaces). Example: Dev",
     });
 
     const startedTags = new cdk.CfnParameter(this, "StartedTags", {
@@ -226,6 +240,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     //End CFN parameters for instance scheduler.
 
+    // CFN Conditions
+    const isMemberOfOrganization = new cdk.CfnCondition(this, "IsMemberOfOrganization", {
+      expression: cdk.Fn.conditionEquals(usingAWSOrganizations, "Yes"),
+    });
+
     //Start Mappings for instance scheduler.
 
     const mappings = new cdk.CfnMapping(this, "mappings");
@@ -245,6 +264,8 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     mappings.setValue("Timeouts", "60", "cron(0 0/1 * * ? *)");
     mappings.setValue("Settings", "MetricsUrl", "https://metrics.awssolutionsbuilder.com/generic");
     mappings.setValue("Settings", "MetricsSolutionId", "S00030");
+    mappings.setValue("SchedulerRole", "Name", "Scheduler-Role");
+    mappings.setValue("SchedulerEventBusName", "Name", "scheduler-event-bus");
 
     const send = new cdk.CfnMapping(this, "Send");
     send.setValue("AnonymousUsage", "Data", "Yes");
@@ -359,6 +380,26 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       },
     });
 
+    // Support AWS Organizations - Cross account event bus
+    const eventBusProps: SchedulerEventBusProps = {
+      organizationId: principals.valueAsList,
+      namespace: namespace.valueAsString,
+      lambdaFunctionArn: coreScheduler.lambdaFunction.functionArn,
+      eventBusName: mappings.findInMap("SchedulerEventBusName", "Name"),
+      isMemberOfOrganizationsCondition: isMemberOfOrganization,
+    };
+
+    const eventBusResource = new SchedulerEventBusResources(this, "SchedulerEventBusResources", eventBusProps);
+
+    const eventBusRuleLambdaPermission = new lambda.CfnPermission(this, "EventBusRuleLambdaPermission", {
+      functionName: coreScheduler.lambdaFunction.functionName,
+      action: "lambda:InvokeFunction",
+      principal: "events.amazonaws.com",
+      sourceArn: eventBusResource.eventRuleCrossAccount.attrArn,
+    });
+
+    eventBusRuleLambdaPermission.cfnOptions.condition = isMemberOfOrganization;
+
     //PolicyStatement for SSM Get and Put Parameters
     const ssmParameterPolicyStatement = new PolicyStatement({
       actions: ["ssm:PutParameter", "ssm:GetParameter"],
@@ -404,7 +445,10 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         schedule_clusters: mappings.findInMap("TrueFalse", scheduleRdsClusters.valueAsString),
         create_rds_snapshot: mappings.findInMap("TrueFalse", createRdsSnapshot.valueAsString),
         regions: regions,
-        cross_account_roles: crossAccountRoles,
+        remote_account_ids: principals,
+        namespace: namespace.valueAsString,
+        aws_partition: cdk.Fn.sub("${AWS::Partition}"),
+        scheduler_role_name: mappings.findInMap("SchedulerRole", "Name"),
         schedule_lambda_account: mappings.findInMap("TrueFalse", scheduleLambdaAccount.valueAsString),
         trace: mappings.findInMap("TrueFalse", trace.valueAsString),
         enable_SSM_maintenance_windows: mappings.findInMap("TrueFalse", enableSSMMaintenanceWindows.valueAsString),
@@ -412,6 +456,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
         started_tags: startedTags.valueAsString,
         stopped_tags: stoppedTags.valueAsString,
         stack_version: props.solutionVersion,
+        use_aws_organizations: mappings.findInMap("TrueFalse", usingAWSOrganizations.valueAsString),
       },
     });
 
@@ -471,7 +516,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
 
     const ec2PolicyAssumeRoleStatement = new PolicyStatement({
       actions: ["sts:AssumeRole"],
-      resources: [cdk.Fn.sub("arn:${AWS::Partition}:iam::*:role/*EC2SchedulerCross*")],
+      resources: [
+        cdk.Fn.sub("arn:${AWS::Partition}:iam::*:role/${Namespace}-${Name}", {
+          Name: mappings.findInMap("SchedulerRole", "Name"),
+        }),
+      ],
       effect: Effect.ALLOW,
     });
 
@@ -687,6 +736,14 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
             ],
           },
           {
+            Label: { default: "Namespace Configuration" },
+            Parameters: ["Namespace"],
+          },
+          {
+            Label: { default: "Account Structure" },
+            Parameters: ["UsingAWSOrganizations", "Principals", "Regions"],
+          },
+          {
             Label: {
               default: "Options",
             },
@@ -700,6 +757,9 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
           },
         ],
         ParameterLabels: {
+          Namespace: {
+            default: "Provide a unique namespace value.",
+          },
           LogRetentionDays: {
             default: "Log retention days",
           },
@@ -712,8 +772,11 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
           SchedulingActive: {
             default: "Scheduling enabled",
           },
-          CrossAccountRoles: {
-            default: "Cross-account roles",
+          UsingAWSOrganizations: {
+            default: "Using AWS Organizations?",
+          },
+          Principals: {
+            default: "Provide Organization Id OR List of Remote Account Ids",
           },
           ScheduleLambdaAccount: {
             default: "This account",

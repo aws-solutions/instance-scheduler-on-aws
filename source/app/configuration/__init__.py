@@ -114,8 +114,6 @@ TIMEZONE = "timezone"
 TAGNAME = "tagname"
 # days in a week the instance is running
 WEEKDAYS = "weekdays"
-# cross_account_roles_arn_list
-CROSS_ACCOUNT_ROLES = "cross_account_roles"
 # process instances in account in which lambda function is installed
 SCHEDULE_LAMBDA_ACCOUNT = "schedule_lambda_account"
 # enforce schedule state
@@ -129,6 +127,18 @@ STARTED_TAGS = "started_tags"
 STOPPED_TAGS = "stopped_tags"
 # stack id for "child" stacks to create schedules in the configuration of a scheduler stack
 SCHEDULE_CONFIG_STACK = "configured_in_stack"
+# namespace
+NAMESPACE = "namespace"
+# use aws organizations
+USE_AWS_ORGANIZATIONS = "use_aws_organizations"
+# remote account ids
+REMOTE_ACCOUNT_IDS = "remote_account_ids"
+# organization id
+ORGANIZATION_ID = "organization_id"
+# Scheduler role name
+SCHEDULER_ROLE_NAME = "scheduler_role_name"
+# AWS Partition
+AWS_PARTITION = "aws_partition"
 
 OVERRIDE_STATUS_STOPPED = "stopped"
 OVERRIDE_STATUS_RUNNING = "running"

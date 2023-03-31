@@ -39,7 +39,7 @@ INF_STARTING_LAMBDA = (
 LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
 LOG_STREAM_PREFIX = "Scheduler"
 
-WARN_DUPLICATE_ACCOUNT = "Account {} in arn {} is already processed, skipping role"
+WARN_DUPLICATE_ACCOUNT = "Remote account {} is already processed"
 
 
 class CloudWatchEventHandler:
@@ -124,15 +124,15 @@ class CloudWatchEventHandler:
             processed_accounts.append(self.lambda_account)
             yield self.lambda_account
 
-        for role in self.configuration.cross_account_roles:
-            account = self.account_from_role(role)
-            if account is None:
+        for remote_account in self.configuration.remote_account_ids:
+            # account = self.account_from_role(role)
+            if remote_account is None:
                 continue
             # warn and skip if account was already processed
-            if account in processed_accounts:
-                self._logger.warning(WARN_DUPLICATE_ACCOUNT, account, role)
+            if remote_account in processed_accounts:
+                self._logger.warning(WARN_DUPLICATE_ACCOUNT, remote_account)
                 continue
-            yield role
+            yield remote_account
 
     def account_names(self, conf):
         """
@@ -143,9 +143,8 @@ class CloudWatchEventHandler:
         if conf.schedule_lambda_account:
             yield self.lambda_account
 
-        for role in conf.cross_account_roles:
-            account_name = self.account_from_role(role)
-            yield account_name
+        for remote_account in conf.remote_account_ids:
+            yield remote_account
 
     @staticmethod
     def is_handling_request(event):
@@ -168,10 +167,10 @@ class CloudWatchEventHandler:
                     account_level_config = copy(service_level_config)
                     if account is self.lambda_account:
                         account_level_config.schedule_lambda_account = True
-                        account_level_config.cross_account_roles = []
+                        account_level_config.remote_account_ids = []
                     else:
                         account_level_config.schedule_lambda_account = False
-                        account_level_config.cross_account_roles = [account]
+                        account_level_config.remote_account_ids = [account]
                     yield account_level_config
 
         def region_level_configs(config):
@@ -201,7 +200,7 @@ class CloudWatchEventHandler:
 
         def number_of_accounts():
             return (
-                len(self.configuration.cross_account_roles) + 1
+                len(self.configuration.remote_account_ids) + 1
                 if self.configuration.schedule_lambda_account
                 else 0
             )

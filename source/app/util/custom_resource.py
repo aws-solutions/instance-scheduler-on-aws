@@ -61,6 +61,11 @@ class CustomResource:
     def resource_properties(self):
         return self.event.get("ResourceProperties", {})
 
+    # Returns the previous resource properties of the custom resource, these are used to customize the updates
+    @property
+    def old_resource_properties(self):
+        return self.event.get("OldResourceProperties", {})
+
     # Returns optional timeout
     @property
     def timeout(self):

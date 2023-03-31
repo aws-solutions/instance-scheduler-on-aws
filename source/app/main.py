@@ -24,6 +24,7 @@ from requesthandlers.cloudwatch_event_handler import CloudWatchEventHandler
 from requesthandlers.schedule_resource_handler import ScheduleResourceHandler
 from requesthandlers.scheduler_request_handler import SchedulerRequestHandler
 from requesthandlers.scheduler_setup_handler import SchedulerSetupHandler
+from requesthandlers.eventbus_request_handler import EventBusRequestHandler
 from util.logger import Logger
 from version import VERSION
 
@@ -51,6 +52,7 @@ def lambda_handler(event, context):
                 ScheduleResourceHandler,
                 AdminCliRequestHandler,
                 CloudWatchEventHandler,
+                EventBusRequestHandler,
             ]:
                 if handler_type.is_handling_request(event):
                     start = time()
