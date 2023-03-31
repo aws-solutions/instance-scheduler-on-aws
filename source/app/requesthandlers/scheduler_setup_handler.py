@@ -11,6 +11,8 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
+import re
+import os
 import json
 from copy import copy
 from datetime import datetime
@@ -108,6 +110,30 @@ class SchedulerSetupHandler(CustomResource):
         return self.resource_properties.get(configuration.TRACE, "True")
 
     @property
+    def namespace(self):
+        """
+        Returns global namespace
+        :return: namespace string
+        """
+        return self.resource_properties.get(configuration.NAMESPACE, None)
+
+    @property
+    def aws_partition(self):
+        """
+        Returns aws partition
+        :return: aws partition string
+        """
+        return self.resource_properties.get(configuration.AWS_PARTITION, None)
+
+    @property
+    def scheduler_role_name(self):
+        """
+        Returns execution_role_name
+        :return: execution_role_name string
+        """
+        return self.resource_properties.get(configuration.SCHEDULER_ROLE_NAME, None)
+
+    @property
     def enable_SSM_maintenance_windows(self):
         """
         Returns global enable SSM Maintenance Windows flag
@@ -165,6 +191,30 @@ class SchedulerSetupHandler(CustomResource):
         return result
 
     @property
+    def remote_account_ids(self):
+        """
+        Returns remote account ids
+        :return: remote account ids
+        """
+        result = set(self.resource_properties.get(configuration.REMOTE_ACCOUNT_IDS))
+        if result == set() or len([i for i in result if i.strip() != ""]) == 0:
+            return None
+
+        return result
+
+    @property
+    def old_remote_account_ids(self):
+        """
+        Returns remote account ids from the previous event of create/update
+        :return: remote account ids
+        """
+        result = set(self.old_resource_properties.get(configuration.REMOTE_ACCOUNT_IDS))
+        if result == set() or len([i for i in result if i.strip() != ""]) == 0:
+            return None
+
+        return result
+
+    @property
     def scheduled_services(self):
         """
         Returns scheduled services
@@ -206,6 +256,16 @@ class SchedulerSetupHandler(CustomResource):
             configuration.SCHEDULE_LAMBDA_ACCOUNT, "True"
         )
 
+    @property
+    def use_aws_organizations(self):
+        """
+        Returns use_aws_organizations flag
+        :return: use_aws_organizations flag
+        """
+        return self.resource_properties.get(
+            configuration.USE_AWS_ORGANIZATIONS, "False"
+        )
+
     def handle_request(self):
         """
         Handles the custom resource request to write scheduler global settings to config database
@@ -222,9 +282,37 @@ class SchedulerSetupHandler(CustomResource):
         finally:
             self._logger.flush()
 
-    def _update_settings(self):
+    def is_valid_org_id(self, org_id):
+        """
+        Verifies if the ou_id param is a valid ou_id format. https://docs.aws.amazon.com/organizations/latest/APIReference/API_Organization.html
+        :return: boolean
+        """
+        try:
+            return re.fullmatch("^o-[a-z0-9]{10,32}$", org_id)
+        except Exception as error:
+            raise error
+
+    def _update_settings(
+        self, prev_org_remote_account_ids={os.getenv(configuration.ENV_ACCOUNT)}
+    ):
         try:
             admin = ConfigAdmin(logger=self._logger, context=self.context)
+            try:
+                org_id = list(self.remote_account_ids)[0]
+            except Exception as error:
+                self._logger.info(f"org id is not valid or empty {error}")
+                org_id = ""
+
+            if self.is_valid_org_id(org_id) and self.use_aws_organizations == "True":
+                self.organization_id = org_id
+                remote_account_ids = prev_org_remote_account_ids
+            elif self.is_valid_org_id(org_id) and self.use_aws_organizations == "False":
+                self.organization_id = org_id
+                remote_account_ids = {}
+            else:
+                self.organization_id = ""
+                remote_account_ids = self.remote_account_ids
+
             settings = admin.update_config(
                 default_timezone=self.default_timezone,
                 scheduled_services=self.scheduled_services,
@@ -232,12 +320,16 @@ class SchedulerSetupHandler(CustomResource):
                 create_rds_snapshot=self.create_rds_snapshot,
                 tagname=self.tagname,
                 regions=self.regions,
-                cross_account_roles=self.cross_account_roles,
+                remote_account_ids=remote_account_ids,
+                organization_id=self.organization_id,
                 schedule_lambda_account=self.schedule_lambda_account.lower() == "true",
                 use_metrics=self.use_metrics.lower() == "true",
                 trace=self.trace.lower() == "true",
                 enable_SSM_maintenance_windows=self.enable_SSM_maintenance_windows.lower()
                 == "true",
+                scheduler_role_name=self.scheduler_role_name,
+                aws_partition=self.aws_partition,
+                namespace=self.namespace,
                 started_tags=self.started_tags,
                 stopped_tags=self.stopped_tags,
             )
@@ -331,7 +423,32 @@ class SchedulerSetupHandler(CustomResource):
         return self._update_settings() and self.set_lambda_logs_retention_period()
 
     def _update_request(self):
-        return self._update_settings() and self.set_lambda_logs_retention_period()
+        try:
+            org_id = list(self.remote_account_ids)[0]
+        except Exception as error:
+            self._logger.info(f"org id is not valid or empty {error}")
+            org_id = ""
+        try:
+            prev_org_id = list(self.old_remote_account_ids)[0]
+        except Exception as error:
+            self._logger.info(
+                f"org id from old custom resource request parameters is not valid or empty {error}"
+            )
+            prev_org_id = ""
+        if (
+            self.is_valid_org_id(org_id)
+            and self.is_valid_org_id(prev_org_id)
+            and org_id == prev_org_id
+        ):
+            config = configuration.get_scheduler_configuration(self._logger)
+            prev_remote_account_id = config.remote_account_ids
+        else:
+            solution_account = os.getenv(configuration.ENV_ACCOUNT)
+            prev_remote_account_id = {solution_account}
+        return (
+            self._update_settings(prev_remote_account_id)
+            and self.set_lambda_logs_retention_period()
+        )
 
     # handles Delete request from CloudFormation
     def _delete_request(self):

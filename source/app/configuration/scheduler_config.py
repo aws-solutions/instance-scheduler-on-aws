@@ -31,7 +31,11 @@ INF_SCHEDULE_DISPLAY = (
     'Started tags = "{}"\n'
     'Stopped tags = "{}"\n'
     'Process Lambda account = "{}"\n'
-    'Cross account roles = "{}"'
+    'Scheduler Role Name = "{}"\n'
+    'Namespace = "{}"\n'
+    'Organization Id = "{}"\n'
+    'Aws Partition = "{}"\n'
+    'Remote Account Ids = "{}"'
 )
 
 TAG_VAL_STR = "{{{}}}"
@@ -53,7 +57,11 @@ class SchedulerConfig:
         trace,
         enable_SSM_maintenance_windows,
         use_metrics,
-        cross_account_roles,
+        remote_account_ids,
+        namespace,
+        aws_partition,
+        scheduler_role_name,
+        organization_id,
         schedule_lambda_account,
         create_rds_snapshot,
         started_tags=None,
@@ -70,7 +78,11 @@ class SchedulerConfig:
         :param trace: set to true for detailed logging
         :param enable_SSM_maintenance_windows: set to true for enable solution to retrieve SSM Maintenance Windows.
         :param use_metrics: global flag to enable metrics collection
-        :param cross_account_roles: cross account roles for cross account scheduling
+        :param remote_account_ids: remote account ids
+        :param namespace: namespace for the stack
+        :param aws_partition: the aws partition where the solution is installed.
+        :param scheduler_role_name: scheduler role name
+        :param organization_id: organization id
         :param schedule_lambda_account: set to true to schedule instances in account in which scheduler is installed
         :param create_rds_snapshot create snapshot before stopping non-cluster rds instances
         :param started_tags: start tags in string format
@@ -83,7 +95,11 @@ class SchedulerConfig:
         self.enable_SSM_maintenance_windows = enable_SSM_maintenance_windows
         self.use_metrics = use_metrics
         self.regions = regions
-        self.cross_account_roles = cross_account_roles
+        self.remote_account_ids = remote_account_ids
+        self.namespace = namespace
+        self.aws_partition = aws_partition
+        self.organization_id = organization_id
+        self.scheduler_role_name = scheduler_role_name
         self.schedule_lambda_account = schedule_lambda_account
         self.scheduled_services = scheduled_services
         self.schedule_clusters = schedule_clusters
@@ -169,7 +185,11 @@ class SchedulerConfig:
             str(self.started_tags),
             str(self.stopped_tags),
             str(self.schedule_lambda_account),
-            ", ".join(self.cross_account_roles),
+            str(self.scheduler_role_name),
+            str(self.namespace),
+            str(self.organization_id),
+            str(self.aws_partition),
+            ", ".join(self.remote_account_ids),
         )
 
         return s

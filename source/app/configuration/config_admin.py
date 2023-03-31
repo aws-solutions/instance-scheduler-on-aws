@@ -179,7 +179,11 @@ class ConfigAdmin:
         """
         valid_attributes = [
             configuration.METRICS,
-            configuration.CROSS_ACCOUNT_ROLES,
+            configuration.REMOTE_ACCOUNT_IDS,
+            configuration.ORGANIZATION_ID,
+            configuration.SCHEDULER_ROLE_NAME,
+            configuration.NAMESPACE,
+            configuration.AWS_PARTITION,
             configuration.DEFAULT_TIMEZONE,
             configuration.REGIONS,
             configuration.SCHEDULE_LAMBDA_ACCOUNT,
@@ -215,7 +219,7 @@ class ConfigAdmin:
             # make sure these fields are set as sets
             if attr in [
                 configuration.REGIONS,
-                configuration.CROSS_ACCOUNT_ROLES,
+                configuration.REMOTE_ACCOUNT_IDS,
                 configuration.SCHEDULED_SERVICES,
             ]:
                 temp = self._ensure_set(settings[attr])

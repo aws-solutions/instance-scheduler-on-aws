@@ -30,9 +30,13 @@ from configuration.setbuilders.weekday_setbuilder import WeekdaySetBuilder
 REGEX_SSM_PARAM = "{param:(.+?)}"
 
 ATTR_BEGINTIME = "begintime"
-ATTR_CROSS_ACCOUNT_ROLES = "cross_account_roles"
+ATTR_REMOTE_ACCOUNT_IDS = "remote_account_ids"
+ATTR_ORGANIZATION_ID = "organization_id"
+ATTR_NAMESPACE = "namespace"
+ATTR_SCHEDULER_ROLE_NAME = "scheduler_role_name"
 ATTR_CREATE_RDS_SNAPSHOT = "create_rds_snapshot"
 ATTR_DEFAULT_TIMEZONE = "default_timezone"
+ATTR_AWS_PARTITION = "aws_partition"
 ATTR_ENDTIME = "endtime"
 ATTR_ENFORCED = "enforced"
 ATTR_HIBERNATE = "hibernate"
@@ -123,7 +127,7 @@ class SchedulerConfigBuilder:
         try:
             scheduler_metrics = config.get(configuration.METRICS, False)
 
-            cross_account_roles = self.get_cross_account_roles(config)
+            remote_account_ids_from_ssm = self.get_remote_account_ids_from_ssm(config)
 
             return SchedulerConfig(
                 scheduled_services=config.get(configuration.SCHEDULED_SERVICES, [])
@@ -141,7 +145,11 @@ class SchedulerConfigBuilder:
                     configuration.ENABLE_SSM_MAINTENANCE_WINDOWS, False
                 ),
                 use_metrics=scheduler_metrics,
-                cross_account_roles=cross_account_roles,
+                remote_account_ids=remote_account_ids_from_ssm,
+                aws_partition=config.get(configuration.AWS_PARTITION, ""),
+                namespace=config.get(configuration.NAMESPACE, ""),
+                scheduler_role_name=config.get(configuration.SCHEDULER_ROLE_NAME, ""),
+                organization_id=config.get(configuration.ORGANIZATION_ID, ""),
                 schedule_lambda_account=config.get(
                     configuration.SCHEDULE_LAMBDA_ACCOUNT, True
                 ),
@@ -153,21 +161,21 @@ class SchedulerConfigBuilder:
                 self._logger.error(str(ex))
             return None
 
-    def get_cross_account_roles(self, config):
-        cross_account_roles = []
-        for role in config.get(configuration.CROSS_ACCOUNT_ROLES, []) or []:
-            if regex.match(REGEX_SSM_PARAM, role):
-                names = regex.findall(REGEX_SSM_PARAM, role)
-                if len(names) > 0:
-                    resp = self.ssm.get_parameters(Names=list(set(names)))
+    def get_remote_account_ids_from_ssm(self, config):
+        remote_account_ids_from_ssm = []
+        for account_id in config.get(configuration.REMOTE_ACCOUNT_IDS, []) or []:
+            if regex.match(REGEX_SSM_PARAM, account_id):
+                account = regex.findall(REGEX_SSM_PARAM, account_id)
+                if len(account) > 0:
+                    resp = self.ssm.get_parameters(Names=list(set(account)))
                     for p in resp.get("Parameters", []):
                         if p["Type"] == "StringList":
-                            cross_account_roles += p["Value"].split(",")
+                            remote_account_ids_from_ssm += p["type"].split(",")
                         else:
-                            cross_account_roles.append(p["Value"])
+                            remote_account_ids_from_ssm.append(p["Value"])
             else:
-                cross_account_roles.append(role)
-        return cross_account_roles
+                remote_account_ids_from_ssm.append(account_id)
+        return remote_account_ids_from_ssm
 
     # build the schedules from the configuration
     def _build_schedules(self, conf, dflt_tz, scheduler_use_metrics, dt):
@@ -402,12 +410,16 @@ class SchedulerConfigBuilder:
             ATTR_CREATE_RDS_SNAPSHOT,
             ATTR_USE_METRICS,
             ATTR_SCHEDULE_LAMBDA_ACCOUNT,
+            ATTR_SCHEDULER_ROLE_NAME,
+            ATTR_ORGANIZATION_ID,
+            ATTR_AWS_PARTITION,
+            ATTR_NAMESPACE,
             ATTR_STARTED_TAGS,
             ATTR_STOPPED_TAGS,
         ]:
             config_args[attr] = d.get(attr, None)
 
-        for attr in [ATTR_REGIONS, ATTR_CROSS_ACCOUNT_ROLES, ATTR_SCHEDULED_SERVICES]:
+        for attr in [ATTR_REGIONS, ATTR_REMOTE_ACCOUNT_IDS, ATTR_SCHEDULED_SERVICES]:
             config_args[attr] = set(d.get(attr, []))
 
         periods = {}
@@ -488,6 +500,10 @@ class SchedulerConfigBuilder:
             ATTR_TAGNAME,
             ATTR_DEFAULT_TIMEZONE,
             ATTR_TRACE,
+            ATTR_NAMESPACE,
+            ATTR_SCHEDULER_ROLE_NAME,
+            ATTR_ORGANIZATION_ID,
+            ATTR_AWS_PARTITION,
             ATTR_ENABLE_SSM_MAINTENANCE_WINDOWS,
             ATTR_USE_METRICS,
             ATTR_SCHEDULE_CLUSTERS,
@@ -508,7 +524,7 @@ class SchedulerConfigBuilder:
                     ]
                 )
 
-        for attr in [ATTR_REGIONS, ATTR_CROSS_ACCOUNT_ROLES, ATTR_SCHEDULED_SERVICES]:
+        for attr in [ATTR_REGIONS, ATTR_REMOTE_ACCOUNT_IDS, ATTR_SCHEDULED_SERVICES]:
             if len(config.__dict__[attr]) > 0:
                 result[attr] = list(config.__dict__[attr])
 
