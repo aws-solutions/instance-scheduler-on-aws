@@ -170,7 +170,7 @@ class SchedulerConfigBuilder:
                     resp = self.ssm.get_parameters(Names=list(set(account)))
                     for p in resp.get("Parameters", []):
                         if p["Type"] == "StringList":
-                            remote_account_ids_from_ssm += p["type"].split(",")
+                            remote_account_ids_from_ssm += p["Value"].split(",")
                         else:
                             remote_account_ids_from_ssm.append(p["Value"])
             else:

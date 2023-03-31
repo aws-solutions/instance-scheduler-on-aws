@@ -187,7 +187,6 @@ class InstanceScheduler:
                 continue
 
             # get a session for the role
-            # arn:aws:iam::597682407414:role/aws-ec2-spot-fleet-tagging-role
             role = f"arn:{self._configuration.aws_partition}:iam::{account}:role/{self._configuration.namespace}-{self._configuration.scheduler_role_name}"
             session = get_session_for_account(role, account)
             if session is not None:

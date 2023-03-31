@@ -175,29 +175,17 @@ class SchedulerSetupHandler(CustomResource):
         return self.resource_properties.get(configuration.STOPPED_TAGS, None)
 
     @property
-    def cross_account_roles(self):
-        """
-        Returns cross-account roles
-        :return: cross account roles
-        """
-        result = set(self.resource_properties.get(configuration.CROSS_ACCOUNT_ROLES))
-        if (
-            result is None
-            or result == set()
-            or len([i for i in result if i.strip() != ""]) == 0
-        ):
-            return None
-
-        return result
-
-    @property
     def remote_account_ids(self):
         """
         Returns remote account ids
         :return: remote account ids
         """
         result = set(self.resource_properties.get(configuration.REMOTE_ACCOUNT_IDS))
-        if result == set() or len([i for i in result if i.strip() != ""]) == 0:
+        if (
+            result is None
+            or result == set()
+            or len([i for i in result if i.strip() != ""]) == 0
+        ):
             return None
 
         return result
