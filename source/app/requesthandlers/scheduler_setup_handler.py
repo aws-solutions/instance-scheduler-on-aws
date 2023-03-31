@@ -191,6 +191,21 @@ class SchedulerSetupHandler(CustomResource):
         return result
 
     @property
+<<<<<<< HEAD
+=======
+    def remote_account_ids(self):
+        """
+        Returns remote account ids
+        :return: remote account ids
+        """
+        result = set(self.resource_properties.get(configuration.REMOTE_ACCOUNT_IDS))
+        if result == set() or len([i for i in result if i.strip() != ""]) == 0:
+            return None
+
+        return result
+
+    @property
+>>>>>>> b377a6a (Merging PR#429 & #428)
     def old_remote_account_ids(self):
         """
         Returns remote account ids from the previous event of create/update

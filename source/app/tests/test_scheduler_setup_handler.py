@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from requesthandlers.scheduler_setup_handler import SchedulerSetupHandler
-from unittest import mock
-from unittest.mock import MagicMock
 
 
 def test_a_valid_org_id_pattern():

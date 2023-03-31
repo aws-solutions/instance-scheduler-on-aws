@@ -209,7 +209,10 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       type: "String",
       description:
         "Provide unique identifier to differentiate between multiple solution deployments (No Spaces). Example: Dev",
+<<<<<<< HEAD
       default: props.paramOverrides?.namespace ?? "",
+=======
+>>>>>>> b377a6a (Merging PR#429 & #428)
     });
 
     const startedTags = new cdk.CfnParameter(this, "StartedTags", {
