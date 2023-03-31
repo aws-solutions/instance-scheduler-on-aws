@@ -46,7 +46,7 @@ INF_DO_NOT_STOP_RETAINED_INSTANCE = (
     "state set to {} but instance will not be stopped if it is still running."
 )
 
-WARN_DUPLICATE_ACCOUNT = "Account {} in arn {} is already processed, skipping role"
+WARN_DUPLICATE_ACCOUNT = "Account {} is already processed, skipping "
 WARN_SKIPPING_UNKNOWN_SCHEDULE = (
     'Skipping instance {} in region {} for account {}, schedule name "{}" is unknown'
 )
@@ -180,21 +180,15 @@ class InstanceScheduler:
                 },
             )
 
-        # iterate through cross account roles
-        for role in self._configuration.cross_account_roles:
-            # get the account
-            role_elements = role.split(":")
-            if len(role_elements) < 5:
-                self._logger.error(ERR_INVALID_ARN, role)
-                continue
-
-            # test if account already processed
-            account = role_elements[4]
+        # iterate through remote accounts
+        for account in self._configuration.remote_account_ids:
             if account in accounts_done:
-                self._logger.warning(WARN_DUPLICATE_ACCOUNT, account, role)
+                self._logger.warning(WARN_DUPLICATE_ACCOUNT, account)
                 continue
 
             # get a session for the role
+            # arn:aws:iam::597682407414:role/aws-ec2-spot-fleet-tagging-role
+            role = f"arn:{self._configuration.aws_partition}:iam::{account}:role/{self._configuration.namespace}-{self._configuration.scheduler_role_name}"
             session = get_session_for_account(role, account)
             if session is not None:
                 yield as_namedtuple(

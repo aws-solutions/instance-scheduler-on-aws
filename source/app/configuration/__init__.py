@@ -127,17 +127,17 @@ STARTED_TAGS = "started_tags"
 STOPPED_TAGS = "stopped_tags"
 # stack id for "child" stacks to create schedules in the configuration of a scheduler stack
 SCHEDULE_CONFIG_STACK = "configured_in_stack"
-#namespace 
+# namespace
 NAMESPACE = "namespace"
 # use aws organizations
 USE_AWS_ORGANIZATIONS = "use_aws_organizations"
-# remote account ids 
+# remote account ids
 REMOTE_ACCOUNT_IDS = "remote_account_ids"
-#organization id
+# organization id
 ORGANIZATION_ID = "organization_id"
 # Scheduler role name
 SCHEDULER_ROLE_NAME = "scheduler_role_name"
-#AWS Partition
+# AWS Partition
 AWS_PARTITION = "aws_partition"
 
 OVERRIDE_STATUS_STOPPED = "stopped"
