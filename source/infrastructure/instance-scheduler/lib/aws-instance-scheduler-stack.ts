@@ -727,7 +727,6 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
               "ScheduleRdsClusters",
               "CreateRdsSnapshot",
               "SchedulingActive",
-              "Regions",
               "DefaultTimezone",
               "CrossAccountRoles",
               "ScheduleLambdaAccount",
