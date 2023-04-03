@@ -137,7 +137,16 @@ class InstanceScheduler:
     @property
     def _sts(self):
         if self._sts_client is None:
-            self._sts_client = get_client_with_standard_retry("sts")
+            session = boto3.Session()
+            sts_regional_endpoint = str.format(
+                "https://sts.{}.amazonaws.com", session.region_name
+            )
+            self._sts_client = session.client(
+                "sts",
+                region_name=session.region_name,
+                endpoint_url=sts_regional_endpoint,
+            )
+
         return self._sts_client
 
     @property
