@@ -21,7 +21,7 @@ import boto3
 import configuration
 import pytz
 import schedulers
-from boto_retry import get_client_with_standard_retry
+from boto_retry import get_client_with_standard_retry, standard_retries_client_config
 from configuration.instance_schedule import InstanceSchedule
 from .instance_states import InstanceStates
 from util.metrics import send_metrics_data, allow_send_metrics
@@ -145,6 +145,7 @@ class InstanceScheduler:
                 "sts",
                 region_name=session.region_name,
                 endpoint_url=sts_regional_endpoint,
+                config=standard_retries_client_config(),
             )
 
         return self._sts_client
