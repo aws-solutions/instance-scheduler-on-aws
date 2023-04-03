@@ -1,9 +1,31 @@
 from unittest import mock
 import os
+from unittest.mock import patch, PropertyMock, MagicMock
+
+import pytest
+
 from configuration.instance_schedule import InstanceSchedule
 from schedulers import Ec2Service
 from util.named_tuple_builder import as_namedtuple
 from schedulers.instance_scheduler import InstanceScheduler
+
+
+@patch("boto3.Session")
+@patch("schedulers.Ec2Service")
+def test_scheduler_uses_regional_sts_endpoint(mock_ec2_service, mock_session):
+    mock_session.return_value.client = MagicMock()
+    mock_session.return_value.region_name = "executing-region"
+    mock_client = mock_session().client
+
+    scheduler = InstanceScheduler(service=mock_ec2_service, scheduler_configuration={})
+
+    returned_sts_client = scheduler._sts
+
+    mock_client.assert_called_with(
+        "sts",
+        region_name="executing-region",
+        endpoint_url="https://sts.executing-region.amazonaws.com",
+    )
 
 
 def test_get_desired_state_and_type_1(mocker):
