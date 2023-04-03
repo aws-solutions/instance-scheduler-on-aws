@@ -29,24 +29,19 @@ def get_client_with_standard_retry(service_name, region=None, session=None):
     """
     args = {
         "service_name": service_name,
+        "region_name": region,
+        "config": standard_retries_client_config(),
     }
-
-    if region is not None:
-        args["region_name"] = region
-
-    user_agent_extra_string = os.getenv("USER_AGENT_EXTRA", None)
-
-    retries = {"max_attempts": 5, "mode": "standard"}
-    if user_agent_extra_string is not None:
-        solution_config = {
-            "user_agent_extra": user_agent_extra_string,
-            "retries": retries,
-        }
-        config = botocore.config.Config(**solution_config)
-        args["config"] = config
 
     aws_session = session if session is not None else boto3.Session()
 
     result = aws_session.client(**args)
 
     return result
+
+
+def standard_retries_client_config():
+    return botocore.config.Config(
+        user_agent_extra=os.getenv("USER_AGENT_EXTRA", None),
+        retries={"max_attempts": 5, "mode": "standard"},
+    )

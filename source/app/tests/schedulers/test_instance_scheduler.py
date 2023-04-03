@@ -1,6 +1,6 @@
 from unittest import mock
 import os
-from unittest.mock import patch, PropertyMock, MagicMock
+from unittest.mock import patch, PropertyMock, MagicMock, ANY
 
 import pytest
 
@@ -25,6 +25,7 @@ def test_scheduler_uses_regional_sts_endpoint(mock_ec2_service, mock_session):
         "sts",
         region_name="executing-region",
         endpoint_url="https://sts.executing-region.amazonaws.com",
+        config=ANY,
     )
 
 
