@@ -66,6 +66,7 @@ export interface AwsInstanceSchedulerParameterDefaultOverrides {
   readonly stoppedTags?: string;
   readonly schedulerFrequency?: "1" | "2" | "5" | "10" | "15" | "30" | "60";
   readonly scheduleLambdaAccount?: "Yes" | "No";
+  readonly namespace?: string;
 }
 
 /*
@@ -208,6 +209,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       type: "String",
       description:
         "Provide unique identifier to differentiate between multiple solution deployments (No Spaces). Example: Dev",
+      default: props.paramOverrides?.namespace ?? "",
     });
 
     const startedTags = new cdk.CfnParameter(this, "StartedTags", {

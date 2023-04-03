@@ -167,6 +167,7 @@ class DeployStage extends Stage {
     paramOverrides: {
       schedulerFrequency: "1",
       scheduledServices: "Both",
+      namespace: "e2etesting",
     },
   });
 }

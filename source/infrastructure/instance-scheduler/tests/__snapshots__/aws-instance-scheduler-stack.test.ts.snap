@@ -737,6 +737,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "Number",
     },
     "Namespace": {
+      "Default": "",
       "Description": "Provide unique identifier to differentiate between multiple solution deployments (No Spaces). Example: Dev",
       "Type": "String",
     },
