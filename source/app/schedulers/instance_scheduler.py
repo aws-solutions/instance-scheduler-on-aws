@@ -93,7 +93,6 @@ class InstanceScheduler:
         self._service = service
         self._instance_states = None
         self._schedule_metrics = None
-        self._valid_regions = []
         self._sts_client = None
         self._scheduled_instances = []
         self._configuration = None
@@ -106,33 +105,15 @@ class InstanceScheduler:
         self._logger = None
         self._context = None
 
-        partition = "aws"
-        try:
-            partition = boto3.client("sts").get_caller_identity()["Arn"].split(":")[1]
-        except Exception as ex:
-            print(ex)
-
-        # valid regions for service
-        self._valid_regions = boto3.Session().get_available_regions(
-            service.service_name, partition
-        )
-
         self._usage_metrics = {"Started": {}, "Stopped": {}, "Resized": {}}
 
     @property
     def _regions(self):
         if len(self._configuration.regions) > 0:
-            result = []
-            regions = self._configuration.regions
-            for r in regions:
-                if r not in self._valid_regions:
-                    self._logger.error(ERR_INVALID_REGION, r)
-                else:
-                    result.append(r)
-            return result
-
-        # no regions, use region of lambda function
-        return [boto3.Session().region_name]
+            return self._configuration.regions
+        else:
+            # no regions, use region of lambda function
+            return [boto3.Session().region_name]
 
     @property
     def _sts(self):
