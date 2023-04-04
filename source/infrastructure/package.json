@@ -31,13 +31,12 @@
   },
   "dependencies": {
     "@aws-cdk/aws-servicecatalogappregistry-alpha": "^2.62.2-alpha.0",
-    "@aws-cdk/aws-lambda-python-alpha" : "~2.68.0-alpha.0",
+    "@aws-cdk/aws-lambda-python-alpha": "~2.68.0-alpha.0",
     "@aws-solutions-constructs/aws-lambda-dynamodb": "2.30.0",
     "aws-cdk-lib": "^2.62.0",
     "cdk-nag": "^2.22.23",
     "constructs": "^10.0.0",
     "source-map-support": "^0.5.16",
-
     "@aws-sdk/client-ec2": "^3.295.0",
     "@aws-sdk/client-dynamodb": "^3.295.0"
   }
