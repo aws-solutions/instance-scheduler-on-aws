@@ -6,10 +6,7 @@
     "experimentalDecorators": false,
     "inlineSourceMap": true,
     "inlineSources": true,
-    "lib": [
-      "es2021",
-      "dom"
-    ],
+    "lib": ["es2021", "dom"],
     "module": "CommonJS",
     "noEmitOnError": true,
     "noFallthroughCasesInSwitch": true,
@@ -24,13 +21,9 @@
     "strictPropertyInitialization": true,
     "stripInternal": true,
     "target": "ES2022",
-    "allowJs" : false,
-    "outDir" : "../../build/cdk.ts.dist"
+    "allowJs": false,
+    "outDir": "../../build/cdk.ts.dist"
   },
-  "include": [
-    "**/*.ts"
-  ],
-  "exclude": [
-    "node_modules"
-  ],
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
 }

@@ -25,7 +25,6 @@ export interface InstanceSchedulerLambdaProps {
   };
 }
 export class CoreScheduler {
-
   public readonly lambdaFunction: lambda.Function;
   public readonly configTable: dynamodb.Table;
   private readonly stateTable: dynamodb.Table;
