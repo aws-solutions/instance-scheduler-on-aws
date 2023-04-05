@@ -187,11 +187,6 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
       ],
     });
 
-<<<<<<< HEAD
-=======
-    // schedulerEventDeliveryRole.attachInlinePolicy(schedulerEventDeliveryPolicy)
-
->>>>>>> b377a6a (Merging PR#429 & #428)
     const parameterStoreEventRule = new events.CfnRule(this, "scheduler-ssm-parameter-store-event", {
       description:
         "Event rule to invoke Instance Scheduler lambda function to store spoke account id in configuration.",
@@ -220,10 +215,6 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
       },
     });
 
-<<<<<<< HEAD
-=======
-    // add condition to skip creation of these resources if deployed in hub account - Event Bus in the same account can not be used as target
->>>>>>> b377a6a (Merging PR#429 & #428)
     const schedulerEventDeliveryRole_ref = schedulerEventDeliveryRole.node.findChild("Resource") as iam.CfnRole;
     const schedulerEventDeliveryPolicy_ref = schedulerEventDeliveryPolicy.node.findChild("Resource") as iam.CfnPolicy;
 
