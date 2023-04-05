@@ -1414,7 +1414,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
             ],
           ],
         },
-        "Handler": "main.lambda_handler",
+        "Handler": "instance_scheduler.main.lambda_handler",
         "MemorySize": {
           "Ref": "MemorySize",
         },
