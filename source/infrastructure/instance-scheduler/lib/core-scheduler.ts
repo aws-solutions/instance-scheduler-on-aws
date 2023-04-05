@@ -50,7 +50,7 @@ export class CoreScheduler {
             return [];
           },
           afterBundling(inputDir: string, outputDir: string): string[] {
-            return [`pip install --target ${outputDir} ${inputDir}`]
+            return [`pip install --target ${outputDir} ${inputDir}`];
           },
         },
       },
