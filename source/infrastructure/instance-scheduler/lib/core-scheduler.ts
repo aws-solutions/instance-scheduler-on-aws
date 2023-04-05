@@ -34,8 +34,8 @@ export class CoreScheduler {
     this.lambdaFunction = new python.PythonFunction(scope, "scheduler-lambda", {
       functionName: Aws.STACK_NAME + "-InstanceSchedulerMain",
       description: "EC2 and RDS instance scheduler, version " + props.solutionVersion,
-      entry: `${__dirname}/../../../app/instance_scheduler`,
-      index: "main.py",
+      entry: `${__dirname}/../../../app`,
+      index: "instance_scheduler/main.py",
       handler: "lambda_handler",
       runtime: lambda.Runtime.PYTHON_3_9,
       role: props.schedulerRole,
@@ -46,11 +46,11 @@ export class CoreScheduler {
 
       bundling: {
         commandHooks: {
-          beforeBundling(inputDir: string, outputDir: string): string[] {
-            return [`pip install --target ${outputDir} -e ${inputDir}`];
-          },
-          afterBundling(): string[] {
+          beforeBundling(): string[] {
             return [];
+          },
+          afterBundling(inputDir: string, outputDir: string): string[] {
+            return [`pip install --target ${outputDir} ${inputDir}`]
           },
         },
       },
