@@ -280,9 +280,7 @@ class SchedulerSetupHandler(CustomResource):
         except Exception as error:
             raise error
 
-    def _update_settings(
-        self, prev_org_remote_account_ids={os.getenv(configuration.ENV_ACCOUNT)}
-    ):
+    def _update_settings(self, prev_org_remote_account_ids={}):
         try:
             admin = ConfigAdmin(logger=self._logger, context=self.context)
             try:
@@ -431,8 +429,7 @@ class SchedulerSetupHandler(CustomResource):
             config = configuration.get_scheduler_configuration(self._logger)
             prev_remote_account_id = config.remote_account_ids
         else:
-            solution_account = os.getenv(configuration.ENV_ACCOUNT)
-            prev_remote_account_id = {solution_account}
+            prev_remote_account_id = {}
         return (
             self._update_settings(prev_remote_account_id)
             and self.set_lambda_logs_retention_period()

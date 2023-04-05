@@ -140,6 +140,7 @@ export class CoreScheduler {
         "dynamodb:Query",
         "dynamodb:Scan",
         "dynamodb:BatchWriteItem",
+        "dynamodb:UpdateItem",
       ],
       effect: iam.Effect.ALLOW,
       resources: [cfnConfigTable.attrArn, cfnMaintenanceWindowTable.attrArn],

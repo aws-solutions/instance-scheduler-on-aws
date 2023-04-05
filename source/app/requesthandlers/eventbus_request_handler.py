@@ -10,8 +10,6 @@ from util.dynamodb_utils import DynamoDBUtils
 
 
 INF_HANDLER = "Request Handler {} : Received request {} at {}"
-LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
-LOG_STREAM_PREFIX = "eventbus_request_handler"
 EVENT_BUS_NAMESPACE_PREFIX = "/scheduler/do-not-delete-manually/{}"
 EVENT_CREATE = "Create"
 EVENT_DELETE = "Delete"
@@ -31,9 +29,11 @@ class EventBusRequestHandler:
 
         # Setup logging
         self._is_trace_enabled = os.getenv("TRACE", False)
-        logging_stream_name = "-".join([LOG_STREAM_PREFIX])
+        logging_stream_name = "-".join(["eventbus_request_handler"])
         dt = datetime.utcnow()
-        logstream = LOG_STREAM.format(logging_stream_name, dt.year, dt.month, dt.day)
+        logstream = "{}-{:0>4d}{:0>2d}{:0>2d}".format(
+            logging_stream_name, dt.year, dt.month, dt.day
+        )
         self._logger = Logger(
             logstream=logstream,
             buffersize=60 if self._is_trace_enabled else 30,

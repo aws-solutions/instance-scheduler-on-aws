@@ -17,10 +17,11 @@ import os
 from datetime import datetime
 
 import boto3
-
+import json
 import configuration
 import pytz
 import schedulers
+from botocore.exceptions import ClientError
 from boto_retry import get_client_with_standard_retry
 from configuration.instance_schedule import InstanceSchedule
 from .instance_states import InstanceStates
@@ -105,6 +106,7 @@ class InstanceScheduler:
         self._lambda_account = os.getenv(configuration.ENV_ACCOUNT)
         self._logger = None
         self._context = None
+        self._lambda_client = None
 
         partition = "aws"
         try:
@@ -118,6 +120,16 @@ class InstanceScheduler:
         )
 
         self._usage_metrics = {"Started": {}, "Stopped": {}, "Resized": {}}
+
+    @property
+    def lambda_client(self):
+        """
+        Get the lambda client
+        :return: lambda client
+        """
+        if self._lambda_client is None:
+            self._lambda_client = get_client_with_standard_retry("lambda")
+        return self._lambda_client
 
     @property
     def _regions(self):
@@ -159,11 +171,53 @@ class InstanceScheduler:
                     aws_secret_access_key=credentials["SecretAccessKey"],
                     aws_session_token=credentials["SessionToken"],
                 )
-            except Exception as ex:
+            except ClientError as ex:
                 self._logger.error(
-                    ERR_ASSUMING_ROLE.format(cross_account_role, aws_account, str(ex))
+                    "Error Code {}".format(ex.response.get("Error", {}).get("Code"))
                 )
-                return None
+                if ex.response.get("Error", {}).get("Code") == "AccessDenied":
+                    try:
+                        self._logger.error(
+                            "Removing the account {} from scheduling configuration as assume role permission is missing for the iam role {}".format(
+                                aws_account, cross_account_role
+                            )
+                        )
+                        payload = str.encode(
+                            json.dumps(
+                                {
+                                    "account": aws_account,
+                                    "detail-type": "Parameter Store Change",
+                                    "detail": {"operation": "Delete"},
+                                }
+                            )
+                        )
+                        response = self.lambda_client.invoke(
+                            FunctionName=self._context.function_name,
+                            InvocationType="Event",
+                            LogType="None",
+                            Payload=payload,
+                        )
+                        self._logger.info(
+                            "Removing account {} from configuration".format(aws_account)
+                        )
+                        self._logger.debug(
+                            "Lambda response {} for removing account from configuration".format(
+                                response
+                            )
+                        )
+                    except Exception as ex:
+                        self._logger.error(
+                            "Error invoking lambda {}".format(
+                                self._context.function_name
+                            )
+                        )
+                else:
+                    self._logger.error(
+                        ERR_ASSUMING_ROLE.format(
+                            cross_account_role, aws_account, str(ex)
+                        )
+                    )
+                    return None
 
         # keep track of accounts processed
         accounts_done = []

@@ -1953,6 +1953,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
                 "dynamodb:Query",
                 "dynamodb:Scan",
                 "dynamodb:BatchWriteItem",
+                "dynamodb:UpdateItem",
               ],
               "Effect": "Allow",
               "Resource": [
