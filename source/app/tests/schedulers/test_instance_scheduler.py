@@ -9,6 +9,7 @@ from schedulers import Ec2Service
 from util.named_tuple_builder import as_namedtuple
 from schedulers.instance_scheduler import InstanceScheduler
 
+
 @patch("boto3.Session")
 @patch("schedulers.Ec2Service")
 def test_scheduler_uses_regional_sts_endpoint(mock_ec2_service, mock_session):

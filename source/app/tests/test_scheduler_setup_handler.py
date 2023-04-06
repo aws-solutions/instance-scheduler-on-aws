@@ -20,4 +20,3 @@ def test_an_invalid_org_id_pattern():
     )
     response = handler.get_valid_org_id("111111111111,222222222222")
     assert response == None
-
