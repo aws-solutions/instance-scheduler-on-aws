@@ -3,6 +3,16 @@
 exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
 {
   "AWSTemplateFormatVersion": "2010-09-09",
+  "Conditions": {
+    "IsMemberOfOrganization": {
+      "Fn::Equals": [
+        {
+          "Ref": "UsingAWSOrganizations",
+        },
+        "Yes",
+      ],
+    },
+  },
   "Description": "",
   "Mappings": {
     "AppRegistryForInstanceSchedulerSolution25A90F05": {
@@ -12,6 +22,14 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         "ID": "SO0030",
         "SolutionName": "aws-instance-scheduler",
         "Version": "v1.5.0",
+      },
+    },
+    "mappings": {
+      "SchedulerEventBusName": {
+        "Name": "scheduler-event-bus",
+      },
+      "SchedulerRole": {
+        "Name": "Scheduler-Role",
       },
     },
   },
@@ -83,7 +101,20 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
     "InstanceSchedulerAccount": {
       "AllowedPattern": "(^[0-9]{12}$)",
       "ConstraintDescription": "Account number is a 12 digit number",
-      "Description": "Account number of Instance Scheduler account to give access to manage EC2 and RDS  Instances in this account.",
+      "Description": "Instance Scheduler Hub Account number to manage EC2 and RDS Resources in this account.",
+      "Type": "String",
+    },
+    "Namespace": {
+      "Description": "Unique identifier used to differentiate between multiple solution deployments. Example: Test or Prod",
+      "Type": "String",
+    },
+    "UsingAWSOrganizations": {
+      "AllowedValues": [
+        "Yes",
+        "No",
+      ],
+      "Default": "No",
+      "Description": "Use this setting to automate spoke account enrollment if using AWS Organizations.",
       "Type": "String",
     },
   },
@@ -258,6 +289,14 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
               "id": "W11",
               "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
             },
+            {
+              "id": "W28",
+              "reason": "The role name is defined to allow cross account access from the hub account.",
+            },
+            {
+              "id": "W76",
+              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+            },
           ],
         },
       },
@@ -362,6 +401,20 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
             "PolicyName": "EC2InstanceSchedulerRemote",
           },
         ],
+        "RoleName": {
+          "Fn::Sub": [
+            "\${Namespace}-\${Name}",
+            {
+              "Name": {
+                "Fn::FindInMap": [
+                  "mappings",
+                  "SchedulerRole",
+                  "Name",
+                ],
+              },
+            },
+          ],
+        },
       },
       "Type": "AWS::IAM::Role",
     },
@@ -397,6 +450,134 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "SSMParameterNamespace2002A907": {
+      "Condition": "IsMemberOfOrganization",
+      "DependsOn": [
+        "schedulerssmparameterstoreevent",
+      ],
+      "Properties": {
+        "Description": "This parameter is for Instance Scheduler solution to support accounts in AWS Organizations.",
+        "Name": "/instance-scheduler/do-not-delete-manually",
+        "Type": "String",
+        "Value": {
+          "Ref": "Namespace",
+        },
+      },
+      "Type": "AWS::SSM::Parameter",
+    },
+    "SchedulerEventDeliveryPolicyD8B17948": {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "events:PutEvents",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Sub": [
+                  "arn:\${AWS::Partition}:events:\${AWS::Region}:\${InstanceSchedulerAccount}:event-bus/\${Namespace}-\${EventBusName}",
+                  {
+                    "EventBusName": {
+                      "Fn::FindInMap": [
+                        "mappings",
+                        "SchedulerEventBusName",
+                        "Name",
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "SchedulerEventDeliveryPolicyD8B17948",
+        "Roles": [
+          {
+            "Ref": "SchedulerEventDeliveryRole5AE883C1",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "SchedulerEventDeliveryRole5AE883C1": {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Description": "Event Role to add the permissions necessary to migrate a sender-receiver relationship to Use AWS Organizations",
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "schedulerssmparameterstoreevent": {
+      "Condition": "IsMemberOfOrganization",
+      "DependsOn": [
+        "SchedulerEventDeliveryRole5AE883C1",
+      ],
+      "Properties": {
+        "Description": "Event rule to invoke Instance Scheduler lambda function to store spoke account id in configuration.",
+        "EventPattern": {
+          "account": [
+            "111111111111",
+          ],
+          "detail": {
+            "name": [
+              "/instance-scheduler/do-not-delete-manually",
+            ],
+            "operation": [
+              "Create",
+              "Delete",
+            ],
+            "type": [
+              "String",
+            ],
+          },
+          "detail-type": [
+            "Parameter Store Change",
+          ],
+          "source": [
+            "aws.ssm",
+          ],
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::Sub": [
+                "arn:\${AWS::Partition}:events:\${AWS::Region}:\${InstanceSchedulerAccount}:event-bus/\${Namespace}-\${EventBusName}",
+                {
+                  "EventBusName": {
+                    "Fn::FindInMap": [
+                      "mappings",
+                      "SchedulerEventBusName",
+                      "Name",
+                    ],
+                  },
+                },
+              ],
+            },
+            "Id": "Spoke-SSM-Parameter-Event",
+            "RoleArn": {
+              "Fn::GetAtt": [
+                "SchedulerEventDeliveryRole5AE883C1",
+                "Arn",
+              ],
+            },
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
     },
   },
 }

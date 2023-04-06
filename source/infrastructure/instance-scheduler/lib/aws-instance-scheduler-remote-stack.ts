@@ -4,6 +4,8 @@
 
 import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as events from "aws-cdk-lib/aws-events";
+import * as ssm from "aws-cdk-lib/aws-ssm";
 import { ArnPrincipal, CompositePrincipal, Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import { AppRegistryForInstanceScheduler } from "./app-registry";
@@ -24,12 +26,33 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
 
     //CFN Parameters
     const instanceSchedulerAccount = new cdk.CfnParameter(this, "InstanceSchedulerAccount", {
-      description:
-        "Account number of Instance Scheduler account to give access to manage EC2 and RDS  Instances in this account.",
+      description: "Instance Scheduler Hub Account number to manage EC2 and RDS Resources in this account.",
       type: "String",
       allowedPattern: "(^[0-9]{12}$)",
       constraintDescription: "Account number is a 12 digit number",
     });
+
+    const namespace = new cdk.CfnParameter(this, "Namespace", {
+      type: "String",
+      description:
+        "Unique identifier used to differentiate between multiple solution deployments. Example: Test or Prod",
+    });
+
+    const usingAWSOrganizations = new cdk.CfnParameter(this, "UsingAWSOrganizations", {
+      type: "String",
+      description: "Use this setting to automate spoke account enrollment if using AWS Organizations.",
+      allowedValues: ["Yes", "No"],
+      default: "No",
+    });
+
+    // CFN Conditions
+    const isMemberOfOrganization = new cdk.CfnCondition(this, "IsMemberOfOrganization", {
+      expression: cdk.Fn.conditionEquals(usingAWSOrganizations, "Yes"),
+    });
+
+    const mappings = new cdk.CfnMapping(this, "mappings");
+    mappings.setValue("SchedulerRole", "Name", "Scheduler-Role");
+    mappings.setValue("SchedulerEventBusName", "Name", "scheduler-event-bus");
 
     new AppRegistryForInstanceScheduler(this, "AppRegistryForInstanceScheduler", {
       solutionId: props.solutionId,
@@ -54,6 +77,9 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
     principals.addToPolicy(principalPolicyStatement);
 
     const ec2SchedulerCrossAccountRole = new iam.Role(this, "EC2SchedulerCrossAccountRole", {
+      roleName: cdk.Fn.sub("${Namespace}-${Name}", {
+        Name: mappings.findInMap("SchedulerRole", "Name"),
+      }),
       path: "/",
       assumedBy: principals,
       inlinePolicies: {
@@ -127,6 +153,79 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
       },
     ]);
 
+    // Event Rule to capture SSM Parameter Store creation by this stack
+    // SSM parameter to invoke event rule
+    const ssmParameterNamespace = new ssm.StringParameter(this, "SSMParameterNamespace", {
+      description: "This parameter is for Instance Scheduler solution to support accounts in AWS Organizations.",
+      stringValue: namespace.valueAsString,
+      parameterName: "/instance-scheduler/do-not-delete-manually",
+    });
+
+    const ssmParameterNamespace_ref = ssmParameterNamespace.node.defaultChild as ssm.CfnParameter;
+
+    // Event Delivery Role and Policy necessary to migrate a sender-receiver relationship to Use AWS Organizations
+    const schedulerEventDeliveryRole = new iam.Role(this, "SchedulerEventDeliveryRole", {
+      description:
+        "Event Role to add the permissions necessary to migrate a sender-receiver relationship to Use AWS Organizations",
+      assumedBy: new iam.ServicePrincipal("events.amazonaws.com"),
+    });
+    const schedulerEventDeliveryPolicy = new iam.Policy(this, "SchedulerEventDeliveryPolicy", {
+      roles: [schedulerEventDeliveryRole],
+      statements: [
+        new iam.PolicyStatement({
+          actions: ["events:PutEvents"],
+          effect: iam.Effect.ALLOW,
+          resources: [
+            cdk.Fn.sub(
+              "arn:${AWS::Partition}:events:${AWS::Region}:${InstanceSchedulerAccount}:event-bus/${Namespace}-${EventBusName}",
+              {
+                EventBusName: mappings.findInMap("SchedulerEventBusName", "Name"),
+              }
+            ),
+          ],
+        }),
+      ],
+    });
+
+    const parameterStoreEventRule = new events.CfnRule(this, "scheduler-ssm-parameter-store-event", {
+      description:
+        "Event rule to invoke Instance Scheduler lambda function to store spoke account id in configuration.",
+      state: "ENABLED",
+      targets: [
+        {
+          arn: cdk.Fn.sub(
+            "arn:${AWS::Partition}:events:${AWS::Region}:${InstanceSchedulerAccount}:event-bus/${Namespace}-${EventBusName}",
+            {
+              EventBusName: mappings.findInMap("SchedulerEventBusName", "Name"),
+            }
+          ),
+          id: "Spoke-SSM-Parameter-Event",
+          roleArn: schedulerEventDeliveryRole.roleArn,
+        },
+      ],
+      eventPattern: {
+        account: [this.account],
+        source: ["aws.ssm"],
+        "detail-type": ["Parameter Store Change"],
+        detail: {
+          name: ["/instance-scheduler/do-not-delete-manually"],
+          operation: ["Create", "Delete"],
+          type: ["String"],
+        },
+      },
+    });
+
+    const schedulerEventDeliveryRole_ref = schedulerEventDeliveryRole.node.findChild("Resource") as iam.CfnRole;
+    const schedulerEventDeliveryPolicy_ref = schedulerEventDeliveryPolicy.node.findChild("Resource") as iam.CfnPolicy;
+
+    // wait for the events rule to be created before creating/deleting the SSM parameter
+    parameterStoreEventRule.addDependency(schedulerEventDeliveryRole_ref);
+    ssmParameterNamespace_ref.addDependency(parameterStoreEventRule);
+    schedulerEventDeliveryPolicy_ref.cfnOptions.condition = isMemberOfOrganization;
+    schedulerEventDeliveryRole_ref.cfnOptions.condition = isMemberOfOrganization;
+    parameterStoreEventRule.cfnOptions.condition = isMemberOfOrganization;
+    ssmParameterNamespace_ref.cfnOptions.condition = isMemberOfOrganization;
+
     //CFN Output
     new cdk.CfnOutput(this, "CrossAccountRole", {
       value: ec2SchedulerCrossAccountRole.roleArn,
@@ -141,6 +240,15 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
         rules_to_suppress: [
           {
             id: "W11",
+            reason:
+              "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+          },
+          {
+            id: "W28",
+            reason: "The role name is defined to allow cross account access from the hub account.",
+          },
+          {
+            id: "W76",
             reason:
               "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
           },
@@ -161,15 +269,23 @@ export class AwsInstanceSchedulerRemoteStack extends cdk.Stack {
       "AWS::CloudFormation::Interface": {
         ParameterGroups: [
           {
-            Label: {
-              default: "Account",
-            },
-            Parameters: ["InstanceSchedulerAccount"],
+            Label: { default: "Namespace Configuration" },
+            Parameters: ["Namespace"],
+          },
+          {
+            Label: { default: "Instance Scheduler Hub Account Configuration" },
+            Parameters: ["InstanceSchedulerAccount", "UsingAWSOrganizations"],
           },
         ],
         ParameterLabels: {
+          Namespace: {
+            default: "Provide the same unique namespace value defined in the hub stack.",
+          },
           InstanceSchedulerAccount: {
-            default: "Primary account",
+            default: "Instance Scheduler Hub Account ID",
+          },
+          UsingAWSOrganizations: {
+            default: "Set this value to match hub stack CloudFormation parameter.",
           },
         },
       },

@@ -17,10 +17,11 @@ import os
 from datetime import datetime
 
 import boto3
-
+import json
 import configuration
 import pytz
 import schedulers
+from botocore.exceptions import ClientError
 from boto_retry import get_client_with_standard_retry, standard_retries_client_config
 from configuration.instance_schedule import InstanceSchedule
 from .instance_states import InstanceStates
@@ -46,7 +47,7 @@ INF_DO_NOT_STOP_RETAINED_INSTANCE = (
     "state set to {} but instance will not be stopped if it is still running."
 )
 
-WARN_DUPLICATE_ACCOUNT = "Account {} in arn {} is already processed, skipping role"
+WARN_DUPLICATE_ACCOUNT = "Account {} is already processed, skipping "
 WARN_SKIPPING_UNKNOWN_SCHEDULE = (
     'Skipping instance {} in region {} for account {}, schedule name "{}" is unknown'
 )
@@ -104,8 +105,19 @@ class InstanceScheduler:
         self._lambda_account = os.getenv(configuration.ENV_ACCOUNT)
         self._logger = None
         self._context = None
+        self._lambda_client = None
 
         self._usage_metrics = {"Started": {}, "Stopped": {}, "Resized": {}}
+
+    @property
+    def lambda_client(self):
+        """
+        Get the lambda client
+        :return: lambda client
+        """
+        if self._lambda_client is None:
+            self._lambda_client = get_client_with_standard_retry("lambda")
+        return self._lambda_client
 
     @property
     def _regions(self):
@@ -131,6 +143,56 @@ class InstanceScheduler:
 
         return self._sts_client
 
+    def remove_account_from_config(self, aws_account, cross_account_role):
+        """
+        This method will invoke the lambda to remove the aws_account from the configuration, it calls the lambda handler eventbus_request_handler,
+        and sends payload which will update the config by removing the account from further scheduling.
+        {
+            "account": 111122223333,
+            "detail-type": "Parameter Store Change",
+            "detail": {
+                "operation": "Delete"
+            }
+        }
+        :param aws_account: account where the assume role permission is not available for the lambda role to assume.
+        :param cross_account_role: role name for logging message to SNS.
+        """
+        try:
+            self._logger.error(
+                "Removing the account {} from scheduling configuration as assume role permission is missing for the iam role {}".format(
+                    aws_account, cross_account_role
+                )
+            )
+            payload = str.encode(
+                json.dumps(
+                    {
+                        "account": aws_account,
+                        "detail-type": "Parameter Store Change",
+                        "detail": {"operation": "Delete"},
+                    }
+                )
+            )
+            response = self.lambda_client.invoke(
+                FunctionName=self._context.function_name,
+                InvocationType="Event",
+                LogType="None",
+                Payload=payload,
+            )
+            self._logger.info(
+                "Removing account {} from configuration".format(aws_account)
+            )
+            self._logger.debug(
+                "Lambda response {} for removing account from configuration".format(
+                    response
+                )
+            )
+        except Exception as ex:
+            self._logger.error(
+                "Error invoking lambda {} error {}".format(
+                    self._context.function_name, ex
+                )
+            )
+
     @property
     def _accounts(self):
         def get_session_for_account(cross_account_role, aws_account):
@@ -150,11 +212,21 @@ class InstanceScheduler:
                     aws_secret_access_key=credentials["SecretAccessKey"],
                     aws_session_token=credentials["SessionToken"],
                 )
-            except Exception as ex:
+            except ClientError as ex:
                 self._logger.error(
-                    ERR_ASSUMING_ROLE.format(cross_account_role, aws_account, str(ex))
+                    "Error Code {}".format(ex.response.get("Error", {}).get("Code"))
                 )
-                return None
+                if ex.response.get("Error", {}).get("Code") == "AccessDenied":
+                    self.remove_account_from_config(
+                        aws_account=aws_account, cross_account_role=cross_account_role
+                    )
+                else:
+                    self._logger.error(
+                        ERR_ASSUMING_ROLE.format(
+                            cross_account_role, aws_account, str(ex)
+                        )
+                    )
+                    return None
 
         # keep track of accounts processed
         accounts_done = []
@@ -171,21 +243,14 @@ class InstanceScheduler:
                 },
             )
 
-        # iterate through cross account roles
-        for role in self._configuration.cross_account_roles:
-            # get the account
-            role_elements = role.split(":")
-            if len(role_elements) < 5:
-                self._logger.error(ERR_INVALID_ARN, role)
-                continue
-
-            # test if account already processed
-            account = role_elements[4]
+        # iterate through remote accounts
+        for account in self._configuration.remote_account_ids:
             if account in accounts_done:
-                self._logger.warning(WARN_DUPLICATE_ACCOUNT, account, role)
+                self._logger.warning(WARN_DUPLICATE_ACCOUNT, account)
                 continue
 
             # get a session for the role
+            role = f"arn:{self._configuration.aws_partition}:iam::{account}:role/{self._configuration.namespace}-{self._configuration.scheduler_role_name}"
             session = get_session_for_account(role, account)
             if session is not None:
                 yield as_namedtuple(

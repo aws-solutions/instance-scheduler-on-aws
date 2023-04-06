@@ -3,6 +3,16 @@
 exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
 {
   "AWSTemplateFormatVersion": "2010-09-09",
+  "Conditions": {
+    "IsMemberOfOrganization": {
+      "Fn::Equals": [
+        {
+          "Ref": "UsingAWSOrganizations",
+        },
+        "Yes",
+      ],
+    },
+  },
   "Description": "",
   "Mappings": {
     "AppRegistryForInstanceSchedulerSolution25A90F05": {
@@ -26,6 +36,12 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "EnabledDisabled": {
         "No": "DISABLED",
         "Yes": "ENABLED",
+      },
+      "SchedulerEventBusName": {
+        "Name": "scheduler-event-bus",
+      },
+      "SchedulerRole": {
+        "Name": "Scheduler-Role",
       },
       "Services": {
         "Both": "ec2,rds",
@@ -230,11 +246,6 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Default": "No",
       "Description": "Create snapshot before stopping RDS instances (does not apply to Aurora Clusters).",
       "Type": "String",
-    },
-    "CrossAccountRoles": {
-      "Default": "",
-      "Description": "Comma separated list of ARN's for cross account access roles. These roles must be created in all checked accounts the scheduler to start and stop instances.",
-      "Type": "CommaDelimitedList",
     },
     "DefaultTimezone": {
       "AllowedValues": [
@@ -725,6 +736,16 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Description": "Size of the Lambda function running the scheduler, increase size when processing large numbers of instances.",
       "Type": "Number",
     },
+    "Namespace": {
+      "Default": "",
+      "Description": "Provide unique identifier to differentiate between multiple solution deployments (No Spaces). Example: Dev",
+      "Type": "String",
+    },
+    "Principals": {
+      "Default": "",
+      "Description": "(Required) If using AWS Organizations, provide Organization ID. Eg. o-xxxxyyy. Else, comma separated list of remote account ids. Eg.: 1111111111, 2222222222 or {param: ssm-param-name}",
+      "Type": "CommaDelimitedList",
+    },
     "Regions": {
       "Default": "",
       "Description": "List of regions in which instances are scheduled, leave blank for current region only.",
@@ -804,7 +825,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         "No",
       ],
       "Default": "No",
-      "Description": "Enable logging of detailed information in CloudWatch logs.",
+      "Description": "Allow 'debug' level logging in CloudWatch logs.",
       "Type": "String",
     },
     "UseCloudWatchMetrics": {
@@ -814,6 +835,15 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       ],
       "Default": "No",
       "Description": "Collect instance scheduling data using CloudWatch metrics.",
+      "Type": "String",
+    },
+    "UsingAWSOrganizations": {
+      "AllowedValues": [
+        "Yes",
+        "No",
+      ],
+      "Default": "No",
+      "Description": "Is the hub account member of the AWS Organizations?",
       "Type": "String",
     },
   },
@@ -1113,7 +1143,18 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Resource": {
-                "Fn::Sub": "arn:\${AWS::Partition}:iam::*:role/*EC2SchedulerCross*",
+                "Fn::Sub": [
+                  "arn:\${AWS::Partition}:iam::*:role/\${Namespace}-\${Name}",
+                  {
+                    "Name": {
+                      "Fn::FindInMap": [
+                        "mappings",
+                        "SchedulerRole",
+                        "Name",
+                      ],
+                    },
+                  },
+                ],
               },
             },
           ],
@@ -1127,6 +1168,23 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "EventBusRuleLambdaPermission": {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {
+          "Ref": "Main",
+        },
+        "Principal": "events.amazonaws.com",
+        "SourceArn": {
+          "Fn::GetAtt": [
+            "schedulerssmparametercrossaccountevents",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::Lambda::Permission",
     },
     "InstanceSchedulerEncryptionKey": {
       "DeletionPolicy": "Delete",
@@ -1424,6 +1482,9 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
             "Arn",
           ],
         },
+        "aws_partition": {
+          "Fn::Sub": "\${AWS::Partition}",
+        },
         "config_table": {
           "Ref": "ConfigTable",
         },
@@ -1435,9 +1496,6 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
               "Ref": "CreateRdsSnapshot",
             },
           ],
-        },
-        "cross_account_roles": {
-          "Ref": "CrossAccountRoles",
         },
         "default_timezone": {
           "Ref": "DefaultTimezone",
@@ -1454,8 +1512,14 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         "log_retention_days": {
           "Ref": "LogRetentionDays",
         },
+        "namespace": {
+          "Ref": "Namespace",
+        },
         "regions": {
           "Ref": "Regions",
+        },
+        "remote_account_ids": {
+          "Ref": "Principals",
         },
         "schedule_clusters": {
           "Fn::FindInMap": [
@@ -1489,6 +1553,13 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
             },
           ],
         },
+        "scheduler_role_name": {
+          "Fn::FindInMap": [
+            "mappings",
+            "SchedulerRole",
+            "Name",
+          ],
+        },
         "stack_version": "v1.5.0",
         "started_tags": {
           "Ref": "StartedTags",
@@ -1506,6 +1577,15 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
             "TrueFalse",
             {
               "Ref": "Trace",
+            },
+          ],
+        },
+        "use_aws_organizations": {
+          "Fn::FindInMap": [
+            "mappings",
+            "TrueFalse",
+            {
+              "Ref": "UsingAWSOrganizations",
             },
           ],
         },
@@ -1772,6 +1852,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
                 "dynamodb:Query",
                 "dynamodb:Scan",
                 "dynamodb:BatchWriteItem",
+                "dynamodb:UpdateItem",
               ],
               "Effect": "Allow",
               "Resource": [
@@ -1883,6 +1964,107 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       },
       "Type": "AWS::DynamoDB::Table",
       "UpdateReplacePolicy": "Delete",
+    },
+    "schedulereventbus": {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "Namespace",
+              },
+              "-",
+              {
+                "Fn::FindInMap": [
+                  "mappings",
+                  "SchedulerEventBusName",
+                  "Name",
+                ],
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Events::EventBus",
+    },
+    "schedulereventbuspolicy": {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": {
+        "Action": "events:PutEvents",
+        "Condition": {
+          "Key": "aws:PrincipalOrgID",
+          "Type": "StringEquals",
+          "Value": {
+            "Fn::Select": [
+              0,
+              {
+                "Ref": "Principals",
+              },
+            ],
+          },
+        },
+        "EventBusName": {
+          "Fn::GetAtt": [
+            "schedulereventbus",
+            "Name",
+          ],
+        },
+        "Principal": "*",
+        "StatementId": {
+          "Fn::GetAtt": [
+            "schedulereventbus",
+            "Name",
+          ],
+        },
+      },
+      "Type": "AWS::Events::EventBusPolicy",
+    },
+    "schedulerssmparametercrossaccountevents": {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": {
+        "Description": "Event rule to invoke Instance Scheduler lambda function to store spoke account id(s) in configuration.",
+        "EventBusName": {
+          "Fn::GetAtt": [
+            "schedulereventbus",
+            "Name",
+          ],
+        },
+        "EventPattern": {
+          "detail": {
+            "name": [
+              "/instance-scheduler/do-not-delete-manually",
+            ],
+            "operation": [
+              "Create",
+              "Delete",
+            ],
+            "type": [
+              "String",
+            ],
+          },
+          "detail-type": [
+            "Parameter Store Change",
+          ],
+          "source": [
+            "aws.ssm",
+          ],
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "Main",
+                "Arn",
+              ],
+            },
+            "Id": "Scheduler-Lambda-Function",
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
     },
   },
 }

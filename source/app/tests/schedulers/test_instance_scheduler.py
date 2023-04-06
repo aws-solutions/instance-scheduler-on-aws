@@ -5,12 +5,9 @@ from unittest.mock import patch, PropertyMock, MagicMock, ANY
 import pytest
 
 from configuration.instance_schedule import InstanceSchedule
-from tests.botomock import mock_boto_env_vars
 from schedulers import Ec2Service
 from util.named_tuple_builder import as_namedtuple
 from schedulers.instance_scheduler import InstanceScheduler
-
-mock_boto_env_vars()
 
 
 @patch("boto3.Session")
