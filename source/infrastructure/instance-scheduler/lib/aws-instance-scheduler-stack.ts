@@ -18,7 +18,7 @@ import { SUPPORTED_TIME_ZONES } from "./time-zones";
 import { AppRegistryForInstanceScheduler } from "./app-registry";
 import { NagSuppressions } from "cdk-nag";
 import { CoreScheduler } from "./core-scheduler";
-import { SchedulerEventBusResources, SchedulerEventBusProps } from "./event-bus-stack";
+import { SchedulerEventBusResources, SchedulerEventBusProps } from "./event-bus-resources";
 
 export interface AwsInstanceSchedulerStackProps extends cdk.StackProps {
   readonly description: string;
@@ -391,7 +391,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
       isMemberOfOrganizationsCondition: isMemberOfOrganization,
     };
 
-    const eventBusResource = new SchedulerEventBusResources(this, "SchedulerEventBusResources", eventBusProps);
+    const eventBusResource = new SchedulerEventBusResources(this, eventBusProps);
 
     const eventBusRuleLambdaPermission = new lambda.CfnPermission(this, "EventBusRuleLambdaPermission", {
       functionName: coreScheduler.lambdaFunction.functionName,

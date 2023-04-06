@@ -282,10 +282,10 @@ class SchedulerSetupHandler(CustomResource):
         finally:
             self._logger.flush()
 
-    def is_valid_org_id(self, org_id):
+    def get_valid_org_id(self, org_id):
         """
         Verifies if the ou_id param is a valid ou_id format. https://docs.aws.amazon.com/organizations/latest/APIReference/API_Organization.html
-        :return: boolean
+        :return: the org id or else None
         """
         try:
             return re.fullmatch("^o-[a-z0-9]{10,32}$", org_id)
@@ -301,10 +301,12 @@ class SchedulerSetupHandler(CustomResource):
                 self._logger.info(f"org id is not valid or empty {error}")
                 org_id = ""
 
-            if self.is_valid_org_id(org_id) and self.use_aws_organizations == "True":
+            if self.get_valid_org_id(org_id) and self.use_aws_organizations == "True":
                 self.organization_id = org_id
                 remote_account_ids = prev_org_remote_account_ids
-            elif self.is_valid_org_id(org_id) and self.use_aws_organizations == "False":
+            elif (
+                self.get_valid_org_id(org_id) and self.use_aws_organizations == "False"
+            ):
                 self.organization_id = org_id
                 remote_account_ids = {}
             else:
@@ -434,8 +436,8 @@ class SchedulerSetupHandler(CustomResource):
             )
             prev_org_id = ""
         if (
-            self.is_valid_org_id(org_id)
-            and self.is_valid_org_id(prev_org_id)
+            self.get_valid_org_id(org_id)
+            and self.get_valid_org_id(prev_org_id)
             and org_id == prev_org_id
         ):
             config = configuration.get_scheduler_configuration(self._logger)

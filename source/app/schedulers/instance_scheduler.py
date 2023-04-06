@@ -143,6 +143,56 @@ class InstanceScheduler:
 
         return self._sts_client
 
+    def remove_account_from_config(self, aws_account, cross_account_role):
+        """
+        This method will invoke the lambda to remove the aws_account from the configuration, it calls the lambda handler eventbus_request_handler,
+        and sends payload which will update the config by removing the account from further scheduling.
+        {
+            "account": 111122223333,
+            "detail-type": "Parameter Store Change",
+            "detail": {
+                "operation": "Delete"
+            }
+        }
+        :param aws_account: account where the assume role permission is not available for the lambda role to assume.
+        :param cross_account_role: role name for logging message to SNS.
+        """
+        try:
+            self._logger.error(
+                "Removing the account {} from scheduling configuration as assume role permission is missing for the iam role {}".format(
+                    aws_account, cross_account_role
+                )
+            )
+            payload = str.encode(
+                json.dumps(
+                    {
+                        "account": aws_account,
+                        "detail-type": "Parameter Store Change",
+                        "detail": {"operation": "Delete"},
+                    }
+                )
+            )
+            response = self.lambda_client.invoke(
+                FunctionName=self._context.function_name,
+                InvocationType="Event",
+                LogType="None",
+                Payload=payload,
+            )
+            self._logger.info(
+                "Removing account {} from configuration".format(aws_account)
+            )
+            self._logger.debug(
+                "Lambda response {} for removing account from configuration".format(
+                    response
+                )
+            )
+        except Exception as ex:
+            self._logger.error(
+                "Error invoking lambda {} error {}".format(
+                    self._context.function_name, ex
+                )
+            )
+
     @property
     def _accounts(self):
         def get_session_for_account(cross_account_role, aws_account):
@@ -167,41 +217,9 @@ class InstanceScheduler:
                     "Error Code {}".format(ex.response.get("Error", {}).get("Code"))
                 )
                 if ex.response.get("Error", {}).get("Code") == "AccessDenied":
-                    try:
-                        self._logger.error(
-                            "Removing the account {} from scheduling configuration as assume role permission is missing for the iam role {}".format(
-                                aws_account, cross_account_role
-                            )
-                        )
-                        payload = str.encode(
-                            json.dumps(
-                                {
-                                    "account": aws_account,
-                                    "detail-type": "Parameter Store Change",
-                                    "detail": {"operation": "Delete"},
-                                }
-                            )
-                        )
-                        response = self.lambda_client.invoke(
-                            FunctionName=self._context.function_name,
-                            InvocationType="Event",
-                            LogType="None",
-                            Payload=payload,
-                        )
-                        self._logger.info(
-                            "Removing account {} from configuration".format(aws_account)
-                        )
-                        self._logger.debug(
-                            "Lambda response {} for removing account from configuration".format(
-                                response
-                            )
-                        )
-                    except Exception as ex:
-                        self._logger.error(
-                            "Error invoking lambda {}".format(
-                                self._context.function_name
-                            )
-                        )
+                    self.remove_account_from_config(
+                        aws_account=aws_account, cross_account_role=cross_account_role
+                    )
                 else:
                     self._logger.error(
                         ERR_ASSUMING_ROLE.format(

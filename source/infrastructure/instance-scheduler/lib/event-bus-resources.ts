@@ -3,7 +3,6 @@
 
 import * as events from "aws-cdk-lib/aws-events";
 import * as cdk from "aws-cdk-lib";
-import { Construct } from "constructs";
 
 export interface SchedulerEventBusProps {
   organizationId: string[];
@@ -13,16 +12,14 @@ export interface SchedulerEventBusProps {
   isMemberOfOrganizationsCondition: cdk.CfnCondition;
 }
 
-export class SchedulerEventBusResources extends Construct {
+export class SchedulerEventBusResources {
   readonly eventRuleCrossAccount: events.CfnRule;
-  constructor(scope: cdk.Stack, id: string, props: SchedulerEventBusProps) {
-    super(scope, id);
-
-    const schedulerEventBus = new events.CfnEventBus(this, "scheduler-event-bus", {
+  constructor(scope: cdk.Stack, props: SchedulerEventBusProps) {
+    const schedulerEventBus = new events.CfnEventBus(scope, "scheduler-event-bus", {
       name: props.namespace + "-" + props.eventBusName,
     });
 
-    const eventBusPolicy = new events.CfnEventBusPolicy(this, "scheduler-event-bus-policy", {
+    const eventBusPolicy = new events.CfnEventBusPolicy(scope, "scheduler-event-bus-policy", {
       eventBusName: schedulerEventBus.attrName,
       statementId: schedulerEventBus.attrName,
       action: "events:PutEvents",
@@ -34,7 +31,7 @@ export class SchedulerEventBusResources extends Construct {
       },
     });
 
-    this.eventRuleCrossAccount = new events.CfnRule(this, "scheduler-ssm-parameter-cross-account-events", {
+    this.eventRuleCrossAccount = new events.CfnRule(scope, "scheduler-ssm-parameter-cross-account-events", {
       description:
         "Event rule to invoke Instance Scheduler lambda function to store spoke account id(s) in configuration.",
       eventBusName: schedulerEventBus.attrName,
