@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock, ANY
 
 
 @patch("boto3.Session")
-@patch("schedulers.Ec2Service")
+@patch("instance_scheduler.schedulers.Ec2Service")
 def test_scheduler_uses_regional_sts_endpoint(mock_ec2_service, mock_session):
     mock_session.return_value.client = MagicMock()
     mock_session.return_value.region_name = "executing-region"
