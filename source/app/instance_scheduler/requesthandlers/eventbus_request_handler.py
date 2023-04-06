@@ -3,10 +3,10 @@
 
 import os
 import json
-import configuration
+from instance_scheduler import configuration
 from datetime import datetime
-from util.logger import Logger
-from util.dynamodb_utils import DynamoDBUtils
+from instance_scheduler.util.logger import Logger
+from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
 
 
 INF_HANDLER = "Request Handler {} : Received request {} at {}"

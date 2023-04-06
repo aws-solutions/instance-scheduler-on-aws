@@ -1,9 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from util.logger import Logger
+from instance_scheduler.util.logger import Logger
 import datetime
-from configuration.scheduler_config_builder import SchedulerConfigBuilder
+from instance_scheduler.configuration.scheduler_config_builder import SchedulerConfigBuilder
 import collections
 import pytz
 
