@@ -107,6 +107,8 @@ class InstanceScheduler:
         self._context = None
         self._lambda_client = None
 
+
+
         self._usage_metrics = {"Started": {}, "Stopped": {}, "Resized": {}}
 
     @property
