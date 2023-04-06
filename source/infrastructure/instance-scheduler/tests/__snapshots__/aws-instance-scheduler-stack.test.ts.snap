@@ -1179,7 +1179,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         "Principal": "events.amazonaws.com",
         "SourceArn": {
           "Fn::GetAtt": [
-            "SchedulerEventBusResourcesschedulerssmparametercrossaccountevents21DB1768",
+            "schedulerssmparametercrossaccountevents",
             "Arn",
           ],
         },
@@ -1602,107 +1602,6 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       "Type": "Custom::ServiceSetup",
       "UpdateReplacePolicy": "Delete",
     },
-    "SchedulerEventBusResourcesschedulereventbusBB7012FB": {
-      "Condition": "IsMemberOfOrganization",
-      "Properties": {
-        "Name": {
-          "Fn::Join": [
-            "",
-            [
-              {
-                "Ref": "Namespace",
-              },
-              "-",
-              {
-                "Fn::FindInMap": [
-                  "mappings",
-                  "SchedulerEventBusName",
-                  "Name",
-                ],
-              },
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::Events::EventBus",
-    },
-    "SchedulerEventBusResourcesschedulereventbuspolicyF17AB2BC": {
-      "Condition": "IsMemberOfOrganization",
-      "Properties": {
-        "Action": "events:PutEvents",
-        "Condition": {
-          "Key": "aws:PrincipalOrgID",
-          "Type": "StringEquals",
-          "Value": {
-            "Fn::Select": [
-              0,
-              {
-                "Ref": "Principals",
-              },
-            ],
-          },
-        },
-        "EventBusName": {
-          "Fn::GetAtt": [
-            "SchedulerEventBusResourcesschedulereventbusBB7012FB",
-            "Name",
-          ],
-        },
-        "Principal": "*",
-        "StatementId": {
-          "Fn::GetAtt": [
-            "SchedulerEventBusResourcesschedulereventbusBB7012FB",
-            "Name",
-          ],
-        },
-      },
-      "Type": "AWS::Events::EventBusPolicy",
-    },
-    "SchedulerEventBusResourcesschedulerssmparametercrossaccountevents21DB1768": {
-      "Condition": "IsMemberOfOrganization",
-      "Properties": {
-        "Description": "Event rule to invoke Instance Scheduler lambda function to store spoke account id(s) in configuration.",
-        "EventBusName": {
-          "Fn::GetAtt": [
-            "SchedulerEventBusResourcesschedulereventbusBB7012FB",
-            "Name",
-          ],
-        },
-        "EventPattern": {
-          "detail": {
-            "name": [
-              "/instance-scheduler/do-not-delete-manually",
-            ],
-            "operation": [
-              "Create",
-              "Delete",
-            ],
-            "type": [
-              "String",
-            ],
-          },
-          "detail-type": [
-            "Parameter Store Change",
-          ],
-          "source": [
-            "aws.ssm",
-          ],
-        },
-        "State": "ENABLED",
-        "Targets": [
-          {
-            "Arn": {
-              "Fn::GetAtt": [
-                "Main",
-                "Arn",
-              ],
-            },
-            "Id": "Scheduler-Lambda-Function",
-          },
-        ],
-      },
-      "Type": "AWS::Events::Rule",
-    },
     "SchedulerEventRuleAllowEventRulestackschedulerlambdaC9E2D53DB26536BE": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
@@ -2065,6 +1964,107 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
       },
       "Type": "AWS::DynamoDB::Table",
       "UpdateReplacePolicy": "Delete",
+    },
+    "schedulereventbus": {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": {
+        "Name": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "Namespace",
+              },
+              "-",
+              {
+                "Fn::FindInMap": [
+                  "mappings",
+                  "SchedulerEventBusName",
+                  "Name",
+                ],
+              },
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::Events::EventBus",
+    },
+    "schedulereventbuspolicy": {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": {
+        "Action": "events:PutEvents",
+        "Condition": {
+          "Key": "aws:PrincipalOrgID",
+          "Type": "StringEquals",
+          "Value": {
+            "Fn::Select": [
+              0,
+              {
+                "Ref": "Principals",
+              },
+            ],
+          },
+        },
+        "EventBusName": {
+          "Fn::GetAtt": [
+            "schedulereventbus",
+            "Name",
+          ],
+        },
+        "Principal": "*",
+        "StatementId": {
+          "Fn::GetAtt": [
+            "schedulereventbus",
+            "Name",
+          ],
+        },
+      },
+      "Type": "AWS::Events::EventBusPolicy",
+    },
+    "schedulerssmparametercrossaccountevents": {
+      "Condition": "IsMemberOfOrganization",
+      "Properties": {
+        "Description": "Event rule to invoke Instance Scheduler lambda function to store spoke account id(s) in configuration.",
+        "EventBusName": {
+          "Fn::GetAtt": [
+            "schedulereventbus",
+            "Name",
+          ],
+        },
+        "EventPattern": {
+          "detail": {
+            "name": [
+              "/instance-scheduler/do-not-delete-manually",
+            ],
+            "operation": [
+              "Create",
+              "Delete",
+            ],
+            "type": [
+              "String",
+            ],
+          },
+          "detail-type": [
+            "Parameter Store Change",
+          ],
+          "source": [
+            "aws.ssm",
+          ],
+        },
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::GetAtt": [
+                "Main",
+                "Arn",
+              ],
+            },
+            "Id": "Scheduler-Lambda-Function",
+          },
+        ],
+      },
+      "Type": "AWS::Events::Rule",
     },
   },
 }
