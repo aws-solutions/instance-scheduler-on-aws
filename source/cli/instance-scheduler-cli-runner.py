@@ -15,7 +15,7 @@
 
 """Convenience wrapper for running instance-scheduler-cli directly."""
 
-from scheduler_cli.scheduler_cli import main
+from instance_scheduler_cli.scheduler_cli import main
 
 if __name__ == "__main__":
     main()

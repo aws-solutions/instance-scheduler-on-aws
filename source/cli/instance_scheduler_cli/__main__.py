@@ -11,20 +11,6 @@
 #  and limitations under the License.                                                                                #
 ######################################################################################################################
 
-from setuptools import setup
+from scheduler_cli import main
 
-setup(
-    name="scheduler-cli",
-    packages=["scheduler_cli"],
-    entry_points={
-        "console_scripts": ["scheduler-cli = scheduler_cli.scheduler_cli:main"]
-    },
-    version="#version#",
-    description="AWS Instance Scheduler CLI",
-    install_requires=[
-        "argparse",
-        "requests>=2.28.1",
-        "jmespath>=1.0.1",
-        "boto3>=1.26.48",
-    ],
-)
+main()

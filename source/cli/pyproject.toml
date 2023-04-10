@@ -1,0 +1,23 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "instance_scheduler_cli"
+version = "1.5.0"
+description = "AWS Instance Scheduler CLI"
+authors = ["AWS"]
+packages = [{ include="instance_scheduler_cli" }]
+
+[tool.poetry.scripts]
+scheduler-cli = 'instance_scheduler_cli.scheduler_cli:main'
+
+[tool.poetry.dependencies]
+python = "^3.9"
+#argparse = "^1.4.0" -- supposedly in the standard package now https://pypi.org/project/argparse/
+requests = "^2.28.1"
+jmespath = "^1.0.1"
+boto3 = "^1.26.48"
+
+[tool.poetry.group.dev.dependencies]
+cli-test-helpers = "^3.2.0"
