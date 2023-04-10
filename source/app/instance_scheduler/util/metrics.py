@@ -20,6 +20,7 @@ import requests
 
 from instance_scheduler import util
 from instance_scheduler.util import safe_json
+from instance_scheduler.version import VERSION
 import boto3
 
 # from botocore.exceptions import ClientError
