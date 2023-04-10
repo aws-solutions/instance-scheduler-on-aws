@@ -3,7 +3,7 @@ import os
 import pytest
 import boto3
 from os import environ
-from moto import mock_dynamodb
+from moto import mock_dynamodb2
 import sys
 
 
@@ -19,7 +19,7 @@ def aws_credentials():
 @pytest.fixture
 def dynamodb_client(aws_credentials):
     """DDB Mock Client"""
-    with mock_dynamodb():
+    with mock_dynamodb2():
         connection = boto3.client("dynamodb", region_name="us-east-1")
         yield connection
 
@@ -27,7 +27,7 @@ def dynamodb_client(aws_credentials):
 @pytest.fixture
 def dynamodb_client_resource(aws_credentials):
     """DDB Mock Client"""
-    with mock_dynamodb():
+    with mock_dynamodb2():
         connection = boto3.resource("dynamodb", region_name="us-east-1")
         yield connection
 
