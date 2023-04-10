@@ -3,7 +3,9 @@
 
 from contextlib import contextmanager
 from os import environ
-from instance_scheduler.requesthandlers.eventbus_request_handler import EventBusRequestHandler
+from instance_scheduler.requesthandlers.eventbus_request_handler import (
+    EventBusRequestHandler,
+)
 from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
 
 table_name = environ["CONFIG_TABLE"]

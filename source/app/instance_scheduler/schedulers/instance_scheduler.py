@@ -22,7 +22,10 @@ import pytz
 from botocore.exceptions import ClientError
 from instance_scheduler import configuration
 from instance_scheduler import schedulers
-from instance_scheduler.boto_retry import get_client_with_standard_retry, standard_retries_client_config
+from instance_scheduler.boto_retry import (
+    get_client_with_standard_retry,
+    standard_retries_client_config,
+)
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
 from .instance_states import InstanceStates
 from instance_scheduler.util.metrics import send_metrics_data, allow_send_metrics

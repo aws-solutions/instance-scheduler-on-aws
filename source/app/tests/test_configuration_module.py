@@ -3,7 +3,10 @@
 
 from instance_scheduler.util.logger import Logger
 import datetime
-from instance_scheduler.configuration.scheduler_config_builder import SchedulerConfigBuilder
+from instance_scheduler.configuration.scheduler_config_builder import (
+    SchedulerConfigBuilder,
+)
+
 
 def test_scheduler_config_builder():
     LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
