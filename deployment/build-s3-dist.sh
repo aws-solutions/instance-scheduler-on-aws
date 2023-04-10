@@ -97,6 +97,6 @@ echo "--------------------------------------------------------------------------
 cp -pr $cli_source_dir $build_dir/
 cd "$build_dir/cli"
 echo "Build the scheduler cli package"
-zip -q --recurse-paths ./scheduler-cli.zip scheduler_cli/* poetry.lock pyproject.toml instance-scheduler-cli-runner.py
+zip -q --recurse-paths ./scheduler-cli.zip instance_scheduler_cli/* poetry.lock pyproject.toml instance-scheduler-cli-runner.py
 echo "Copy the scheduler cli package to $global_dist_dir"
 cp -pr ./scheduler-cli.zip $global_dist_dir/

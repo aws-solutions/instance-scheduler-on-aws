@@ -105,7 +105,11 @@ class PipelineStack extends Stack {
   getUnitTestStep() {
     return new pipelines.CodeBuildStep("unitTests", {
       installCommands: ["pip install tox"],
-      commands: ["tox -e cdk", "tox -e lambda -- --junitxml=../../deployment/test-reports/lambda-test-report.xml"],
+      commands: [
+        "tox -e cdk",
+        "tox -e lambda -- --junitxml=../../deployment/test-reports/lambda-test-report.xml",
+        "tox -e cli -- --junitxml=../../deployment/test-reports/cli-test-report.xml",
+      ],
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
           cdk_test_reports: {
@@ -115,6 +119,11 @@ class PipelineStack extends Stack {
           },
           lambda_test_reports: {
             files: ["lambda-test-report.xml"],
+            "file-format": "JUNITXML",
+            "base-directory": "deployment/test-reports",
+          },
+          cli_test_reports: {
+            files: ["cli-test-report.xml"],
             "file-format": "JUNITXML",
             "base-directory": "deployment/test-reports",
           },
