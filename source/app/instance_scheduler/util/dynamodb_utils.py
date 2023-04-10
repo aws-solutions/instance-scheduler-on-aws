@@ -13,12 +13,12 @@
 
 
 import boto3
-import instance_scheduler.util
+from instance_scheduler import util
 
 
 class DynamoDBUtils:
     @staticmethod
     def get_dynamodb_table_resource_ref(table_name):
         return boto3.resource(
-            "dynamodb", config=instance_scheduler.util.get_config()
+            "dynamodb", config=util.get_config()
         ).Table(table_name)

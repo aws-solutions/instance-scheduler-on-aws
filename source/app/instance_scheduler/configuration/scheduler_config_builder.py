@@ -19,7 +19,7 @@ import dateutil.parser
 from instance_scheduler import configuration
 import pytz
 import re as regex
-import instance_scheduler.boto_retry
+from instance_scheduler import boto_retry
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
 from instance_scheduler.configuration.running_period import RunningPeriod
 from instance_scheduler.configuration.scheduler_config import SchedulerConfig
