@@ -3,7 +3,9 @@
 
 from instance_scheduler.util.logger import Logger
 import datetime
-from instance_scheduler.configuration.scheduler_config_builder import SchedulerConfigBuilder
+from instance_scheduler.configuration.scheduler_config_builder import (
+    SchedulerConfigBuilder,
+)
 import collections
 import pytz
 

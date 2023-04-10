@@ -1,7 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from instance_scheduler.requesthandlers.scheduler_setup_handler import SchedulerSetupHandler
+from instance_scheduler.requesthandlers.scheduler_setup_handler import (
+    SchedulerSetupHandler,
+)
 from unittest import mock
 from unittest.mock import MagicMock
 
