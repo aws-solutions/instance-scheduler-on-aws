@@ -17,6 +17,7 @@ import sys
 
 import boto3
 import jmespath
+from instance_scheduler_cli import __version__
 
 EVENT_SOURCE = "scheduler.cli"
 
@@ -101,9 +102,9 @@ PARAM_REGION = "--region"
 PARAM_QUERY = "--query"
 PARAM_PROFILE_NAME = "--profile-name"
 COMMON_PARAMS = [
-    s[2:].replace("-", "_")
-    for s in [PARAM_QUERY, PARAM_REGION, PARAM_STACK, PARAM_PROFILE_NAME]
-] + ["command"]
+                    s[2:].replace("-", "_")
+                    for s in [PARAM_QUERY, PARAM_REGION, PARAM_STACK, PARAM_PROFILE_NAME]
+                ] + ["command"]
 
 CMD_CREATE_PERIOD = "create-period"
 CMD_CREATE_SCHEDULE = "create-schedule"
@@ -152,9 +153,9 @@ def handle_command(args, command):
                 a: getattr(args, a)
                 for a in args.__dict__
                 if (
-                    a not in COMMON_PARAMS
-                    and getattr(args, a) is not None
-                    and not hasattr(getattr(args, a), "__call__")
+                        a not in COMMON_PARAMS
+                        and getattr(args, a) is not None
+                        and not hasattr(getattr(args, a), "__call__")
                 )
             },
         }
@@ -358,7 +359,7 @@ def build_parser():
         )
 
     new_parser = argparse.ArgumentParser(prog=PROG_NAME)
-    new_parser.add_argument(CMD_VERSION, action="version", version="%(prog)s #version#")
+    new_parser.add_argument(CMD_VERSION, action="version", version=f"'%(prog)s {__version__}'")
     subparsers = new_parser.add_subparsers(
         help=HELP_SUB_COMMANDS, description=HELP_VALID_COMMANDS
     )
@@ -378,5 +379,9 @@ def build_parser():
 
 def main():
     parser = build_parser()
-    p = parser.parse_args(sys.argv[1:])
-    sys.exit(p.func(p, p.command))
+    if (len(sys.argv) == 1):  # no args
+        parser.print_help()
+        sys.exit(0)
+    else:
+        p = parser.parse_args(sys.argv[1:])
+        sys.exit(p.func(p, p.command))

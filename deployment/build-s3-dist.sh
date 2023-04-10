@@ -97,15 +97,6 @@ echo "--------------------------------------------------------------------------
 cp -pr $cli_source_dir $build_dir/
 cd "$build_dir/cli"
 echo "Build the scheduler cli package"
-mv ./setup.py ./setup.bak.py
-echo "update the version in setup.py"
-sed "s/#version#/$DIST_VERSION/g" ./setup.bak.py > ./setup.py
-rm setup.bak.py
-echo "update the version in scheduler_cli.py"
-mv ./scheduler_cli/scheduler_cli.py ./scheduler_cli/scheduler_cli.bak.py
-sed "s/#version#/$DIST_VERSION/g" ./scheduler_cli/scheduler_cli.bak.py > ./scheduler_cli/scheduler_cli.py
-rm ./scheduler_cli/scheduler_cli.bak.py
-zip -q --recurse-paths ./scheduler-cli.zip scheduler_cli/* setup.py instance-scheduler-cli-runner.py
-
+zip -q --recurse-paths ./scheduler-cli.zip scheduler_cli/* poetry.lock pyproject.toml instance-scheduler-cli-runner.py
 echo "Copy the scheduler cli package to $global_dist_dir"
 cp -pr ./scheduler-cli.zip $global_dist_dir/
