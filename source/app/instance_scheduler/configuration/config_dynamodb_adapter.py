@@ -13,8 +13,7 @@
 
 from boto3.dynamodb.conditions import Key
 from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
-
-import instance_scheduler.configuration
+from instance_scheduler import configuration
 
 
 class ConfigDynamodbAdapter:
