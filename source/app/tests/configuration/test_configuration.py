@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import os
 from unittest.mock import patch
-import configuration
+from instance_scheduler import configuration
 
 
 def test_env_var_names():
@@ -92,7 +92,6 @@ def test_attributes():
     assert configuration.TIMEZONE == "timezone"
     assert configuration.TAGNAME == "tagname"
     assert configuration.WEEKDAYS == "weekdays"
-    assert configuration.CROSS_ACCOUNT_ROLES == "cross_account_roles"
     assert configuration.SCHEDULE_LAMBDA_ACCOUNT == "schedule_lambda_account"
     assert configuration.ENFORCED == "enforced"
     assert configuration.HIBERNATE == "hibernate"
@@ -129,8 +128,8 @@ def test_configuration_global():
     assert configuration.__configuration == None
 
 
-@patch("configuration.SchedulerConfigBuilder")
-@patch("configuration.ConfigDynamodbAdapter")
+@patch("instance_scheduler.configuration.SchedulerConfigBuilder")
+@patch("instance_scheduler.configuration.ConfigDynamodbAdapter")
 def test_get_scheduler_configuration(
     mock_config_dynamodb_adapter, mock_scheduler_config_builder
 ):
