@@ -6,9 +6,10 @@ from cli_test_helpers import shell
 
 
 def test_cli_entrypoint_exists():
-    result = shell('scheduler-cli --help')
+    result = shell("scheduler-cli --help")
     assert result.exit_code == 0
 
+
 def test_calling_with_no_args_exits_gracefully():
-    result = shell('scheduler-cli')
+    result = shell("scheduler-cli")
     assert result.exit_code == 0
