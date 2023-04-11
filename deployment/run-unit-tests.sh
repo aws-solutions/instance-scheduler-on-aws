@@ -44,7 +44,7 @@ echo "--------------------------------------------------------------------------
 echo "Starting CDK Unit Test"
 echo "------------------------------------------------------------------------------"
 #tox runs cdk relative to source/infrastructure
-cdk_coverage_report_path="../../$coverage_reports_dir/cdk-coverage"
+cdk_coverage_report_path="$coverage_reports_dir/cdk-coverage"
 echo "running tests and saving coverage to $coverage_reports_dir"
 tox -e cdk --exit-and-dump-after 1200 -- --coverage --coverageDirectory "$cdk_coverage_report_path"
 
@@ -52,7 +52,7 @@ echo "--------------------------------------------------------------------------
 echo "Starting Lambda Unit Tests"
 echo "------------------------------------------------------------------------------"
 #tox runs lambda relative to source/app
-lambda_coverage_report_path="../../$coverage_reports_dir/lambda-coverage.xml"
+lambda_coverage_report_path="$coverage_reports_dir/lambda-coverage.xml"
 echo "running tests and saving coverage to $lambda_coverage_report_path"
 tox -e lambda --exit-and-dump-after 1200 -- --cov --cov-report "xml:$lambda_coverage_report_path"
 
@@ -60,7 +60,7 @@ echo "--------------------------------------------------------------------------
 echo "Starting CLI Unit Tests"
 echo "------------------------------------------------------------------------------"
 #tox runs cli tests relative to source/cli
-cli_coverage_report_path="../../$coverage_reports_dir/cli-coverage.xml"
+cli_coverage_report_path="$coverage_reports_dir/cli-coverage.xml"
 echo "running tests and saving coverage to $cli_coverage_report_path"
 tox -e cli --exit-and-dump-after 1200 -- --cov --cov-report "xml:$cli_coverage_report_path"
 
