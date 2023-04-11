@@ -102,9 +102,9 @@ PARAM_REGION = "--region"
 PARAM_QUERY = "--query"
 PARAM_PROFILE_NAME = "--profile-name"
 COMMON_PARAMS = [
-                    s[2:].replace("-", "_")
-                    for s in [PARAM_QUERY, PARAM_REGION, PARAM_STACK, PARAM_PROFILE_NAME]
-                ] + ["command"]
+    s[2:].replace("-", "_")
+    for s in [PARAM_QUERY, PARAM_REGION, PARAM_STACK, PARAM_PROFILE_NAME]
+] + ["command"]
 
 CMD_CREATE_PERIOD = "create-period"
 CMD_CREATE_SCHEDULE = "create-schedule"
@@ -153,9 +153,9 @@ def handle_command(args, command):
                 a: getattr(args, a)
                 for a in args.__dict__
                 if (
-                        a not in COMMON_PARAMS
-                        and getattr(args, a) is not None
-                        and not hasattr(getattr(args, a), "__call__")
+                    a not in COMMON_PARAMS
+                    and getattr(args, a) is not None
+                    and not hasattr(getattr(args, a), "__call__")
                 )
             },
         }
@@ -359,7 +359,9 @@ def build_parser():
         )
 
     new_parser = argparse.ArgumentParser(prog=PROG_NAME)
-    new_parser.add_argument(CMD_VERSION, action="version", version=f"'%(prog)s {__version__}'")
+    new_parser.add_argument(
+        CMD_VERSION, action="version", version=f"'%(prog)s {__version__}'"
+    )
     subparsers = new_parser.add_subparsers(
         help=HELP_SUB_COMMANDS, description=HELP_VALID_COMMANDS
     )
@@ -379,7 +381,7 @@ def build_parser():
 
 def main():
     parser = build_parser()
-    if (len(sys.argv) == 1):  # no args
+    if len(sys.argv) == 1:  # no args
         parser.print_help()
         sys.exit(0)
     else:
