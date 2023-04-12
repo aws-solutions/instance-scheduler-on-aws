@@ -156,7 +156,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
     });
 
     const trace = new cdk.CfnParameter(this, "Trace", {
-      description: "Allow 'debug' level logging in CloudWatch logs.",
+      description: "Enable debug-level logging in CloudWatch logs.",
       type: "String",
       allowedValues: ["Yes", "No"],
       default: props.paramOverrides?.trace ?? "No",
@@ -786,7 +786,7 @@ export class AwsInstanceSchedulerStack extends cdk.Stack {
             default: "Enable CloudWatch Metrics",
           },
           Trace: {
-            default: "Enable CloudWatch Logs",
+            default: "Enable CloudWatch Debug Logs",
           },
           EnableSSMMaintenanceWindows: {
             default: "Enable SSM Maintenance windows",
