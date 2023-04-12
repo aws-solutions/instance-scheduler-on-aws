@@ -825,7 +825,7 @@ exports[`AwsInstanceSchedulerStack snapshot test 1`] = `
         "No",
       ],
       "Default": "No",
-      "Description": "Allow 'debug' level logging in CloudWatch logs.",
+      "Description": "Enable debug-level logging in CloudWatch logs.",
       "Type": "String",
     },
     "UseCloudWatchMetrics": {
