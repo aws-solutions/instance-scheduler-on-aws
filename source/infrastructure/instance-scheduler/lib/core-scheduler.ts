@@ -5,7 +5,6 @@ import { LambdaToDynamoDB } from "@aws-solutions-constructs/aws-lambda-dynamodb"
 import { Aws, RemovalPolicy, Stack } from "aws-cdk-lib";
 
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as s3 from "aws-cdk-lib/aws-s3";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as cdk from "aws-cdk-lib";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -13,7 +12,6 @@ import * as kms from "aws-cdk-lib/aws-kms";
 import * as python from "@aws-cdk/aws-lambda-python-alpha";
 export interface InstanceSchedulerLambdaProps {
   readonly solutionVersion: string;
-  readonly solutionsBucket?: s3.IBucket;
   readonly memorySize: number;
   readonly schedulerRole: iam.Role;
   readonly kmsEncryptionKey: kms.Key;
