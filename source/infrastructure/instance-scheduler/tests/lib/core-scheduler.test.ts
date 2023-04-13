@@ -4,7 +4,6 @@ import { Stack } from "aws-cdk-lib";
 import { Template } from "aws-cdk-lib/assertions";
 import { CompositePrincipal, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Key } from "aws-cdk-lib/aws-kms";
-import { Bucket } from "aws-cdk-lib/aws-s3";
 import { CoreScheduler } from "../../lib/core-scheduler";
 
 describe("core scheduler", function () {
@@ -17,13 +16,10 @@ describe("core scheduler", function () {
     ),
   });
 
-  const bucket = Bucket.fromBucketName(stack, "DistBucket", "my-bucket");
-
   new CoreScheduler(stack, {
     kmsEncryptionKey: key,
     memorySize: 128,
     schedulerRole: role,
-    solutionsBucket: bucket,
     solutionVersion: "v9.9.9",
   });
   const template = Template.fromStack(stack);
