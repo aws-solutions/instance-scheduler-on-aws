@@ -29,19 +29,19 @@ to deploy Instance Scheduler on AWS using our pre-packaged deployment assets.
 
 ### Deploy from GitHub (CDK Deploy)
 
-Instance Scheduler can be deployed your AWS account directly from the source code using `cdk deploy`.
+Instance Scheduler can be deployed to your AWS account directly from the source code using `cdk deploy`.
 
 #### Deploying the Primary Control Stack
 ```
 cd source/infrastructure
 npm install
-cd aws-instance-scheduler
+cd instance-scheduler
 cdk bootstrap
 cdk deploy aws-instance-scheduler
 ```
 
 This will deploy the solution into your aws account using all default configuration settings. 
-You can then update those settings to their desired values from the CloudFormation console 
+You will then need to update those settings to their desired values from the CloudFormation console 
 by selecting the deployed template and clicking "Update" -> "Use Current Template".
 
 Refer to the [Implementation Guide](https://docs.aws.amazon.com/solutions/latest/instance-scheduler-on-aws/deployment.html#step1)
@@ -54,9 +54,13 @@ and deploy the remote stack.
 ```
 /source/infrastructure/aws-instance-scheduler
 
-cdk deploy aws-instance-scheduler-remote --parameters InstanceSchedulerAccount={account-id}
+cdk bootstrap
+cdk deploy aws-instance-scheduler-remote --parameters InstanceSchedulerAccount={account-id} --parameters namespace={namespace} --parameters UsingAWSOrganizations={useOrgs}
 ```
-Replace {account-id} with the id of the account that contains the primary control stack.
+Replace:
+- {account-id} with the id of the account that contains the primary control stack.
+- {namespace} with the same unique namespace that was provided to the primary control stack
+- {useOrgs} with the same value set in the primary control stack (yes/no)
 
 For example: `InstanceSchedulerAccount=111222333444`
 
@@ -121,7 +125,7 @@ s3://mybucket-us-east-1/aws-instance-scheduler/v1.5.0/f779f5b7643ba70e9a5e25c889
 s3://mybucket-us-west-1/aws-instance-scheduler/v1.5.0/f779f5b7643ba70e9a5e25c8898f4e4e8e54ca15b150eee1dd25c2c636b188b8.zip
 ```
 
-*Note: The scheduler-cli is optional does not need to be published to the global bucket for deploy to work.*
+*Note: The scheduler-cli is optional and does not need to be published to the global bucket for deploy to work.*
 
 
 
@@ -153,6 +157,9 @@ tox -e lambda
 
 //test just the cdk code
 tox -e cdk
+
+//test just the cli code
+tox -e cli
 ```
 
 ### Automated Testing Pipeline
