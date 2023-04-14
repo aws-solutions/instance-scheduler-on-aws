@@ -1,11 +1,14 @@
 # Instance Scheduler on AWS (ID SO0030)
 
-Scheduler for Cross-Account and Cross-Region scheduling for EC2 and RDS instances
+Instance Scheduler on AWS automates the starting and stopping of Amazon Elastic Compute Cloud (Amazon EC2) and Amazon Relational Database Service (Amazon RDS) instances.
+
+This solution helps reduce operational costs by stopping resources that are not in use and starting them when they are needed. The cost savings can be significant if you leave all of your instances running at full utilization continuously.
 
 ## Getting Started
 
-To get started with Instance Scheduler, please review the solution documentation. 
-[Instance Scheduler on AWS](https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/)
+To understand how to use Instance Scheduler on AWS, please review the [implementation guide](https://docs.aws.amazon.com/solutions/latest/instance-scheduler-on-aws/solution-overview.html)
+on the [solution landing page](https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/). 
+To deploy the solution, see [Deploying the Solution](#deploying-the-solution)
 
 
 ## Repository Organization
