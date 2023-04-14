@@ -3,7 +3,7 @@ Config
 
 ^docs/
 ^viperlight/
-source/app/instance_scheduler/requesthandlers/setup_demo_data.py:64
+source/app/instance_scheduler/requesthandlers/setup_demo_data.py:55
 deployment/buildspecs/mainline-s3-spec.yml:20
 CODE_OF_CONDUCT.md:4
 CONTRIBUTING.md:51
