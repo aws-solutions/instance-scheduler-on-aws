@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as ec2 from "@aws-sdk/client-ec2";
-import * as dynamodb from "@aws-sdk/client-dynamodb";
 
 import { resourceParams } from "./basic-ec2-start-stop.test.resources";
 import { delayMinutes } from "./index";
@@ -10,7 +9,6 @@ import { getInstanceState } from "./utils/ec2-test-utils";
 import { createSchedule, currentTimePlus } from "./utils/schedule-test-utils";
 
 const ec2Client = new ec2.EC2Client({});
-const dynamoClient = new dynamodb.DynamoDBClient({});
 const instanceId = resourceParams.ec2InstanceId;
 
 test("instanceId exists", () => {
@@ -29,7 +27,7 @@ test("basic ec2 start-stop schedule", async () => {
   expect(await getInstanceState(ec2Client, instanceId)).toBe(ec2.InstanceStateName.stopped);
 
   //create schedule
-  await createSchedule(dynamoClient, {
+  await createSchedule({
     name: resourceParams.startStopTestScheduleName,
     description: `testing schedule`,
     periods: [

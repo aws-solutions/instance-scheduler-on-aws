@@ -101,7 +101,6 @@ ENV/
 
 #cdk 
 *cdk.out*
-*.d.ts
 *.js
 
 # config

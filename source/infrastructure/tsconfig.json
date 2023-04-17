@@ -25,5 +25,6 @@
     "outDir": "../../build/cdk.ts.dist"
   },
   "include": ["**/*.ts"],
+  "files" : ["global.d.ts"],
   "exclude": ["node_modules"]
 }
