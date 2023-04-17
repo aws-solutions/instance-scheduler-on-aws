@@ -17,14 +17,19 @@ export interface Schedule {
   description: string;
   periods: Period[];
 }
-export async function createSchedule(client: dynamodb.DynamoDBClient, schedule: Schedule) {
-  await client.send(
-    new dynamodb.BatchWriteItemCommand({
-      RequestItems: {
-        [configTableName]: scheduleToBatchedPutRequests(schedule),
-      },
-    })
-  );
+export async function createSchedule(schedule: Schedule) {
+  const dynamoClient = new dynamodb.DynamoDBClient({});
+  try {
+    await dynamoClient.send(
+      new dynamodb.BatchWriteItemCommand({
+        RequestItems: {
+          [configTableName]: scheduleToBatchedPutRequests(schedule),
+        },
+      })
+    );
+  } finally {
+    dynamoClient.destroy();
+  }
 }
 
 /**
