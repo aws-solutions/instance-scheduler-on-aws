@@ -9,10 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enable solution to support deployment using organization id.
 - Lambda code is organized with tox.
 - Development/e2e testing pipeline included under source/infrastructure/pipeline capable of automatically deploying and testing solution.
-- Integration with eslint, prettier, and black for enforcing code style
 - App Registry integration
-- Lambda dependencies now packaged and maintained by Poetry
-- Natively deployable with cdk deploy using CDK-Helper to maintain compatibility with internal solutions pipelines
 ### Fixed
 - Boto Retry module could cause unintended high lambda utilization in case of API failures.
 - Cross account scheduling no longer requires IAM role name but only account id.
