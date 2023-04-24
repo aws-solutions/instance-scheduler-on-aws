@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2023-04-27
+### Added
+- Enable solution to support deployment using organization id.
+- Lambda code is organized with tox.
+- Development/e2e testing pipeline included under source/infrastructure/pipeline capable of automatically deploying and testing solution.
+- Integration with eslint, prettier, and black for enforcing code style
+- App Registry integration
+- Lambda dependencies now packaged and maintained by Poetry
+- Natively deployable with cdk deploy using CDK-Helper to maintain compatibility with internal solutions pipelines
+### Fixed
+- Boto Retry module could cause unintended high lambda utilization in case of API failures.
+- Cross account scheduling no longer requires IAM role name but only account id.
+
 ## [1.4.2] - 2023-01-11
 ### Fixed
 - Upgrade certifi to mitigate [CVE-2022-23491](https://nvd.nist.gov/vuln/detail/CVE-2022-23491).
