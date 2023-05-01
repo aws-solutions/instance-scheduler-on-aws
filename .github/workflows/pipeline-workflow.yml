@@ -1,4 +1,4 @@
-name: Pipeline Workflow
+name: Internal Pipeline
 
 env:
   REGION: us-east-1

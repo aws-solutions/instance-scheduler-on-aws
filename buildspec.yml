@@ -3,26 +3,21 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      python: 3.10    
+      python: 3.10
     commands:
       - pip install --upgrade pip
   pre_build:
     commands:
       - echo "Installing dependencies and executing unit tests - `pwd`"
-      - cd source
-      - chmod +x ./run-all-tests.sh && ./run-all-tests.sh
+      - cd deployment
+      - chmod +x ./run-unit-tests.sh && ./run-unit-tests.sh
       - echo "Installing dependencies and executing unit tests completed `date`"
   build:
     commands:
       - echo "`pwd`"
-      - echo "cd ../deployment"
-      - cd ../deployment
       - echo "Starting build `date` in `pwd`"
       - chmod +x ./build-s3-dist.sh && ./build-s3-dist.sh $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION
-      - echo "Build completed `date`" 
-      - echo "Starting open-source-dist `date` in `pwd`" 
-      - chmod +x ./build-open-source-dist.sh && ./build-open-source-dist.sh $SOLUTION_NAME
-      - echo "Open Source Dist completed `date`" 
+      - echo "Build completed `date`"
 
   post_build:
     commands:
@@ -30,9 +25,13 @@ phases:
       - aws s3 cp s3://solutions-build-assets/changelog-spec.yml ../buildspec.yml
       - echo "Retrieving next stage buildspec complete"
       - echo "Post build completed on `date`"
+      - mkdir -p open-source
+      - touch open-source/source-is-on-github
 
 artifacts:
   files:
       - deployment/**/*
+      - source/**/*
       - buildspec.yml
       - CHANGELOG.md
+      - sonar-project.properties

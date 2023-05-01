@@ -1,0 +1,55 @@
+name: Linting
+
+on: [push, pull_request]
+
+jobs:
+  ESLint:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+          cache: 'pip'
+          cache-dependency-path: 'source/app/pyproject.toml'
+      - name: Install Tox and any other packages
+        run: |
+          pip install --upgrade pip
+          pip install tox
+      - name: Cache tox and mypy
+        uses: actions/cache@v3
+        with:
+          path: |
+            .tox
+            .mypy_cache
+          key: ESLint-tox-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('tox.ini') }}-${{ hashFiles('.github/workflows/code-style-workflow.yml') }}
+      - name: Run ESLint
+        run: tox -e eslint
+  Black:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+      - name: setup
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+          cache: 'pip'
+          cache-dependency-path: 'source/app/pyproject.toml'
+      - name: Install Tox and any other packages
+        run: |
+          pip install --upgrade pip
+          pip install tox
+      - name: Cache tox and mypy
+        uses: actions/cache@v3
+        with:
+          path: |
+            .tox
+            .mypy_cache
+          key: Black-tox-${{ hashFiles('pyproject.toml') }}-${{ hashFiles('tox.ini') }}-${{ hashFiles('.github/workflows/code-style-workflow.yml') }}
+      - name: Run Black
+        run: tox -e black

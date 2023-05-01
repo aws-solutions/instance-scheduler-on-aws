@@ -1,0 +1,24 @@
+# Workflow that runs cdk-nag via cdk synth
+name: CDK Nag
+
+on: [push, pull_request]
+
+jobs:
+  cdk-nag:
+    name: CDK Nag Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [16.x]
+        module: [instance-scheduler, pipeline]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: CDK Synth
+        working-directory: source/infrastructure
+        run: |
+          npm ci
+          cd ${{ matrix.module }}
+          npx cdk synth
