@@ -14,7 +14,7 @@ scheduler-cli = 'instance_scheduler_cli.scheduler_cli:main'
 
 [tool.poetry.dependencies]
 python = "^3.9"
-requests = "^2.28.1"
+requests = "^2.31.0"
 jmespath = "^1.0.1"
 boto3 = "^1.26.48"
 
