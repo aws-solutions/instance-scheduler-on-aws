@@ -38,8 +38,8 @@
     "cdk-nag": "^2.22.23",
     "constructs": "^10.0.0",
     "source-map-support": "^0.5.16",
-    "@aws-sdk/client-ec2": "^3.295.0",
-    "@aws-sdk/client-dynamodb": "^3.295.0",
-    "@aws-sdk/client-rds" : "^3.314.0"
+    "@aws-sdk/client-ec2": "^3.350.0",
+    "@aws-sdk/client-dynamodb": "^3.351.0",
+    "@aws-sdk/client-rds" : "^3.350.0"
   }
 }
