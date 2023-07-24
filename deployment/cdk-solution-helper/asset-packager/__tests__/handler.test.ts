@@ -1,7 +1,5 @@
-/*
- * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 import path from "path";
 import { existsSync } from "fs";
@@ -49,7 +47,7 @@ describe("Handler", () => {
     const mockAssetPath = path.join(__assetDirectoryPath, zipName);
     await writeFile(mockAssetPath, "NoOp");
     await expect(handler(__assetDirectoryPath, __outputPath)).resolves.toBeUndefined();
-    expect(existsSync(path.join(__outputPath, zipName.split("asset.").pop()!))).toBe(true);
+    expect(existsSync(path.join(__outputPath, zipName.split("asset.").pop() ?? "unexpected"))).toBe(true);
   });
 
   afterAll(async function Cleanup() {

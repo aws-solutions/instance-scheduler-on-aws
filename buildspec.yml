@@ -1,37 +1,35 @@
 version: 0.2
-
 phases:
   install:
     runtime-versions:
-      python: 3.10
+      nodejs: 18
+      python: 3.11
     commands:
-      - pip install --upgrade pip
+    - npm install --location=global npm@latest
+    - pyenv install -s 3.8 3.9
+    - pyenv global $PYTHON_311_VERSION 3.9 3.8
+    - python -m pip install -U pip setuptools poetry tox
+    - npm ci
   pre_build:
     commands:
-      - echo "Installing dependencies and executing unit tests - `pwd`"
-      - cd deployment
-      - chmod +x ./run-unit-tests.sh && ./run-unit-tests.sh
-      - echo "Installing dependencies and executing unit tests completed `date`"
+    - cd ./deployment
+    - ./build-open-source-dist.sh
+    - cd ..
+    - npm run test:ci
   build:
     commands:
-      - echo "`pwd`"
-      - echo "Starting build `date` in `pwd`"
-      - chmod +x ./build-s3-dist.sh && ./build-s3-dist.sh $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION
-      - echo "Build completed `date`"
-
+    - cd ./deployment
+    - ./build-s3-dist.sh $DIST_OUTPUT_BUCKET $SOLUTION_NAME $VERSION
+    - cd ..
   post_build:
     commands:
-      - echo "Retrieving next stage buildspec `date` in `pwd`"
-      - aws s3 cp s3://solutions-build-assets/changelog-spec.yml ../buildspec.yml
-      - echo "Retrieving next stage buildspec complete"
-      - echo "Post build completed on `date`"
-      - mkdir -p open-source
-      - touch open-source/source-is-on-github
-
+    - rm ./deployment/global-s3-assets/instance-scheduler-on-aws-testing-pipeline.template
+    - rm ./deployment/global-s3-assets/instance-scheduler-on-aws-testing-pipeline-*.template
+    - rm ./deployment/global-s3-assets/instance-scheduler-on-aws-end-to-end-testing-*.template
 artifacts:
   files:
-      - deployment/**/*
-      - source/**/*
-      - buildspec.yml
-      - CHANGELOG.md
-      - sonar-project.properties
+  - '**/*'
+  exclude-paths:
+  - '**/.mypy_cache/**/*'
+  - '**/__pycache__/**'
+  - '**/.tox/**/*'

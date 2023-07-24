@@ -1,4 +1,0 @@
-{
-  "app": "npx ts-node bin/testing-pipeline.ts",
-  "output": "../../../build/cdk.pipeline.out"
-}

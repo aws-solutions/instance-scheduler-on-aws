@@ -1,13 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 import argparse
 import json
-import sys
+from argparse import ArgumentParser
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 import boto3
 import jmespath
+
 from instance_scheduler_cli import __version__
 
 EVENT_SOURCE = "scheduler.cli"
@@ -23,7 +23,6 @@ HELP_CMD_SCHEDULE_DESCRIBE_USAGE = (
 )
 HELP_CMD_UPDATE_PERIOD = "Updates a period"
 HELP_CMD_UPDATE_SCHEDULE = "Updates a schedule"
-CMD_HELP_VERSION = "Show version"
 
 HELP_ENDDATE = "End time of the period in format yyyymmdd, default is today"
 HELP_NAME_SCHEDULE = "Name of the schedule"
@@ -110,30 +109,38 @@ CMD_VERSION = "--version"
 
 PARAM_NAME = "--name"
 
+if TYPE_CHECKING:
+    from mypy_boto3_cloudformation.client import CloudFormationClient
+    from mypy_boto3_lambda.client import LambdaClient
+else:
+    CloudFormationClient = object
+    LambdaClient = object
 
-def _service_client(service, region=None, profile_name=None):
+
+def _service_client(
+    service: Union[Literal["cloudformation"], Literal["lambda"]],
+    region: Optional[str] = None,
+    profile_name: Optional[str] = None,
+) -> Any:
     session = (
         boto3.Session()
         if profile_name is None
         else boto3.Session(profile_name=profile_name)
     )
-    args = {"service_name": service}
-    if region is not None:
-        args["region_name"] = region
 
-    return session.client(**args)
+    return session.client(service_name=service, region_name=region)
 
 
-def handle_command(args, command):
+def handle_command(args: Any, command: str) -> int:
     try:
-        cloudformation_client = _service_client(
+        cloudformation_client: CloudFormationClient = _service_client(
             "cloudformation", region=args.region, profile_name=args.profile_name
         )
         lambda_resource = cloudformation_client.describe_stack_resource(
             StackName=args.stack, LogicalResourceId="Main"
-        ).get("StackResourceDetail", None)
+        )["StackResourceDetail"]
 
-        lambda_client = _service_client(
+        lambda_client: LambdaClient = _service_client(
             "lambda", region=args.region, profile_name=args.profile_name
         )
 
@@ -184,8 +191,8 @@ def handle_command(args, command):
         return 1
 
 
-def build_parser():
-    def add_common_arguments(parser):
+def build_parser() -> ArgumentParser:
+    def add_common_arguments(parser: ArgumentParser) -> None:
         parser.add_argument(PARAM_QUERY, PARAM_QUERY[1:3], help=HELP_QUERY)
         parser.add_argument(PARAM_REGION, PARAM_REGION[1:3], help=HELP_REGION)
         parser.add_argument(
@@ -198,7 +205,7 @@ def build_parser():
             help=HELP_PROFILE_NAME,
         )
 
-    def add_period_arguments(period_parser):
+    def add_period_arguments(period_parser: ArgumentParser) -> None:
         period_parser.add_argument(PARAM_BEGINTIME, help=HELP_PERIOD_BEGINTIME)
         period_parser.add_argument(PARAM_DESCRIPTION, help=HELP_PERIOD_DESCRIPTION)
         period_parser.add_argument(PARAM_ENDTIME, help=HELP_PERIOD_ENDTIME)
@@ -207,7 +214,7 @@ def build_parser():
         period_parser.add_argument(PARAM_NAME, required=True, help=HELP_PERIOD_NAME)
         period_parser.add_argument(PARAM_WEEKDAYS, help=HELP_PERIOD_WEEKDAYS)
 
-    def add_schedule_arguments(schedule_parser):
+    def add_schedule_arguments(schedule_parser: ArgumentParser) -> None:
         schedule_parser.add_argument(PARAM_DESCRIPTION, help=HELP_SCHEDULE_DESCRIPTION)
         schedule_parser.add_argument(PARAM_TIMEZONE, help=HELP_PARAM_TIMEZONE)
         schedule_parser.add_argument(PARAM_NAME, required=True, help=HELP_SCHEDULE_NAME)
@@ -273,7 +280,7 @@ def build_parser():
             help=HELP_SCHEDULE_CLOUDWATCH_METRICS,
         )
 
-    def build_describe_schedules_parser():
+    def build_describe_schedules_parser() -> None:
         sub_parser = subparsers.add_parser(
             CMD_DESCRIBE_SCHEDULES, help=HELP_CMD_DESCRIBE_SCHEDULES
         )
@@ -281,7 +288,7 @@ def build_parser():
         add_common_arguments(sub_parser)
         sub_parser.set_defaults(func=handle_command, command=CMD_DESCRIBE_SCHEDULES)
 
-    def build_describe_periods_parser():
+    def build_describe_periods_parser() -> None:
         sub_parser = subparsers.add_parser(
             CMD_DESCRIBE_PERIODS, help=HELP_CMD_DESCRIBE_PERIODS
         )
@@ -289,7 +296,7 @@ def build_parser():
         add_common_arguments(sub_parser)
         sub_parser.set_defaults(func=handle_command, command=CMD_DESCRIBE_PERIODS)
 
-    def build_create_period_parser():
+    def build_create_period_parser() -> None:
         sub_parser = subparsers.add_parser(
             CMD_CREATE_PERIOD, help=HELP_CMD_CREATE_PERIOD
         )
@@ -297,7 +304,7 @@ def build_parser():
         add_common_arguments(sub_parser)
         sub_parser.set_defaults(func=handle_command, command=CMD_CREATE_PERIOD)
 
-    def build_create_schedule_parser():
+    def build_create_schedule_parser() -> None:
         sub_parser = subparsers.add_parser(
             CMD_CREATE_SCHEDULE, help=HELP_CMD_CREATE_SCHEDULE
         )
@@ -305,7 +312,7 @@ def build_parser():
         add_common_arguments(sub_parser)
         sub_parser.set_defaults(func=handle_command, command=CMD_CREATE_SCHEDULE)
 
-    def build_update_period_parser():
+    def build_update_period_parser() -> None:
         sub_parser = subparsers.add_parser(
             CMD_UPDATE_PERIOD, help=HELP_CMD_UPDATE_PERIOD
         )
@@ -313,7 +320,7 @@ def build_parser():
         add_common_arguments(sub_parser)
         sub_parser.set_defaults(func=handle_command, command=CMD_UPDATE_PERIOD)
 
-    def build_update_schedule_parser():
+    def build_update_schedule_parser() -> None:
         sub_parser = subparsers.add_parser(
             CMD_UPDATE_SCHEDULE, help=HELP_CMD_UPDATE_SCHEDULE
         )
@@ -321,7 +328,7 @@ def build_parser():
         add_common_arguments(sub_parser)
         sub_parser.set_defaults(func=handle_command, command=CMD_UPDATE_SCHEDULE)
 
-    def build_delete_period_parser():
+    def build_delete_period_parser() -> None:
         sub_parser = subparsers.add_parser(
             CMD_DELETE_PERIOD, help=HELP_CMD_DELETE_PERIOD
         )
@@ -329,7 +336,7 @@ def build_parser():
         add_common_arguments(sub_parser)
         sub_parser.set_defaults(func=handle_command, command=CMD_DELETE_PERIOD)
 
-    def build_delete_schedule_parser():
+    def build_delete_schedule_parser() -> None:
         sub_parser = subparsers.add_parser(
             CMD_DELETE_SCHEDULE, help=HELP_CMD_DELETE_SCHEDULE
         )
@@ -337,7 +344,7 @@ def build_parser():
         add_common_arguments(sub_parser)
         sub_parser.set_defaults(func=handle_command, command=CMD_DELETE_SCHEDULE)
 
-    def build_describe_schedule_usage_parser():
+    def build_describe_schedule_usage_parser() -> None:
         sub_parser = subparsers.add_parser(
             CMD_DESCRIBE_SCHEDULE_USAGE, help=HELP_CMD_SCHEDULE_DESCRIBE_USAGE
         )
@@ -368,13 +375,3 @@ def build_parser():
     build_update_schedule_parser()
 
     return new_parser
-
-
-def main():
-    parser = build_parser()
-    if len(sys.argv) == 1:  # no args
-        parser.print_help()
-        sys.exit(0)
-    else:
-        p = parser.parse_args(sys.argv[1:])
-        sys.exit(p.func(p, p.command))

@@ -1,26 +1,18 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-import os
+from typing import Optional
 
 from instance_scheduler.configuration.config_dynamodb_adapter import (
     ConfigDynamodbAdapter,
 )
+from instance_scheduler.configuration.scheduler_config import GlobalConfig
 from instance_scheduler.configuration.scheduler_config_builder import (
     SchedulerConfigBuilder,
 )
+from instance_scheduler.util.app_env import get_app_env
+from instance_scheduler.util.logger import Logger
 
-# environment parameter for configuration table
-ENV_CONFIG = "CONFIG_TABLE"
-ENV_STATE = "STATE_TABLE"
-ENV_ACCOUNT = "ACCOUNT"
 ENV_STACK = "STACK_NAME"
-ENV_TAG_NAME = "TAG_NAME"
-ENV_SCHEDULE_FREQUENCY = "SCHEDULER_FREQUENCY"
-ENV_TRACE = "TRACE"
-ENV_ENABLE_SSM_MAINTENANCE_WINDOWS = "ENABLE_SSM_MAINTENANCE_WINDOWS"
-ENV_USER_AGENT = "USER_AGENT"
-ENV_SCHEDULER_RULE = "SCHEDULER_RULE"
 
 # name of months
 MONTH_NAMES = [
@@ -56,7 +48,7 @@ TIME_FORMAT_STRING = "%H:%M"
 TRACE = "trace"
 
 # enable SSM maintenance windows
-ENABLE_SSM_MAINTENANCE_WINDOWS = "enable_SSM_maintenance_windows"
+ENABLE_SSM_MAINTENANCE_WINDOWS = "enable_ssm_maintenance_windows"
 
 # metrics flag
 METRICS = "use_metrics"
@@ -149,24 +141,24 @@ TAG_VAL_MONTH = "month"
 TAG_VAL_DAY = "day"
 TAG_VAL_TIMEZONE = "timezone"
 
-__configuration = None
+__configuration: Optional[GlobalConfig] = None
 
 
-def get_scheduler_configuration(logger):
+def get_global_configuration(logger: Optional[Logger]) -> GlobalConfig:
     """
     Returns the scheduler configuration
     :return: scheduler configuration
     """
     global __configuration
     if __configuration is None:
-        configdata = ConfigDynamodbAdapter(os.getenv(ENV_CONFIG)).config
+        configdata = ConfigDynamodbAdapter(get_app_env().config_table_name).config
         __configuration = SchedulerConfigBuilder(logger=logger).build(configdata)
         if logger is not None:
             logger.debug("Configuration loaded\n{}", str(__configuration))
     return __configuration
 
 
-def unload_scheduler_configuration():
+def unload_global_configuration() -> None:
     """
     Force the configuration to unload
     :return:

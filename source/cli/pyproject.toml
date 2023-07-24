@@ -1,25 +1,36 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "instance_scheduler_cli"
-version = "1.5.0"
-description = "AWS Instance Scheduler CLI"
-authors = ["AWS"]
-packages = [{ include="instance_scheduler_cli" }]
+version = "1.5.1"
+description = "Instance Scheduler on AWS CLI"
+license = "Apache-2.0"
+authors = ["Amazon Web Services"]
+homepage = "https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/"
+repository = "https://github.com/aws-solutions/instance-scheduler-on-aws"
+documentation = "https://docs.aws.amazon.com/solutions/latest/instance-scheduler-on-aws/solution-overview.html"
 
 [tool.poetry.scripts]
-scheduler-cli = 'instance_scheduler_cli.scheduler_cli:main'
+scheduler-cli = "instance_scheduler_cli:__main__"
 
 [tool.poetry.dependencies]
-python = "^3.9"
-requests = "^2.28.1"
+python = "^3.8.1"
+boto3 = "^1.26.90"
 jmespath = "^1.0.1"
-boto3 = "^1.26.48"
 
 [tool.poetry.group.dev.dependencies]
-cli-test-helpers = "^3.2.0"
-pytest = "^7.2.0"
-pytest-cov = "^4.0.0"
-black = "^23.1.0"
+black = "^23.7.0"
+boto3-stubs-lite = {extras = ["cloudformation", "lambda"], version = "^1.26.90"}
+cli-test-helpers = "^3.4.0"
+flake8 = "^6.0.0"
+isort = "^5.12.0"
+moto = {extras = ["cloudformation", "lambda"], version = "^4.1.12"}
+mypy = "^1.4.1"
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+types-jmespath = "^1.0.2.6"
+types-requests = "^2.31.0.1"

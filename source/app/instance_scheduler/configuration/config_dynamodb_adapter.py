@@ -1,10 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 from boto3.dynamodb.conditions import Key
-from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
+
 from instance_scheduler import configuration
+from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
 
 
 class ConfigDynamodbAdapter:

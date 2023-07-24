@@ -1,10 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 import decimal
 import json
 from datetime import datetime
+from typing import Any
 
 
 class CustomEncoder(json.JSONEncoder):
@@ -12,7 +11,7 @@ class CustomEncoder(json.JSONEncoder):
     Internal class used for serialization of types not supported in json.
     """
 
-    def default(self, o):  # pylint: disable=E0202
+    def default(self, o: Any) -> Any:
         # sets become lists
         if isinstance(o, set):
             return list(o)

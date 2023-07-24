@@ -1,0 +1,7 @@
+[run]
+branch = true
+source = instance_scheduler
+
+[report]
+exclude_lines =
+    if TYPE_CHECKING:

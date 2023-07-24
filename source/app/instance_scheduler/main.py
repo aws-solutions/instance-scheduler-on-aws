@@ -1,62 +1,43 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 import json
-import os
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from time import time
+from typing import TYPE_CHECKING, Any, Mapping
 
-from instance_scheduler import configuration
-from instance_scheduler import util
-from instance_scheduler.requesthandlers.admin_cli_request_handler import (
-    AdminCliRequestHandler,
-)
-from instance_scheduler.requesthandlers.cloudwatch_event_handler import (
-    CloudWatchEventHandler,
-)
-from instance_scheduler.requesthandlers.schedule_resource_handler import (
-    ScheduleResourceHandler,
-)
-from instance_scheduler.requesthandlers.scheduler_request_handler import (
-    SchedulerRequestHandler,
-)
-from instance_scheduler.requesthandlers.scheduler_setup_handler import (
-    SchedulerSetupHandler,
-)
-from instance_scheduler.requesthandlers.eventbus_request_handler import (
-    EventBusRequestHandler,
-)
+from instance_scheduler import configuration, util
+from instance_scheduler.handler import handlers
+from instance_scheduler.util.app_env import get_app_env
 from instance_scheduler.util.logger import Logger
-from instance_scheduler.version import VERSION
+
+if TYPE_CHECKING:
+    from aws_lambda_powertools.utilities.typing import LambdaContext
+else:
+    LambdaContext = object
 
 LOG_STREAM = "InstanceScheduler-{:0>4d}{:0>2d}{:0>2d}"
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: Mapping[str, Any], context: LambdaContext) -> Any:
     try:
-        dt = datetime.utcnow()
+        dt = datetime.now(timezone.utc)
+        app_env = get_app_env()
         log_stream = LOG_STREAM.format(dt.year, dt.month, dt.day)
         result = {}
         with Logger(
-            logstream=log_stream,
-            buffersize=20,
-            context=context,
-            debug=util.as_bool(os.getenv(configuration.ENV_TRACE, False)),
+            log_group=app_env.log_group,
+            log_stream=log_stream,
+            topic_arn=app_env.topic_arn,
+            debug=app_env.enable_debug_logging,
         ) as logger:
-            logger.info("InstanceScheduler, version {}".format(VERSION))
+            logger.info(
+                "InstanceScheduler, version {}".format(app_env.solution_version)
+            )
 
             logger.debug("Event is {}", util.safe_json(event, indent=3))
 
-            for handler_type in [
-                SchedulerRequestHandler,
-                SchedulerSetupHandler,
-                ScheduleResourceHandler,
-                AdminCliRequestHandler,
-                CloudWatchEventHandler,
-                EventBusRequestHandler,
-            ]:
+            for handler_type in handlers:
                 if handler_type.is_handling_request(event):
                     start = time()
                     handler = handler_type(event, context)
@@ -79,4 +60,4 @@ def lambda_handler(event, context):
                 json.dumps(event),
             )
     finally:
-        configuration.unload_scheduler_configuration()
+        configuration.unload_global_configuration()

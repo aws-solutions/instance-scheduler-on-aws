@@ -1,102 +1,84 @@
-#!/bin/bash
-#
-#  Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
-#  with the License. A copy of the License is located at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  or in the 'license' file accompanying this file. This file is distributed on an 'AS IS' BASIS, WITHOUT WARRANTIES
-#  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions
-#  and limitations under the License.
-#
+#!/usr/bin/env bash
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+[[ $DEBUG ]] && set -x
+set -eu -o pipefail
 
+header() {
+    declare text=$1
+    echo "------------------------------------------------------------------------------"
+    echo "$text"
+    echo "------------------------------------------------------------------------------"
+}
 
-# Check to see if the required parameters have been provided:
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
+usage() {
     echo "Please provide the base source bucket name, trademark approved solution name and version where the lambda code will eventually reside."
     echo "For example: ./build-s3-dist.sh solutions trademarked-solution-name v1.0.0"
-    exit 1
-fi
+}
 
-#"$DEBUG" == 'true' -> enable detailed messages.
-#set -x enables a mode of the shell where all executed commands are printed to the terminal
-[[ $DEBUG ]] && set -x
-set -eou pipefail
+main() {
+    declare DIST_OUTPUT_BUCKET=$1 SOLUTION_NAME=$2 VERSION=$3
+    # Check to see if the required parameters have been provided:
+    if [ -z "$DIST_OUTPUT_BUCKET" ] || [ -z "$SOLUTION_NAME" ] || [ -z "$VERSION" ]; then
+        usage
+        exit 1
+    fi
 
-export DIST_OUTPUT_BUCKET=$1
-export SOLUTION_NAME=$2
-export DIST_VERSION=$3
+    export DIST_OUTPUT_BUCKET
+    export SOLUTION_NAME
+    export VERSION
 
-# Get reference for all important folders
-project_root="$PWD/.."
-deployment_dir="$PWD"
-#output folders
-global_dist_dir="$deployment_dir/global-s3-assets"
-regional_dist_dir="$deployment_dir/regional-s3-assets"
+    # Get reference for all important folders
+    local project_root=$(dirname "$(cd -P -- "$(dirname "$0")" && pwd -P)")
+    local deployment_dir="$project_root"/deployment
+    #output folders
+    local global_dist_dir="$deployment_dir"/global-s3-assets
+    local regional_dist_dir="$deployment_dir"/regional-s3-assets
 
-#build directories
-build_dir="$project_root/build"
-cdk_out_dir="$build_dir/cdk.out"
+    #build directories
+    local build_dir="$project_root"/build
+    local cdk_out_dir="$build_dir"/cdk.out
 
-#project folders
-lambda_source_dir="$project_root/source/app" #not currently needed, but here for reference
-cli_source_dir="$project_root/source/cli"
-cdk_source_dir="$project_root/source/infrastructure/instance-scheduler"
+    #project folders
+    local cli_source_dir="$project_root/source/cli"
 
+    header "[Init] Remove any old dist files from previous runs"
 
-echo "------------------------------------------------------------------------------"
-echo "[Init] Remove any old dist files from previous runs"
-echo "------------------------------------------------------------------------------"
+    rm -rf "$global_dist_dir"
+    mkdir -p "$global_dist_dir"
+    rm -rf "$regional_dist_dir"
+    mkdir -p "$regional_dist_dir"
+    rm -rf "$build_dir"
+    mkdir -p "$build_dir"
 
-rm -rf $global_dist_dir
-mkdir -p $global_dist_dir
-rm -rf $regional_dist_dir
-mkdir -p $regional_dist_dir
-rm -rf $build_dir
-mkdir -p $build_dir
-rm -rf $cdk_out_dir
+    header "[Synth] CDK Project"
 
+    npm run synth -- --no-version-reporting
 
-echo "------------------------------------------------------------------------------"
-echo "[Synth] CDK Project"
-echo "------------------------------------------------------------------------------"
+    header "[Packing] Template artifacts"
 
-# Install the npm install in the source folder
-cd "$cdk_source_dir"
-npm ci
-npm run synth -- --no-version-reporting
+    # copy templates to global_dist_dir
+    echo "Move templates from staging to global_dist_dir"
+    cp "$cdk_out_dir"/*.template.json "$global_dist_dir"/
 
-echo "------------------------------------------------------------------------------"
-echo "[Packing] Template artifacts"
-echo "------------------------------------------------------------------------------"
+    # Rename all *.template.json files to *.template
+    echo "Rename all *.template.json to *.template"
+    echo "copy templates and rename"
+    for f in "$global_dist_dir"/*.template.json; do
+        mv -- "$f" "${f%.template.json}.template"
+    done
 
-# copy templates to global_dist_dir
-echo "Move templates from staging to global_dist_dir"
-cp "$cdk_out_dir"/*.template.json "$global_dist_dir"/
+    header "[CDK-Helper] Copy the Lambda Asset"
+    pushd "$deployment_dir"/cdk-solution-helper/asset-packager
+    npm ci
+    npx ts-node ./index "$cdk_out_dir" "$regional_dist_dir"
+    popd
 
+    header "[Scheduler-CLI] Package the Scheduler cli"
+    pushd "$cli_source_dir"
+    python -m poetry build
+    cp ./dist/* "$global_dist_dir"
+    popd
+}
 
-# Rename all *.template.json files to *.template
-echo "Rename all *.template.json to *.template"
-echo "copy templates and rename"
-for f in $global_dist_dir/*.template.json; do
-    mv -- "$f" "${f%.template.json}.template"
-done
-
-
-echo "------------------------------------------------------------------------------"
-echo "[CDK-Helper] Copy the Lambda Asset"
-echo "------------------------------------------------------------------------------"
-cd "$deployment_dir"/cdk-solution-helper/asset-packager && npm ci
-npx ts-node ./index "$cdk_out_dir" "$regional_dist_dir"
-
-echo "------------------------------------------------------------------------------"
-echo "[Scheduler-CLI] Package the Scheduler cli"
-echo "------------------------------------------------------------------------------"
-cp -pr $cli_source_dir $build_dir/
-cd "$build_dir/cli"
-echo "Build the scheduler cli package"
-zip -q --recurse-paths ./scheduler-cli.zip instance_scheduler_cli/* poetry.lock pyproject.toml instance-scheduler-cli-runner.py
-echo "Copy the scheduler cli package to $global_dist_dir"
-cp -pr ./scheduler-cli.zip $global_dist_dir/
+main "$@"
