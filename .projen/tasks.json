@@ -1,0 +1,373 @@
+{
+  "tasks": {
+    "build": {
+      "name": "build",
+      "description": "Full release build",
+      "steps": [
+        {
+          "spawn": "default"
+        },
+        {
+          "spawn": "pre-compile"
+        },
+        {
+          "spawn": "compile"
+        },
+        {
+          "spawn": "post-compile"
+        },
+        {
+          "spawn": "test"
+        },
+        {
+          "spawn": "package"
+        }
+      ]
+    },
+    "bundle": {
+      "name": "bundle",
+      "description": "Prepare assets"
+    },
+    "clobber": {
+      "name": "clobber",
+      "description": "hard resets to HEAD of origin and cleans the local repo",
+      "env": {
+        "BRANCH": "$(git branch --show-current)"
+      },
+      "steps": [
+        {
+          "exec": "git checkout -b scratch",
+          "name": "save current HEAD in \"scratch\" branch"
+        },
+        {
+          "exec": "git checkout $BRANCH"
+        },
+        {
+          "exec": "git fetch origin",
+          "name": "fetch latest changes from origin"
+        },
+        {
+          "exec": "git reset --hard origin/$BRANCH",
+          "name": "hard reset to origin commit"
+        },
+        {
+          "exec": "git clean -fdx",
+          "name": "clean all untracked files"
+        },
+        {
+          "say": "ready to rock! (unpushed commits are under the \"scratch\" branch)"
+        }
+      ],
+      "condition": "git diff --exit-code > /dev/null"
+    },
+    "compile": {
+      "name": "compile",
+      "description": "Only compile"
+    },
+    "default": {
+      "name": "default",
+      "description": "Synthesize project files",
+      "steps": [
+        {
+          "exec": "ts-node --project tsconfig.json .projenrc.ts"
+        }
+      ]
+    },
+    "deploy": {
+      "name": "deploy",
+      "description": "Deploys your CDK app to the AWS cloud",
+      "steps": [
+        {
+          "exec": "cdk deploy",
+          "receiveArgs": true
+        }
+      ]
+    },
+    "destroy": {
+      "name": "destroy",
+      "description": "Destroys your cdk app in the AWS cloud",
+      "steps": [
+        {
+          "exec": "cdk destroy",
+          "receiveArgs": true
+        }
+      ]
+    },
+    "diff": {
+      "name": "diff",
+      "description": "Diffs the currently deployed app against your code",
+      "steps": [
+        {
+          "exec": "cdk diff"
+        }
+      ]
+    },
+    "e2e-tests": {
+      "name": "e2e-tests",
+      "steps": [
+        {
+          "exec": "jest --config source/pipeline/jest.config.ts",
+          "receiveArgs": true
+        }
+      ]
+    },
+    "eject": {
+      "name": "eject",
+      "description": "Remove projen from the project",
+      "env": {
+        "PROJEN_EJECTING": "true"
+      },
+      "steps": [
+        {
+          "spawn": "default"
+        }
+      ]
+    },
+    "install": {
+      "name": "install",
+      "description": "Install project dependencies and update lockfile (non-frozen)",
+      "steps": [
+        {
+          "exec": "npm install"
+        }
+      ]
+    },
+    "install:ci": {
+      "name": "install:ci",
+      "description": "Install project dependencies using frozen lockfile",
+      "steps": [
+        {
+          "exec": "npm ci"
+        }
+      ]
+    },
+    "package": {
+      "name": "package",
+      "description": "Creates the distribution package"
+    },
+    "post-compile": {
+      "name": "post-compile",
+      "description": "Runs after successful compilation",
+      "steps": [
+        {
+          "spawn": "synth:silent"
+        }
+      ]
+    },
+    "post-upgrade": {
+      "name": "post-upgrade",
+      "description": "Runs after upgrading dependencies"
+    },
+    "pre-compile": {
+      "name": "pre-compile",
+      "description": "Prepare the project for compilation"
+    },
+    "synth": {
+      "name": "synth",
+      "description": "Synthesizes your cdk app into cdk.out",
+      "steps": [
+        {
+          "exec": "cdk synth"
+        }
+      ]
+    },
+    "synth:silent": {
+      "name": "synth:silent",
+      "description": "Synthesizes your cdk app into cdk.out and suppresses the template in stdout (part of \"yarn build\")",
+      "steps": [
+        {
+          "exec": "cdk synth -q"
+        }
+      ]
+    },
+    "test": {
+      "name": "test",
+      "description": "Run tests",
+      "steps": [
+        {
+          "spawn": "test:prettier"
+        },
+        {
+          "spawn": "test:eslint"
+        },
+        {
+          "spawn": "test:cdk"
+        },
+        {
+          "spawn": "test:app"
+        },
+        {
+          "spawn": "test:cli"
+        }
+      ]
+    },
+    "test:app": {
+      "name": "test:app",
+      "steps": [
+        {
+          "exec": "python -m tox --parallel --exit-and-dump-after 1200"
+        }
+      ],
+      "cwd": "source/app"
+    },
+    "test:app:ci": {
+      "name": "test:app:ci",
+      "env": {
+        "TOX_PARALLEL_NO_SPINNER": "true"
+      },
+      "steps": [
+        {
+          "exec": "python -m tox --parallel --exit-and-dump-after 1200 --skip-missing-interpreters false -- --junitxml=../../deployment/test-reports/lambda-test-report.xml --cov --cov-report \"xml:../../deployment/coverage-reports/lambda-coverage.xml\" && sed -i -e \"s|<source>.*</source>|<source>source/app/instance_scheduler</source>|g\" ../../deployment/coverage-reports/lambda-coverage.xml"
+        }
+      ],
+      "cwd": "source/app"
+    },
+    "test:cdk": {
+      "name": "test:cdk",
+      "steps": [
+        {
+          "exec": "jest --coverageProvider=v8 --ci"
+        }
+      ]
+    },
+    "test:cdk:ci": {
+      "name": "test:cdk:ci",
+      "steps": [
+        {
+          "exec": "jest --coverageProvider=v8 --ci --coverage --coverageDirectory deployment/coverage-reports/cdk-coverage"
+        }
+      ]
+    },
+    "test:ci": {
+      "name": "test:ci",
+      "steps": [
+        {
+          "spawn": "test:prettier"
+        },
+        {
+          "spawn": "test:eslint"
+        },
+        {
+          "spawn": "test:cdk:ci"
+        },
+        {
+          "spawn": "test:app:ci"
+        },
+        {
+          "spawn": "test:cli:ci"
+        }
+      ]
+    },
+    "test:cli": {
+      "name": "test:cli",
+      "steps": [
+        {
+          "exec": "python -m tox --parallel --exit-and-dump-after 1200"
+        }
+      ],
+      "cwd": "source/cli"
+    },
+    "test:cli:ci": {
+      "name": "test:cli:ci",
+      "env": {
+        "TOX_PARALLEL_NO_SPINNER": "true"
+      },
+      "steps": [
+        {
+          "exec": "python -m tox --parallel --exit-and-dump-after 1200 --skip-missing-interpreters false -- --junitxml=../../deployment/test-reports/cli-test-report.xml --cov --cov-report \"xml:../../deployment/coverage-reports/cli-coverage.xml\" && sed -i -e \"s|<source>.*</source>|<source>source/cli/instance_scheduler_cli</source>|g\" ../../deployment/coverage-reports/cli-coverage.xml"
+        }
+      ],
+      "cwd": "source/cli"
+    },
+    "test:eslint": {
+      "name": "test:eslint",
+      "steps": [
+        {
+          "exec": "npx eslint --max-warnings=0 ."
+        }
+      ]
+    },
+    "test:prettier": {
+      "name": "test:prettier",
+      "steps": [
+        {
+          "exec": "npx prettier --check ./**/*.ts"
+        }
+      ]
+    },
+    "test:update": {
+      "name": "test:update",
+      "description": "Update jest snapshots",
+      "steps": [
+        {
+          "exec": "jest --updateSnapshot --passWithNoTests --coverageProvider=v8 --ci",
+          "receiveArgs": true
+        }
+      ]
+    },
+    "test:watch": {
+      "name": "test:watch",
+      "description": "Run jest in watch mode",
+      "steps": [
+        {
+          "exec": "jest --watch"
+        }
+      ]
+    },
+    "upgrade": {
+      "name": "upgrade",
+      "description": "upgrade dependencies",
+      "env": {
+        "CI": "0"
+      },
+      "steps": [
+        {
+          "exec": "npm update npm-check-updates"
+        },
+        {
+          "exec": "npm-check-updates --dep dev --upgrade --target=minor"
+        },
+        {
+          "exec": "npm-check-updates --dep optional --upgrade --target=minor"
+        },
+        {
+          "exec": "npm-check-updates --dep peer --upgrade --target=minor"
+        },
+        {
+          "exec": "npm-check-updates --dep prod --upgrade --target=minor"
+        },
+        {
+          "exec": "npm-check-updates --dep bundle --upgrade --target=minor"
+        },
+        {
+          "exec": "npm install"
+        },
+        {
+          "exec": "npm update"
+        },
+        {
+          "exec": "npx projen"
+        },
+        {
+          "spawn": "post-upgrade"
+        }
+      ]
+    },
+    "watch": {
+      "name": "watch",
+      "description": "Watches changes in your source code and rebuilds and deploys to the current account",
+      "steps": [
+        {
+          "exec": "cdk deploy --hotswap"
+        },
+        {
+          "exec": "cdk watch"
+        }
+      ]
+    }
+  },
+  "env": {
+    "PATH": "$(npx -c \"node --print process.env.PATH\")"
+  },
+  "//": "~~ Generated by projen. To modify, edit .projenrc.ts and run \"npx projen\"."
+}

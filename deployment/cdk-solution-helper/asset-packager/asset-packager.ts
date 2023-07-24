@@ -1,7 +1,5 @@
-/*
- * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 import { readdir, lstat, rename } from "node:fs/promises";
 import path from "path";
@@ -53,7 +51,11 @@ export class CDKAssetPackager {
     const allFiles = await readdir(this.assetFolderPath);
     const allZipPaths = allFiles.filter((file) => path.extname(file) === ".zip");
     for (const zipPath of allZipPaths) {
-      await rename(path.join(this.assetFolderPath, zipPath), path.join(outputPath, zipPath.split("asset.").pop()!));
+      const hashPart = zipPath.split("asset.").pop();
+      if (!hashPart) {
+        throw new Error(`Unexpected path: {${zipPath}}`);
+      }
+      await rename(path.join(this.assetFolderPath, zipPath), path.join(outputPath, hashPart));
       // remove cdk prepended string "asset.*"
     }
   }

@@ -1,8 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 import logging
+from collections.abc import Callable, Sequence
+from typing import Optional
+
+Parser = Callable[[str], Optional[list[int]]]
 
 
 class SetBuilder:
@@ -27,17 +29,17 @@ class SetBuilder:
 
     def __init__(
         self,
-        names=None,
-        min_value=None,
-        max_value=None,
-        offset=None,
-        wrap=False,
-        ignorecase=True,
-        significant_name_characters=None,
-        first_item_wildcard=WILDCARD_FIRST,
-        all_items_wildcards=WILDCARD_ALL,
-        last_item_wildcard=WILDCARD_LAST,
-    ):
+        names: Optional[Sequence[str]] = None,
+        min_value: Optional[int] = None,
+        max_value: Optional[int] = None,
+        offset: Optional[int] = None,
+        wrap: bool = False,
+        ignorecase: bool = True,
+        significant_name_characters: Optional[int] = None,
+        first_item_wildcard: str = WILDCARD_FIRST,
+        all_items_wildcards: str = WILDCARD_ALL,
+        last_item_wildcard: str = WILDCARD_LAST,
+    ) -> None:
         """
 
         :param names: Names for values
@@ -123,11 +125,11 @@ class SetBuilder:
         )
 
         # custom parsers to be executed before standard parsers
-        self._pre_custom_parsers = []
+        self._pre_custom_parsers: list[Parser] = []
         # custom parsers to be executes after standard parsers
-        self._post_custom_parsers = []
+        self._post_custom_parsers: list[Parser] = []
         # setup list of standard parsers
-        self._standard_parsers = [
+        self._standard_parsers: list[Parser] = [
             self._parse_name,  # name
             self._parse_value,  # value, first and last wildcard
             self._parse_name_range,  # name-name
@@ -139,7 +141,7 @@ class SetBuilder:
             self._parse_value_range_incr,
         ]  # value-value/incr
 
-    def build(self, set_spec):
+    def build(self, set_spec: str | list[str] | set[str]) -> set[int]:
         """
         Builds set of values from string or list of strings
         :param set_spec: Sets as comma separated string or list of strings
@@ -153,42 +155,8 @@ class SetBuilder:
         else:
             raise ValueError("set_str argument must be of type string, set or array")
 
-    def str(self, the_set):
-        """
-        Displays set as a string using ',' to separate values and '-' for sequent ranges
-        :param the_set: Set to display
-        :return: String to display the set in a normalized format
-        """
-        result = []
-
-        # gets list of single and subsequent items in the set
-        def get_sub_sets():
-            if the_set is not None and len(the_set) > 0:
-                temp = sorted(the_set)
-                last = temp[0]
-                current = {temp[0]}
-
-                for index in range(1, len(temp)):
-                    if temp[index] == last + 1:
-                        current.add(temp[index])
-                    else:
-                        yield current
-                        current = {temp[index]}
-                    last = temp[index]
-
-                yield current
-
-        # build string from subset
-        for subset in get_sub_sets():
-            s = self._displaynames[min(subset) - self._offset]
-            if len(subset) > 1:
-                s = "-".join([s, self._displaynames[max(subset) - self._offset]])
-            result.append(s)
-
-        return ", ".join(result)
-
     @property
-    def first(self):
+    def first(self) -> int:
         """
         Return lowest possible value in set
         :return: Lowest possible value in set
@@ -196,7 +164,7 @@ class SetBuilder:
         return self._offset
 
     @property
-    def last(self):
+    def last(self) -> int:
         """
         Return highest possible value in set
         :return: Highest possible value in set
@@ -204,7 +172,7 @@ class SetBuilder:
         return len(self._names) - 1 + self._offset
 
     @property
-    def all(self):
+    def all(self) -> set[int]:
         """
         Returns all items in set
         :return: All items in set
@@ -212,56 +180,57 @@ class SetBuilder:
         return set(self._all)
 
     @property
-    def _all(self):
+    def _all(self) -> list[int]:
         # internal function to return all items in set
         return [val + self._offset for val in range(0, len(self._values))]
 
-    def _parse_name(self, name_str):
+    def _parse_name(self, name_str: str) -> Optional[list[int]]:
         # gets a set item by its name
         return self._get_single_item(name_str, self._get_value_by_name)
 
-    def _parse_value(self, value_str):
+    def _parse_value(self, value_str: str) -> Optional[list[int]]:
         # value
         return self._get_single_item(value_str, self._get_value_by_str)
 
-    def _parse_name_range(self, name_range_str):
+    def _parse_name_range(self, name_range_str: str) -> Optional[list[int]]:
         # name-name
         return self._get_range_from_str(name_range_str, self._get_value_by_name)
 
-    def _parse_value_range(self, value_range_str):
+    def _parse_value_range(self, value_range_str: str) -> Optional[list[int]]:
         # value-value
         return self._get_range_from_str(value_range_str, fn=self._get_value_by_str)
 
-    def _parse_name_incr(self, name_incr_str):
+    def _parse_name_incr(self, name_incr_str: str) -> Optional[list[int]]:
         # name/incr
         return self._get_increment(name_incr_str, self._get_name_incr)
 
-    def _parse_value_incr(self, value_incr_str):
+    def _parse_value_incr(self, value_incr_str: str) -> Optional[list[int]]:
         # value/incr
         return self._get_increment(value_incr_str, self._get_value_incr)
 
-    def _parse_name_range_incr(self, name_range_incr_str):
+    def _parse_name_range_incr(self, name_range_incr_str: str) -> Optional[list[int]]:
         # name-name/incr
         return self._get_increment(name_range_incr_str, fn=self._get_name_range_incr)
 
-    def _parse_value_range_incr(self, value_range_incr_str):
+    def _parse_value_range_incr(self, value_range_incr_str: str) -> Optional[list[int]]:
         # value-value/incr
         return self._get_increment(value_range_incr_str, fn=self._get_value_range_incr)
 
-    def _parse_all(self, all_wildcard_str):
+    def _parse_all(self, all_wildcard_str: str) -> Optional[list[int]]:
         # wildcards
         if (
             len(all_wildcard_str) == 1
             and all_wildcard_str in self._all_items_wildcard_characters
         ):
             return self._all
+        return None
 
-    def _parse_unknown(self, _):
+    def _parse_unknown(self, _: str) -> Optional[list[int]]:
         # handle unknown items
         return None
 
     @property
-    def _parsers(self):
+    def _parsers(self) -> list[Parser]:
         # flattened list of all parsers
         return [
             parser
@@ -273,7 +242,7 @@ class SetBuilder:
             for parser in parsers
         ]
 
-    def _special_items(self):
+    def _special_items(self) -> str:
         # special items that do not need pre-formatting or must be excluded from formatting
         return "".join(
             [
@@ -283,11 +252,11 @@ class SetBuilder:
             ]
         )
 
-    def _seperator_characters(self):
+    def _seperator_characters(self) -> str:
         # character that separates name from instructions like increments
         return SetBuilder.INCREMENT_CHARACTER
 
-    def _get_set_items(self, set_string_list):
+    def _get_set_items(self, set_string_list: list[str]) -> set[int]:
         # gets the items from a list of strings
         set_items = set()
 
@@ -322,7 +291,6 @@ class SetBuilder:
                             self._parse_unknown.__name__, set_str, value
                         )
                     )
-                    # noinspection PyTypeChecker
                     set_items.update(set(value))
                 else:
                     # if it does not return a value then raise an exception because of an unknown item
@@ -330,7 +298,7 @@ class SetBuilder:
 
         return set_items
 
-    def _format_item(self, set_str):
+    def _format_item(self, set_str: str) -> str:
         # pre-processes the item before trying to parse it
         s = set_str.strip()
 
@@ -368,17 +336,19 @@ class SetBuilder:
         return s
 
     @staticmethod
-    def _get_single_item(item_str, fn):
+    def _get_single_item(
+        item_str: str, fn: Callable[[str], Optional[int]]
+    ) -> Optional[list[int]]:
         # function to return single set items in a uniform way as a set
         value = fn(item_str)
         if value is not None:
             return [value]
         return None
 
-    def _get_value_by_name(self, name_str):
+    def _get_value_by_name(self, name_str: str) -> Optional[int]:
         # gets the value of a set item by its name, also handled first and last item wildcards
         # internal iterator for testing for names
-        def from_name(name):
+        def from_name(name: str) -> Optional[int]:
             if name in self._names:
                 return self._names.index(name) + self._offset
             return None
@@ -390,7 +360,7 @@ class SetBuilder:
                 return value
         return None
 
-    def _get_value_by_str(self, value_str):
+    def _get_value_by_str(self, value_str: str) -> Optional[int]:
         # gets the value of a set item by its numeric string
         s = value_str
         while len(s) > 1 and s[0] == "0":
@@ -399,7 +369,9 @@ class SetBuilder:
             return self._values.index(s) + self._offset
         return None
 
-    def _get_range_from_str(self, range_str, fn, incr=1):
+    def _get_range_from_str(
+        self, range_str: str, fn: Callable[[str], Optional[int]], incr: int = 1
+    ) -> Optional[list[int]]:
         # gets a range from a string, items are retrieved using the function specified by fn
         # check if there is a range separator in the string
         set_range = range_str.split(self.RANGE_CHARACTER)
@@ -413,7 +385,7 @@ class SetBuilder:
                     return self._get_range(start, end, incr)
         return None
 
-    def _get_last_value(self, last_wildcard_str):
+    def _get_last_value(self, last_wildcard_str: str) -> Optional[int]:
         # returns the last possible value if the str is the last wildcard character
         if (
             len(last_wildcard_str) == 1
@@ -422,7 +394,7 @@ class SetBuilder:
             return self.last
         return None
 
-    def _get_first_value(self, first_wildcard_str):
+    def _get_first_value(self, first_wildcard_str: str) -> Optional[int]:
         # returns the first possible value if the str is the first item wildcard character
         if (
             len(first_wildcard_str) == 1
@@ -431,7 +403,7 @@ class SetBuilder:
             return self.first
         return None
 
-    def _get_range(self, start, end, step=1):
+    def _get_range(self, start: int, end: int, step: int = 1) -> list[int]:
         # gets a range of items for the specified start, end and step value
 
         # check if wrapping is needed and allowed
@@ -462,7 +434,9 @@ class SetBuilder:
         return result
 
     @staticmethod
-    def _get_increment(incr_str, fn):
+    def _get_increment(
+        incr_str: str, fn: Callable[[str, int], Optional[list[int]]]
+    ) -> Optional[list[int]]:
         # returns a set of values using a start value and a increment
         temp = incr_str.split(SetBuilder.INCREMENT_CHARACTER)
         # check if there is an increment character and if the increment value is present and valid
@@ -480,7 +454,9 @@ class SetBuilder:
             return fn(temp[0], incr)
         return None
 
-    def _get_increment_by_string(self, incr_string, fn, incr):
+    def _get_increment_by_string(
+        self, incr_string: str, fn: Callable[[str], Optional[int]], incr: int
+    ) -> Optional[list[int]]:
         # get increment items for start value retrieved by function fn
 
         start = fn(incr_string)
@@ -488,32 +464,38 @@ class SetBuilder:
             return self._get_range(start=start, end=self.last, step=incr)
         return None
 
-    def _get_name_incr(self, name_incr_str, incr):
+    def _get_name_incr(self, name_incr_str: str, incr: int) -> Optional[list[int]]:
         # get increment items for start value retrieved by its name
         return self._get_increment_by_string(
             name_incr_str, self._get_value_by_name, incr
         )
 
-    def _get_value_incr(self, value_incr_str, incr):
+    def _get_value_incr(self, value_incr_str: str, incr: int) -> Optional[list[int]]:
         # get increment items for start value retrieved by its value string
         return self._get_increment_by_string(
             value_incr_str, self._get_value_by_str, incr
         )
 
-    def _get_range_increment(self, incr_str, fn, incr):
+    def _get_range_increment(
+        self, incr_str: str, fn: Callable[[str], Optional[int]], incr: int
+    ) -> Optional[list[int]]:
         # gets increment values from a range specified by the name of the start and end value retrieved by function fn
         set_range = self._get_range_from_str(incr_str, fn, incr)
         if set_range is not None:
             return set_range
         return None
 
-    def _get_name_range_incr(self, name_range_incr_str, incr):
+    def _get_name_range_incr(
+        self, name_range_incr_str: str, incr: int
+    ) -> Optional[list[int]]:
         # gets increment values from a range specified by the name of the start and end value retrieved by their names
         return self._get_range_increment(
             name_range_incr_str, self._get_value_by_name, incr
         )
 
-    def _get_value_range_incr(self, value_range_incr_str, incr):
+    def _get_value_range_incr(
+        self, value_range_incr_str: str, incr: int
+    ) -> Optional[list[int]]:
         # gets increment values from a range specified by the name of the start and end value retrieved by their value strings
         return self._get_range_increment(
             value_range_incr_str, self._get_value_by_str, incr

@@ -1,6 +1,6 @@
-AWS Instance Scheduler V2
+Instance Scheduler on AWS
 
-Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except
 in compliance with the License. A copy of the License is located at http://www.apache.org/licenses/
 or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS,
@@ -12,7 +12,37 @@ THIRD PARTY COMPONENTS
 **********************
 This software includes third party software subject to the following copyrights:
 
-AWS SDK under the Apache License Version 2.0
-pytz under the Massachusetts Institute of Technology (MIT) license
-freezegun under the Apache License Version 2.0
-adm-zip under the Massachusetts Institute of Technology (MIT) license
+@aws-cdk/aws-lambda-python-alpha under the Apache License 2.0
+@aws-cdk/aws-servicecatalogappregistry-alpha under the Apache License 2.0
+@aws-sdk/client-dynamodb under the Apache License 2.0
+@aws-sdk/client-ec2 under the Apache License 2.0
+@aws-sdk/client-rds under the Apache License 2.0
+@aws-sdk/client-ssm under the Apache License 2.0
+@aws-solutions-constructs/aws-lambda-dynamodb under the Apache License 2.0
+adm-zip under the MIT License
+aws-cdk-lib under the Apache License 2.0
+cdk-nag under the Apache License 2.0
+constructs under the Apache License 2.0
+projen under the Apache License 2.0
+source-map-support under the MIT License
+
+attrs under the MIT License
+aws-lambda-powertools under the MIT License
+boto3 under the Apache License 2.0
+botocore under the Apache License 2.0
+certifi under the Mozilla Public License 2.0
+charset-normalizer under the MIT License
+filelock under the The Unlicense
+idna under the BSD 3-Clause "New" or "Revised" License
+iniconfig under the MIT License
+jmespath under the MIT License
+pluggy under the MIT License
+pytest under the MIT License
+python-dateutil under the Apache License 2.0 and the BSD 3-Clause "New" or "Revised" License
+pytz under the MIT License
+requests under the Apache License 2.0
+rsa under the Apache License 2.0
+s3transfer under the Apache License 2.0
+six under the MIT License
+typing_extensions under the Python Software Foundation License 2.0
+urllib3 under the MIT License

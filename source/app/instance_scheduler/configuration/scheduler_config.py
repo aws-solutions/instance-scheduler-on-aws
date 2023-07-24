@@ -1,12 +1,14 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 import copy
 import os
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any, Optional
+from zoneinfo import ZoneInfo
 
 from instance_scheduler import configuration
+from instance_scheduler.configuration.instance_schedule import InstanceSchedule
+from instance_scheduler.configuration.scheduling_context import TagTemplate
 
 # class to hold the configuration for the instance scheduler
 INF_SCHEDULE_DISPLAY = (
@@ -33,32 +35,32 @@ INF_SCHEDULE_DISPLAY = (
 TAG_VAL_STR = "{{{}}}"
 
 
-class SchedulerConfig:
+class GlobalConfig:
     """
     Implements scheduler configuration
     """
 
     def __init__(
         self,
-        scheduled_services,
-        schedule_clusters,
-        tag_name,
-        regions,
-        default_timezone,
-        schedules,
-        trace,
-        enable_SSM_maintenance_windows,
-        use_metrics,
-        remote_account_ids,
-        namespace,
-        aws_partition,
-        scheduler_role_name,
-        organization_id,
-        schedule_lambda_account,
-        create_rds_snapshot,
-        started_tags=None,
-        stopped_tags=None,
-    ):
+        scheduled_services: list[str],
+        schedule_clusters: bool,
+        tag_name: str,
+        regions: list[str],
+        default_timezone: ZoneInfo,
+        schedules: dict[str, InstanceSchedule],
+        trace: bool,
+        enable_ssm_maintenance_windows: bool,
+        use_metrics: bool,
+        remote_account_ids: list[str],
+        namespace: str,
+        aws_partition: str,
+        scheduler_role_name: str,
+        organization_id: str,
+        schedule_lambda_account: bool,
+        create_rds_snapshot: bool,
+        started_tags: str = "",
+        stopped_tags: str = "",
+    ) -> None:
         """
         Initializes schedule configuration instance
         :param scheduled_services: services handled by the scheduler
@@ -68,7 +70,7 @@ class SchedulerConfig:
         :param default_timezone: default timezone for schedules
         :param schedules: instance running schedules
         :param trace: set to true for detailed logging
-        :param enable_SSM_maintenance_windows: set to true for enable solution to retrieve SSM Maintenance Windows.
+        :param enable_ssm_maintenance_windows: set to true for enable solution to retrieve SSM Maintenance Windows.
         :param use_metrics: global flag to enable metrics collection
         :param remote_account_ids: remote account ids
         :param namespace: namespace for the stack
@@ -84,7 +86,7 @@ class SchedulerConfig:
         self.schedules = schedules
         self.default_timezone = default_timezone
         self.trace = trace
-        self.enable_SSM_maintenance_windows = enable_SSM_maintenance_windows
+        self.enable_ssm_maintenance_windows = enable_ssm_maintenance_windows
         self.use_metrics = use_metrics
         self.regions = regions
         self.remote_account_ids = remote_account_ids
@@ -108,7 +110,7 @@ class SchedulerConfig:
             else self.tag_list(self.build_tags_from_template(stopped_tags))
         )
 
-    def get_schedule(self, name):
+    def get_schedule(self, name: str) -> Optional[InstanceSchedule]:
         """
         Get a schedule by its name
         :param name: name of the schedule
@@ -117,7 +119,9 @@ class SchedulerConfig:
         return self.schedules[name] if name in self.schedules else None
 
     @classmethod
-    def build_tags_from_template(cls, tags_str, tag_variables=None):
+    def build_tags_from_template(
+        cls, tags_str: Any, tag_variables: Optional[Any] = None
+    ) -> dict[str, str]:
         lastkey = None
         tags = {}
         for tag in tags_str.split(","):
@@ -130,7 +134,7 @@ class SchedulerConfig:
 
         tag_vars = {} if tag_variables is None else copy.copy(tag_variables)
 
-        dt = datetime.utcnow()
+        dt = datetime.now(timezone.utc)
         tag_vars.update(
             {
                 configuration.TAG_VAL_SCHEDULER: os.getenv(configuration.ENV_STACK, ""),
@@ -151,27 +155,18 @@ class SchedulerConfig:
         return tags
 
     @classmethod
-    def tag_list(cls, tags_dict):
-        valid_tags = {
-            tag_key: tags_dict[tag_key]
-            for tag_key in tags_dict
-            if not (tag_key.startswith("aws:") or tag_key.startswith("cloudformation:"))
-        }
-        return (
-            [{"Key": t, "Value": tags_dict[t]} for t in tags_dict]
-            if valid_tags is not None
-            else []
-        )
+    def tag_list(cls, tags_dict: dict[str, str]) -> list[TagTemplate]:
+        return [{"Key": t, "Value": tags_dict[t]} for t in tags_dict]
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = INF_SCHEDULE_DISPLAY.format(
             ", ".join(self.scheduled_services),
             str(self.schedule_clusters),
             str(self.create_rds_snapshot),
             self.tag_name,
-            self.default_timezone,
+            str(self.default_timezone),
             str(self.trace),
-            str(self.enable_SSM_maintenance_windows),
+            str(self.enable_ssm_maintenance_windows),
             str(self.use_metrics),
             ", ".join(self.regions),
             str(self.started_tags),

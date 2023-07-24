@@ -1,8 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 import calendar
+from typing import Optional
 
 from instance_scheduler.configuration.setbuilders.setbuilder import SetBuilder
 
@@ -15,7 +14,7 @@ class MonthdaySetBuilder(SetBuilder):
     WILDCARD_WEEKDAY = "W"
     WILDCARD_LAST_WEEKDAY = "L"
 
-    def __init__(self, year, month):
+    def __init__(self, year: int, month: int) -> None:
         """
         Initializes monthday set builder.
         :param year: Year of month to build sets for, only required for month aware 'W' and 'L' features in expressions
@@ -37,18 +36,18 @@ class MonthdaySetBuilder(SetBuilder):
 
         self._post_custom_parsers = [self._parse_weekday]
 
-    def _parse_weekday(self, day_str):
+    def _parse_weekday(self, day_str: str) -> Optional[list[int]]:
         # dayW return working day nearest to day
         return self._get_weekday(day_str)
 
-    def _parse_unknown(self, item):
+    def _parse_unknown(self, item: str) -> Optional[list[int]]:
         return [] if item in [str(d) for d in range(self.last, 32)] else None
 
-    def _seperator_characters(self):
+    def _seperator_characters(self) -> str:
         # adding W to separator characters, it should not be formatted
         return SetBuilder._seperator_characters(self) + self.WILDCARD_WEEKDAY
 
-    def _get_weekday(self, day_str):
+    def _get_weekday(self, day_str: str) -> Optional[list[int]]:
         # returns working day nearest to day in month, string is in format dayW
         if (1 < len(day_str) <= 3) and day_str.endswith(self.WILDCARD_WEEKDAY):
             day = self._get_value_by_str(day_str[0:-1])

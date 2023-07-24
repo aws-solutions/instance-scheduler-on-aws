@@ -1,7 +1,5 @@
-/*
- * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 const readdirMock = jest.fn();
 const addLocalFolderMock = jest.fn();
@@ -114,7 +112,7 @@ describe("CDKAssetPackager", () => {
       await assetPackager.moveZips(__outputPath);
       expect(renameMock).toBeCalledWith(
         path.join(__assetPath, __asset2),
-        path.join(__outputPath, __asset2.split("asset.").pop()!)
+        path.join(__outputPath, __asset2.split("asset.").pop() ?? "unexpected"),
       );
     });
 

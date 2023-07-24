@@ -12,7 +12,7 @@ class MonthSetBuilder(SetBuilder):
     Class for building month sets, 1-12 ans jan-dec
     """
 
-    def __init__(self, wrap=True, ignorecase=True):
+    def __init__(self, wrap: bool = True, ignorecase: bool = True) -> None:
         """
         Initializes set builder for month sets
         :param wrap: Set to True to allow wrapping at last month of the year

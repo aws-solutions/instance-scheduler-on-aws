@@ -1,9 +1,12 @@
-# Ignore Config used with code.amazon.com
-Config
+.tox/
+.mypy_cache/
+.venv/
+node_modules/
+build/cdk.out/
 
-^docs/
-^viperlight/
-source/app/instance_scheduler/requesthandlers/setup_demo_data.py:55
-deployment/buildspecs/mainline-s3-spec.yml:20
+source/app/instance_scheduler/handler/setup_demo_data.py:59
 CODE_OF_CONDUCT.md:4
 CONTRIBUTING.md:51
+
+[node-npmoutdated]
+@types/node=18.0.0

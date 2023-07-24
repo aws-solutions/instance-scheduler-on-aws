@@ -1,88 +1,64 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
-import os
 import time
-from datetime import datetime
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, Optional
 
 from instance_scheduler import boto_retry
 
-LOG_FORMAT = "{:7s} : {}"
-
-ENV_LOG_GROUP = "LOG_GROUP"
-ENV_ISSUES_TOPIC_ARN = "ISSUES_TOPIC_ARN"
-ENV_SUPPRESS_LOG_STDOUT = "SUPPRESS_LOG_TO_STDOUT"
-
-LOG_LEVEL_INFO = "INFO"
-LOG_LEVEL_ERROR = "ERROR"
-LOG_LEVEL_WARNING = "WARNING"
-LOG_LEVEL_DEBUG = "DEBUG"
+if TYPE_CHECKING:
+    from mypy_boto3_logs.client import CloudWatchLogsClient
+    from mypy_boto3_logs.type_defs import PutLogEventsRequestRequestTypeDef
+    from mypy_boto3_sns.client import SNSClient
+else:
+    CloudWatchLogsClient = object
+    SNSClient = object
+    PutLogEventsRequestRequestTypeDef = object
 
 LOG_MAX_BATCH_SIZE = 1048576
 LOG_ENTRY_ADDITIONAL = 26
 
 
 class Logger:
-    """
-    Wrapper class for CloudWatch logging with buffering and helper methods
-    """
-
-    def __init__(self, logstream, context, loggroup=None, buffersize=10, debug=False):
-        def get_loggroup(lambda_context):
-            group = os.getenv(ENV_LOG_GROUP, None)
-            if group is None:
-                if lambda_context is None:
-                    return None
-                group = lambda_context.log_group_name
-            return group
-
-        self._logstream = logstream
-        self._buffer_size = min(buffersize, 10000)
-        self._context = context
-        self._buffer = []
+    def __init__(
+        self,
+        *,
+        log_group: str,
+        log_stream: str,
+        topic_arn: str,
+        debug: bool = False,
+    ) -> None:
+        self._log_group = log_group
+        self._log_stream = log_stream
+        self._topic_arn = topic_arn
         self._debug = debug
+        self._buffer_size = 60 if self._debug else 30
+        self._buffer: list[tuple[int, str]] = []
         self._cached_size = 0
-        self._client = None
-        self._log_sequence_token = None
-        self._loggroup = (
-            loggroup if loggroup is not None else get_loggroup(self._context)
-        )
+        self._client: Optional[CloudWatchLogsClient] = None
+        self._sns: Optional[SNSClient] = None
 
-        self._sns = None
-
-    def __enter__(self):
-        """
-        Returns itself as the managed resource.
-        :return:
-        """
+    def __enter__(self) -> "Logger":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Writes all cached action items to dynamodb table when going out of scope
-        :param exc_type:
-        :param exc_val:
-        :param exc_tb:
-        :return:
-        """
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
         self.flush()
 
-    def _emit(self, level, msg, *args):
+    def _emit(self, level: str, msg: str, *args: Any) -> str:
         s = msg if len(args) == 0 else msg.format(*args)
         t = time.time()
-        s = LOG_FORMAT.format(level, s)
+        s = "{:7s} : {}".format(level, s)
 
         if self._cached_size + (len(s) + LOG_ENTRY_ADDITIONAL) > LOG_MAX_BATCH_SIZE:
             self.flush()
 
         self._cached_size += len(s) + LOG_ENTRY_ADDITIONAL
 
-        if (
-            self._context is None
-            and str(os.getenv(ENV_SUPPRESS_LOG_STDOUT, False)).lower() != "true"
-        ):
-            print("> " + s)
         self._buffer.append((int(t * 1000), s))
 
         if len(self._buffer) >= self._buffer_size:
@@ -91,72 +67,53 @@ class Logger:
         return s
 
     @property
-    def debug_enabled(self):
-        """
-        Return debug on/off switch
-        :return: debug on/of
-        """
-        return self._debug
-
-    @property
-    def sns(self):
+    def sns(self) -> SNSClient:
         if self._sns is None:
             self._sns = boto_retry.get_client_with_standard_retry("sns")
         return self._sns
 
-    @debug_enabled.setter
-    def debug_enabled(self, value):
-        """
-        Sets debug switch
-        :param value: True to enable debugging, False to disable
-        :return:
-        """
-        self._debug = value
-
-    def publish_to_sns(self, level, msg):
+    def publish_to_sns(self, level: str, msg: str) -> None:
         """
         Publish message to sns topic
         :param msg:
         :param level:
         :return:
         """
-        sns_arn = os.getenv(ENV_ISSUES_TOPIC_ARN, None)
-        if sns_arn is not None:
-            message = "Loggroup: {}\nLogstream {}\n{} : {}".format(
-                self._loggroup, self._logstream, level, msg
-            )
-            self.sns.publish(TopicArn=sns_arn, Message=message)
+        message = "Loggroup: {}\nLogstream {}\n{} : {}".format(
+            self._log_group, self._log_stream, level, msg
+        )
+        self.sns.publish(TopicArn=self._topic_arn, Message=message)
 
-    def info(self, msg, *args):
+    def info(self, msg: str, *args: Any) -> None:
         """
         Logs informational message
         :param msg: Message format string
         :param args: Message parameters
         :return:
         """
-        self._emit(LOG_LEVEL_INFO, msg, *args)
+        self._emit("INFO", msg, *args)
 
-    def error(self, msg, *args):
+    def error(self, msg: str, *args: Any) -> None:
         """
         Logs error message
         :param msg: Error message format string
         :param args: parameters
         :return:
         """
-        s = self._emit(LOG_LEVEL_ERROR, msg, *args)
+        s = self._emit("ERROR", msg, *args)
         self.publish_to_sns("Error", s)
 
-    def warning(self, msg, *args):
+    def warning(self, msg: str, *args: Any) -> None:
         """
         Logs warning message
         :param msg: Warning message format string
         :param args: parameters
         :return:
         """
-        s = self._emit(LOG_LEVEL_WARNING, msg, *args)
+        s = self._emit("WARNING", msg, *args)
         self.publish_to_sns("Warning", s)
 
-    def debug(self, msg, *args):
+    def debug(self, msg: str, *args: Any) -> None:
         """
         Conditionally logs debug message, does not log if debugging is disabled
         :param msg: Debug message format string
@@ -164,23 +121,15 @@ class Logger:
         :return:
         """
         if self._debug:
-            self._emit(LOG_LEVEL_DEBUG, msg, *args)
-
-    def clear(self):
-        """
-        Clear all buffered error messages
-        :return:
-        """
-        self._buffer = []
+            self._emit("DEBUG", msg, *args)
 
     @property
-    def client(self):
+    def client(self) -> CloudWatchLogsClient:
         if self._client is None:
-            methods = ["create_log_stream"]
             self._client = boto_retry.get_client_with_standard_retry("logs")
         return self._client
 
-    def flush(self):
+    def flush(self) -> None:
         """
         Writes all buffered messages to CloudWatch Stream
         :return:
@@ -189,9 +138,9 @@ class Logger:
         if len(self._buffer) == 0:
             return
 
-        put_event_args = {
-            "logGroupName": self._loggroup,
-            "logStreamName": self._logstream,
+        put_event_args: PutLogEventsRequestRequestTypeDef = {
+            "logGroupName": self._log_group,
+            "logStreamName": self._log_stream,
             "logEvents": [{"timestamp": r[0], "message": r[1]} for r in self._buffer],
         }
 
@@ -205,12 +154,7 @@ class Logger:
             except self.client.exceptions.ResourceNotFoundException:
                 retries -= 1
                 self.client.create_log_stream(
-                    logGroupName=self._loggroup, logStreamName=self._logstream
-                )
-            except self.client.exceptions.InvalidSequenceTokenException as ex:
-                retries -= 1
-                put_event_args["sequenceToken"] = ex.response.get(
-                    "expectedSequenceToken"
+                    logGroupName=self._log_group, logStreamName=self._log_stream
                 )
             except Exception:
                 return

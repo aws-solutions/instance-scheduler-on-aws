@@ -1,11 +1,21 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, Optional
 
-
-import os
-
-from instance_scheduler import configuration
 from instance_scheduler.boto_retry import get_client_with_standard_retry
+from instance_scheduler.configuration.instance_schedule import (
+    Instance,
+    InstanceSchedule,
+)
+from instance_scheduler.util.app_env import get_app_env
+
+if TYPE_CHECKING:
+    from mypy_boto3_cloudwatch.client import CloudWatchClient
+    from mypy_boto3_cloudwatch.type_defs import MetricDatumTypeDef
+else:
+    CloudWatchClient = object
+    MetricDatumTypeDef = object
 
 
 class SchedulerMetrics:
@@ -21,27 +31,28 @@ class SchedulerMetrics:
     ERRORS = "Errors"
     WARNINGS = "Warnings"
 
-    def __init__(self, dt, context=None):
+    def __init__(self, dt: datetime) -> None:
         """
         Initializes instance of metrics wrapper
         :param dt: date and time of the metrics data (typically the scheduling moment)
         """
         self._dt = dt
-        self._metrics_managed = {}
-        self._metrics_running = {}
-        self._context = context
-        self._stack = os.getenv(configuration.ENV_STACK)
+        self._metrics_managed: dict[str, dict[str, int]] = {}
+        self._metrics_running: dict[str, dict[str, int]] = {}
+        self._stack = get_app_env().stack_name
         self._namespace = "{}:{}".format(self._stack, SchedulerMetrics.NAMESPACE)
 
-        self._metrics_client = None
+        self._metrics_client: Optional[CloudWatchClient] = None
 
     @property
-    def metrics_client(self):
+    def metrics_client(self) -> CloudWatchClient:
         if self._metrics_client is None:
             self._metrics_client = get_client_with_standard_retry("cloudwatch")
         return self._metrics_client
 
-    def add_schedule_metrics(self, service, schedule, instance):
+    def add_schedule_metrics(
+        self, service: str, schedule: InstanceSchedule, instance: Instance
+    ) -> None:
         """
         Adds metrics data
         :param service: name of the service
@@ -58,17 +69,22 @@ class SchedulerMetrics:
             )
             self._metrics_running[service][schedule.name] = (
                 self._metrics_running[service].get(schedule.name, 0) + 1
-                if instance.is_running
+                if instance["is_running"]
                 else 0
             )
 
-    def put_schedule_metrics(self):
+    def put_schedule_metrics(self) -> None:
         """
         Writes the stores metrics data to cloudwatch metrics
         :return:
         """
 
-        def build_metric(service_name, schedule_name, metric_name, data):
+        def build_metric(
+            service_name: str,
+            schedule_name: str,
+            metric_name: str,
+            data: dict[str, Any],
+        ) -> MetricDatumTypeDef:
             return {
                 "MetricName": metric_name,
                 "Dimensions": [

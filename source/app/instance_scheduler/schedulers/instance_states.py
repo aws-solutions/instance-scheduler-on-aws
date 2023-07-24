@@ -1,14 +1,14 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 import time
 from decimal import Decimal
+from typing import Any, Optional
 
-import boto3
 from botocore.exceptions import ClientError
-from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
+
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
+from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
+from instance_scheduler.util.logger import Logger
 
 INF_CLEANING = "Cleaning up instance registry."
 INF_MOVING_FOR_PURGE = "Moving instance {} to be purged in next cleanup."
@@ -17,7 +17,6 @@ INF_REMOVING_INSTANCE = "Removing instance {} from instance registry."
 WARN_LOADING_STATE = "Could not load instance state data {}, this warning should only occur once after creating the scheduler"
 
 
-# noinspection SpellCheckingInspection,SpellCheckingInspection,SpellCheckingInspection,SpellCheckingInspection,SpellCheckingInspection,SpellCheckingInspection,SpellCheckingInspection
 class InstanceStates:
     """
     Implements store for last desired state for service instances
@@ -31,27 +30,25 @@ class InstanceStates:
     # cleanup interval time
     cleanup_interval = Decimal(12 * 3600)
 
-    def __init__(self, table_name, service, logger, context):
+    def __init__(self, table_name: str, service: str, logger: Logger) -> None:
         """
         Initializes instance of state store
         :param table_name: name of the state table
         :param service: name of the service
         :param logger: logger to log output of ste logic
-        :param context: lambda context
         """
         self._table_name = table_name
         self._state_table = None
-        self._state_info = {}
-        self._instances_to_purge = set()
-        self._dirty = None
-        self._timestamp = Decimal(time.time())
+        self._state_info: dict[str, Any] = {}
+        self._instances_to_purge: set[Any] = set()
+        self._dirty: Optional[bool] = None
+        self._timestamp: Decimal | float = Decimal(time.time())
         self._service = service
-        self._current_account_region = None
+        self._current_account_region: Optional[str] = None
         self._logger = logger
-        self._context = context
 
     @property
-    def state_table(self):
+    def state_table(self) -> Any:
         """
         Returns state table dynamodb table resource
         :return:
@@ -62,7 +59,7 @@ class InstanceStates:
             )
         return self._state_table
 
-    def load(self, account, region):
+    def load(self, account: str, region: str) -> None:
         """
         Loads the desired state for the specified account and service
         :param account: account to load state for
@@ -110,7 +107,7 @@ class InstanceStates:
         if InstanceStates.INSTANCE_TABLE_PURGE in item:
             self._instances_to_purge = item[InstanceStates.INSTANCE_TABLE_PURGE]
 
-    def set_instance_state(self, instance_id, new_state):
+    def set_instance_state(self, instance_id: str, new_state: str) -> None:
         """
         Sets the state of an instance
         :param instance_id: id of the instance
@@ -133,7 +130,7 @@ class InstanceStates:
         state = self._state_info.get(instance_id, None)
         return state if state else InstanceSchedule.STATE_UNKNOWN
 
-    def delete_instance_state(self, instance_id):
+    def delete_instance_state(self, instance_id: str) -> None:
         """
         Removes the state of an instance
         :param instance_id: id of the instance
@@ -145,14 +142,14 @@ class InstanceStates:
                 self._instances_to_purge.remove(instance_id)
             self._dirty = True
 
-    def save(self):
+    def save(self) -> None:
         """
         Stores the instance state information to the dynamodb table if it has changed
         :return:
         """
         if self._dirty:
             # key and timestamp
-            data = {
+            data: dict[str, Any] = {
                 InstanceStates.INSTANCE_TABLE_NAME: self._service,
                 InstanceStates.INSTANCE_TABLE_ACCOUNT_REGION: self._current_account_region,
                 InstanceStates.INSTANCE_TABLE_TIMESTAMP: Decimal(time.time()),
@@ -169,7 +166,7 @@ class InstanceStates:
             self.state_table.put_item(Item=data)
             self._dirty = False
 
-    def cleanup(self, instances):
+    def cleanup(self, instances: list[str]) -> None:
         """
         Removes instance id's from the table that have been terminated or not being processed by the scheduler.
         This code contains workaround for instances not being returned by describe_instances when changing state

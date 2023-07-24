@@ -1,23 +1,57 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from aws_lambda_powertools.utilities.typing import LambdaContext
+
+from instance_scheduler import main
+from instance_scheduler.handler.collect_configuration_description import (
+    CollectConfigurationDescription,
+    CollectConfigurationMetricsRequest,
+)
+from instance_scheduler.handler.scheduling_orchestrator import (
+    OrchestrationRequest,
+    SchedulingOrchestratorHandler,
+)
 from instance_scheduler.main import lambda_handler
+from instance_scheduler.util.logger import Logger
+from tests.context import MockLambdaContext
 
 
-class MockContext:
-    def __init__(self):
-        self.log_group_name = "My log group"
-
-
-@patch("instance_scheduler.main.SchedulerRequestHandler")
-def test_scheduler_request_handler_called(mock_handler):
-    """SchedulerRequestHandler handle_request is called when is_handling_request is True"""
+def test_scheduling_request_handler_called() -> None:
+    mock_handler = MagicMock()
     mock_handler.is_handling_request.return_value = True
     my_response = "Everything's great!"
     mock_handler.return_value.handle_request.return_value = my_response
-    mock_handler.__name__ = "My handler name"
+    mock_handler.__name__ = "my-handler"
 
-    assert lambda_handler({}, MockContext()) == my_response
+    with patch.object(main, "handlers", (mock_handler,)):
+        assert lambda_handler({}, LambdaContext()) == my_response
 
     mock_handler.return_value.handle_request.assert_called_once()
+
+
+@patch.object(Logger, "client")
+@patch.object(SchedulingOrchestratorHandler, "handle_request")
+def test_orchestrator_event(
+    handle_request_method: MagicMock, logger_client: MagicMock
+) -> None:
+    event: OrchestrationRequest = {
+        "scheduled_action": "run_orchestrator",
+    }
+
+    lambda_handler(event, MockLambdaContext())
+    handle_request_method.assert_called_once()
+
+
+@patch.object(Logger, "client")
+@patch.object(CollectConfigurationDescription, "handle_request")
+def test_collect_metrics_event(
+    handle_request_method: MagicMock, logger_client: MagicMock
+) -> None:
+    event: CollectConfigurationMetricsRequest = {
+        "scheduled_action": "collect_configuration_metrics"
+    }
+
+    lambda_handler(event, MockLambdaContext())
+    handle_request_method.assert_called_once()

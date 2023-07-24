@@ -1,20 +1,48 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 import json
 import threading
 import uuid
+from abc import ABC, abstractmethod
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeGuard, TypeVar
 
 import requests
+from typing_extensions import NotRequired, TypedDict
+
+from instance_scheduler.handler.base import Handler
+
+if TYPE_CHECKING:
+    from aws_lambda_powertools.utilities.typing import LambdaContext
+else:
+    LambdaContext = object
+
+ResourcePropertiesType = TypeVar("ResourcePropertiesType", bound=Mapping[str, Any])
 
 
-class CustomResource:
+class CustomResourceRequest(TypedDict, Generic[ResourcePropertiesType]):
+    ServiceToken: str  # Lambda Function ARN
+    RequestType: Literal["Create", "Update", "Delete"]
+    ResponseURL: str  # CloudFormation pre-signed URL
+    StackId: str  # CloudFormation Stack ARN
+    RequestId: str  # UUID
+    ResourceType: str
+    LogicalResourceId: str
+    PhysicalResourceId: str
+    ResourceProperties: ResourcePropertiesType
+    OldResourceProperties: NotRequired[ResourcePropertiesType]
+
+
+class CustomResource(
+    Generic[ResourcePropertiesType],
+    Handler[CustomResourceRequest[ResourcePropertiesType]],
+    ABC,
+):
     EVENT_TYPE_CREATE = "Create"
     EVENT_TYPE_UPDATE = "Update"
     EVENT_TYPE_DELETE = "Delete"
 
-    def __init__(self, event, context):
+    def __init__(self, event: Mapping[str, Any], context: LambdaContext) -> None:
         self.event = event
         self.context = context
         # physical resource is empty for create request, for other requests is it the returned physical id from the create request
@@ -29,108 +57,108 @@ class CustomResource:
 
     # Returned attributes of custom resource
     @property
-    def response_data(self):
+    def response_data(self) -> Any:
         return self.response["Data"]
 
     # Test if event is a request custom resource request from cloudformation
     @staticmethod
-    def is_handling_request(event):
+    def is_handling_request(
+        event: Mapping[str, Any]
+    ) -> TypeGuard[CustomResourceRequest[ResourcePropertiesType]]:
         return event.get("StackId") is not None
 
     # Returns Logical Resource Id in cloudformation stack
     @property
-    def logical_resource_id(self):
+    def logical_resource_id(self) -> Any:
         return self.event.get("LogicalResourceId")
 
     # Returns the id of the cloudformation request
     @property
-    def request_id(self):
+    def request_id(self) -> Any:
         return self.event.get("RequestId")
 
     # Returns the resource properties of the custom resource, these are used to pass data to te custom resource
     @property
-    def resource_properties(self):
+    def resource_properties(self) -> ResourcePropertiesType:
         return self.event.get("ResourceProperties", {})
 
     # Returns the previous resource properties of the custom resource, these are used to customize the updates
     @property
-    def old_resource_properties(self):
+    def old_resource_properties(self) -> ResourcePropertiesType:
         return self.event.get("OldResourceProperties", {})
 
     # Returns optional timeout
     @property
-    def timeout(self):
+    def timeout(self) -> Any:
         return self.resource_properties.get("timeout", None)
 
     # Returns the type of the custom resource
     @property
-    def resource_type(self):
+    def resource_type(self) -> Any:
         return self.event.get("ResourceType")
 
     # Returns the URL to send the response to cloudformation with the result of the request
     @property
-    def response_url(self):
+    def response_url(self) -> Any:
         return self.event.get("ResponseURL")
 
     # Returns the type of the request which can be one of the following: Create, Update, Delete
     @property
-    def request_type(self):
+    def request_type(self) -> Any:
         return self.event.get("RequestType")
-
-    # Returns the service token of the request
-    @property
-    def service_token(self):
-        return self.event.get("ServiceToken")
 
     # Returns the id of the stack
     @property
-    def stack_id(self):
+    def stack_id(self) -> Any:
         return self.event.get("StackId")
 
     # Returns the short name of the stack
     @property
-    def stack_name(self):
+    def stack_name(self) -> Any:
         sid = self.stack_id
         last = sid.split(":")[-1]
         name = last.split("/")[-2]
         return name
 
     @property
-    def region(self):
+    def region(self) -> Any:
         return self.stack_id.split(":")[3]
 
     # Build unique physical id
-    def new_physical_resource_id(self):
+    def new_physical_resource_id(self) -> str:
         uu = str(uuid.uuid4()).replace("-", "")[0:14]
         new_id = "{}-{}-{}".format(self.__class__.__name__, self.stack_name, uu)
         return new_id.lower()
 
     # Handles Create request, overwrite in inherited class to implement create actions
     # Return True on success, False if on failure
-    def _create_request(self):
+    @abstractmethod
+    def _create_request(self) -> bool:
         self.response["Reason"] = "No handler for Create request"
         return True
 
     # Handles Update request, overwrite in inherited class to implement update actions
     # Return True on success, False if on failure
-    def _update_request(self):
+    @abstractmethod
+    def _update_request(self) -> bool:
         self.response["Reason"] = "No handler for Update request"
         return True
 
     # Handles Delete request, overwrite in inherited class to implement delete actions
     # Return True on success, False if on failure
-    def _delete_request(self):
+    @abstractmethod
+    def _delete_request(self) -> bool:
         self.response["Reason"] = "No handler for Delete request"
         return True
 
-    def fn_timeout(self):
+    def fn_timeout(self) -> None:
         print("Execution is about to time out, sending failure message")
         self.response["Status"] = "FAILED"
         self.response["Reason"] = "Timeout"
         self._send_response()
 
     # Handles cloudformation request
-    def handle_request(self):
+    def handle_request(self) -> Any:
         timeleft = (
             (self.context.get_remaining_time_in_millis() / 1000.00) - 0.5
             if self.context is not None
@@ -170,7 +198,7 @@ class CustomResource:
         return self._send_response()
 
     # Send the response to cloudformation
-    def _send_response(self):
+    def _send_response(self) -> bool:
         # Build the PUT request and the response data
         resp = json.dumps(self.response)
 

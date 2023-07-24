@@ -1,11 +1,19 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Any, ClassVar, Optional, TypedDict
+from zoneinfo import ZoneInfo
 
-from instance_scheduler import configuration
-import pytz
+from typing_extensions import NotRequired
+
+from instance_scheduler import ScheduleState, configuration
+from instance_scheduler.configuration.running_period import RunningPeriod
+from instance_scheduler.configuration.running_period_dict_element import (
+    RunningPeriodDictElement,
+)
+from instance_scheduler.util.logger import Logger
 
 DEBUG_ACTIVE_PERIOD_IN_SCHEDULE = 'Active period{} in schedule "{}": {}'
 DEBUG_NO_RUNNING_PERIODS = 'No running periods at this time found in schedule "{}" for this time, desired state is {}'
@@ -22,78 +30,73 @@ DEBUG_USED_PERIOD = 'Using period "{}" to set the desired state and instance siz
 DEBUG_USED_TIME_FOR_SCHEDULE = "Time used to determine desired for instance is {}"
 
 
+class Instance(TypedDict):
+    id: str
+    arn: NotRequired[str]
+    allow_resize: bool
+    hibernate: bool
+    state: Any
+    state_name: str
+    is_running: bool
+    is_terminated: bool
+    current_state: ScheduleState
+    instancetype: str
+    engine_type: NotRequired[str]
+    maintenance_window: Optional["InstanceSchedule"]
+    tags: dict[str, str]
+    name: str
+    schedule_name: Optional[str]
+    is_cluster: NotRequired[bool]
+    resized: NotRequired[bool]
+    account: NotRequired[str]
+    region: NotRequired[str]
+    service: NotRequired[str]
+    instance_str: NotRequired[str]
+
+
+class PeriodWithDesiredState(TypedDict):
+    period: RunningPeriod
+    instancetype: Optional[str]
+    state: ScheduleState
+
+
+@dataclass
 class InstanceSchedule:
-    """
-    Implements an instance schedule
-    """
+    STATE_UNKNOWN: ClassVar[str] = "unknown"
+    STATE_ANY: ClassVar[str] = "any"
+    STATE_STOPPED: ClassVar[str] = "stopped"
+    STATE_STOPPED_FOR_RESIZE: ClassVar[str] = "stopped_for_resize"
+    STATE_RUNNING: ClassVar[str] = "running"
+    STATE_RETAIN_RUNNING: ClassVar[str] = "retain-running"
 
-    STATE_UNKNOWN = "unknown"
-    STATE_ANY = "any"
-    STATE_STOPPED = "stopped"
-    STATE_STOPPED_FOR_RESIZE = "stopped_for_resize"
-    STATE_RUNNING = "running"
-    STATE_RETAIN_RUNNING = "retain-running"
+    # todo: reduce the number of optionals here, it complicates all downstream dependencies
+    name: str
+    periods: list[RunningPeriodDictElement] = field(default_factory=list)
+    # todo: UTC was defined as the default in the original comments but we need to confirm
+    #  exactly how default tz is loaded from cfn input parameters, test it, and then decide if we should remove this
+    #  fallback entirely
+    timezone: str = "UTC"
+    override_status: Optional[str] = None
+    description: Optional[str] = None
+    use_metrics: Optional[bool] = None
+    stop_new_instances: Optional[bool] = None
+    use_maintenance_window: Optional[bool] = False
+    ssm_maintenance_window: Optional[str] = None
+    enforced: Optional[bool] = False
+    hibernate: Optional[bool] = False
+    retain_running: Optional[bool] = False
+    # todo: this value is loaded in global_config but is not respected by scheduling_context.
+    #  when these are unified, this may be a behavioral change to consider
+    configured_in_stack: Optional[str] = None
 
-    def __init__(
-        self,
-        name,
-        periods=None,
-        timezone=None,
-        override_status=None,
-        description=None,
-        use_metrics=None,
-        stop_new_instances=None,
-        schedule_dt=None,
-        use_maintenance_window=False,
-        ssm_maintenance_window=None,
-        enforced=False,
-        hibernate=False,
-        retain_running=False,
-    ):
-        """
-        Initializes a schedule instance
-        :param name: Name of a schedule
-        :param periods: Periods in which instances are running
-        :param timezone: Timezone of the schedule (default = UTC)
-        :param override_status: Set to have instances always started or stopped
-        :param description: Description of the schedule
-        :param use_metrics: Set to true to collect metrics for the schedule
-        :param stop_new_instances: Set to True to stop instances that are added to the schema if they are not in a running period
-        :param schedule_dt: datetime to use for scheduling
-        :param use_maintenance_window: Set to True to use the maintenance window as an additional schedule in
-        which instances are running
-        :param ssm_maintenance_window: name of ssm mainatenance window in which to start ec2 instances
-        :param enforced: start/stop state of the schema on instances
-        :param: hibernate: hibernate instances when stopping
-        """
-        self.name = name
-        self.periods = periods
-        self.timezone = timezone
-        self.override_status = override_status
-        self.description = description
-        self.stop_new_instances = stop_new_instances
-        self.use_maintenance_window = use_maintenance_window
-        self.ssm_maintenance_window = ssm_maintenance_window
-        self.use_metrics = use_metrics
-        self.enforced = enforced
-        self.hibernate = hibernate
-        self.retain_running = retain_running
-        self.schedule_dt = (
-            schedule_dt
-            if schedule_dt is not None
-            else datetime.now(pytz.timezone(self.timezone))
-        )
-        self._logger = None
+    def __post_init__(self) -> None:
+        self._logger: Optional[Logger] = None
 
-    def _log_info(self, msg, *args):
-        if self._logger is not None:
-            self._logger.info(msg, *args)
-
-    def _log_debug(self, msg, *args):
+    def _log_debug(self, msg: str, *args: Optional[str]) -> None:
         if self._logger is not None:
             self._logger.debug(msg, *args)
 
-    def __str__(self):
+    def __str__(self) -> str:
         s = 'Schedule "{}": '.format(self.name)
         attributes = []
         if self.description:
@@ -155,26 +158,33 @@ class InstanceSchedule:
         return s
 
     def get_desired_state(
-        self, instance, logger=None, dt=None, check_adjacent_periods=True
-    ):
+        self,
+        instance: Instance,
+        dt: datetime,
+        logger: Optional[Logger] = None,
+        check_adjacent_periods: bool = True,
+    ) -> tuple[ScheduleState, Optional[str], Optional[str]]:
         """
         Test if an instance should be running at a specific moment in this schedule
         :param instance: the instance to test
         :param logger: logger for logging output of scheduling logic
-        :param dt: date time to use for scheduling, use None for using the time specified in the constructor of the schedule
+        :param dt: date time to use for scheduling, THIS MUST BE A TIMEZONE-AWARE DATETIME
         :param check_adjacent_periods: check for adjacent periods in a schedule
         :return: desired state, instance type and name of the active period of the schedule if the state is running
         """
 
         # gets the local time using the configured timezone
-        def get_check_time(time):
-            check_time = time if time else self.schedule_dt
-            return check_time.astimezone(pytz.timezone(self.timezone))
+        def get_check_time(time: datetime) -> datetime:
+            return time.astimezone(ZoneInfo(self.timezone))
 
         # actions for desired state is running
-        def handle_running_state(inst, periods):
+        def handle_running_state(
+            inst: Instance, periods: list[PeriodWithDesiredState]
+        ) -> tuple[ScheduleState, Optional[str], str]:
             # used to determining most nearest period if more than one period returns a running state in a schedule
-            def latest_starttime(p1, p2):
+            def latest_starttime(
+                p1: PeriodWithDesiredState, p2: PeriodWithDesiredState
+            ) -> PeriodWithDesiredState:
                 if p1["period"].begintime is None:
                     return p2
                 if p2["period"].begintime is None:
@@ -182,16 +192,24 @@ class InstanceSchedule:
                 return p1 if p1["period"].begintime > p2["period"].begintime else p2
 
             # test if we need to change the type of the instance
-            def requires_adjust_instance_size(desired_instance_type, checked_instance):
+            def requires_adjust_instance_size(
+                desired_instance_type: Optional[str], checked_instance: Instance
+            ) -> bool:
                 return (
-                    checked_instance.allow_resize
+                    checked_instance["allow_resize"]
                     and desired_instance_type is not None
-                    and checked_instance.is_running
-                    and desired_instance_type != checked_instance.instancetype
+                    and checked_instance["is_running"]
+                    and desired_instance_type != checked_instance["instancetype"]
                 )
 
             # reduce is removed from python3, replace by minimal implementation for python3 compatibility
-            def _reduce(fn, items):
+            def _reduce(
+                fn: Callable[
+                    [PeriodWithDesiredState, PeriodWithDesiredState],
+                    PeriodWithDesiredState,
+                ],
+                items: list[PeriodWithDesiredState],
+            ) -> Optional[PeriodWithDesiredState]:
                 if items is None or len(list(items)) == 0:
                     return None
                 else:
@@ -204,6 +222,11 @@ class InstanceSchedule:
 
             # nearest period in schedule with running state
             current_running_period = _reduce(latest_starttime, periods)
+
+            if not current_running_period:
+                raise ValueError(
+                    "Tried to find the latest start time of an empty list of periods"
+                )
 
             multiple_active_periods = len(list(periods)) > 1
 
@@ -219,41 +242,41 @@ class InstanceSchedule:
                     DEBUG_USED_PERIOD.format(current_running_period["period"].name)
                 )
 
-            desired_state = InstanceSchedule.STATE_RUNNING
-            desired_type = (
-                current_running_period["instancetype"] if inst.allow_resize else None
+            desired_state: ScheduleState = "running"
+            desired_type: Optional[str] = (
+                current_running_period["instancetype"] if inst["allow_resize"] else None
             )
 
             # check if the instance type matches the desired type, if not set the status to stopped if the instance is currently
             # and the instance will be started with the desired type at the next invocation
             if requires_adjust_instance_size(desired_type, inst):
-                desired_state = InstanceSchedule.STATE_STOPPED_FOR_RESIZE
+                desired_state = "stopped_for_resize"
                 self._log_debug(
                     DEBUG_SET_DESIRED_INSTANCE_TYPE,
-                    inst.instancetype,
+                    inst["instancetype"],
                     desired_type,
                     desired_state,
                 )
             return desired_state, desired_type, current_running_period["period"].name
 
         # actions for desired state is any state
-        def handle_any_state():
-            desired_state = InstanceSchedule.STATE_ANY
+        def handle_any_state() -> tuple[ScheduleState, None, None]:
+            desired_state: ScheduleState = "any"
             self._log_debug(DEBUG_STATE_ANY, self.name, desired_state)
             return desired_state, None, None
 
         # actions for desired state is stopped
-        def handle_stopped_state():
-            desired_state = InstanceSchedule.STATE_STOPPED
+        def handle_stopped_state() -> tuple[ScheduleState, None, None]:
+            desired_state: ScheduleState = "stopped"
             self._log_debug(DEBUG_NO_RUNNING_PERIODS, self.name, desired_state)
             return desired_state, None, None
 
         # actions if there is an override value set for the schema
-        def handle_override_status():
-            desired_state = (
-                InstanceSchedule.STATE_RUNNING
+        def handle_override_status() -> tuple[ScheduleState, None, str]:
+            desired_state: ScheduleState = (
+                "running"
                 if self.override_status == configuration.OVERRIDE_STATUS_RUNNING
-                else InstanceSchedule.STATE_STOPPED
+                else "stopped"
             )
             self._log_debug(DEBUG_OVERRIDE_STATUS, self.override_status, desired_state)
             return desired_state, None, "override_status"
@@ -276,16 +299,14 @@ class InstanceSchedule:
 
         # get periods from the schema that have a running state
         periods_with_running_state = [
-            p
-            for p in periods_with_desired_states
-            if p["state"] == InstanceSchedule.STATE_RUNNING
+            p for p in periods_with_desired_states if p["state"] == "running"
         ]
 
         if any(periods_with_running_state):
             return handle_running_state(instance, periods_with_running_state)
 
         period_with_any_state = filter(
-            lambda period: period["state"] == InstanceSchedule.STATE_ANY,
+            lambda period: period["state"] == "any",
             periods_with_desired_states,
         )
         if any(period_with_any_state):
@@ -299,7 +320,7 @@ class InstanceSchedule:
                 for p in self.get_periods_with_desired_states(
                     localized_time - timedelta(minutes=1)
                 )
-                if p["state"] == InstanceSchedule.STATE_RUNNING
+                if p["state"] == "running"
             ]
             self._log_debug(
                 "Running period(s) for previous minute {}",
@@ -312,7 +333,7 @@ class InstanceSchedule:
                     for p in self.get_periods_with_desired_states(
                         localized_time + timedelta(minutes=1)
                     )
-                    if p["state"] == InstanceSchedule.STATE_RUNNING
+                    if p["state"] == "running"
                 ]
                 self._log_debug(
                     "Running period(s) for next minute {}",
@@ -326,8 +347,10 @@ class InstanceSchedule:
 
         return handle_stopped_state()
 
-    def get_periods_with_desired_states(self, time):
-        periods_with_desired_states = [
+    def get_periods_with_desired_states(
+        self, time: datetime
+    ) -> list[PeriodWithDesiredState]:
+        periods_with_desired_states: list[PeriodWithDesiredState] = [
             {
                 "period": p["period"],
                 "instancetype": p.get("instancetype", None),

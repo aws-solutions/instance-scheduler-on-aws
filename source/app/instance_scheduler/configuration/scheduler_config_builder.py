@@ -1,19 +1,18 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 import datetime
-import time
-
-import dateutil.parser
-
-from instance_scheduler import configuration
-import pytz
 import re as regex
-from instance_scheduler import boto_retry
+import time
+import zoneinfo
+from typing import TYPE_CHECKING, Any, Optional
+from zoneinfo import ZoneInfo
+
+from boto3.session import Session
+
+from instance_scheduler import boto_retry, configuration
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
 from instance_scheduler.configuration.running_period import RunningPeriod
-from instance_scheduler.configuration.scheduler_config import SchedulerConfig
+from instance_scheduler.configuration.scheduler_config import GlobalConfig
 from instance_scheduler.configuration.setbuilders.month_setbuilder import (
     MonthSetBuilder,
 )
@@ -23,52 +22,21 @@ from instance_scheduler.configuration.setbuilders.monthday_setbuilder import (
 from instance_scheduler.configuration.setbuilders.weekday_setbuilder import (
     WeekdaySetBuilder,
 )
+from instance_scheduler.util.app_env import get_app_env
+from instance_scheduler.util.logger import Logger
+
+if TYPE_CHECKING:
+    from mypy_boto3_ssm.client import SSMClient
+else:
+    SSMClient = object
 
 REGEX_SSM_PARAM = "{param:(.+?)}"
 
-ATTR_BEGINTIME = "begintime"
-ATTR_REMOTE_ACCOUNT_IDS = "remote_account_ids"
-ATTR_ORGANIZATION_ID = "organization_id"
-ATTR_NAMESPACE = "namespace"
-ATTR_SCHEDULER_ROLE_NAME = "scheduler_role_name"
-ATTR_CREATE_RDS_SNAPSHOT = "create_rds_snapshot"
-ATTR_DEFAULT_TIMEZONE = "default_timezone"
-ATTR_AWS_PARTITION = "aws_partition"
-ATTR_ENDTIME = "endtime"
-ATTR_ENFORCED = "enforced"
-ATTR_HIBERNATE = "hibernate"
-ATTR_INSTANCE_TYPE = "instancetype"
-ATTR_MONTHDAYS = "monthdays"
-ATTR_MONTHS = "months"
-ATTR_NAME = "name"
-ATTR_OVERRIDE_STATUS = "override_status"
-ATTR_PERIOD = "period"
-ATTR_PERIODS = "periods"
-ATTR_REGIONS = "regions"
-ATTR_RETAIN_RUNNING = "retain_running"
-ATTR_SCHEDULE_DT = "schedule_dt"
-ATTR_SCHEDULE_LAMBDA_ACCOUNT = "schedule_lambda_account"
-ATTR_SCHEDULED_SERVICES = "scheduled_services"
-ATTR_SCHEDULE_CLUSTERS = "schedule_clusters"
-ATTR_SCHEDULES = "schedules"
-ATTR_STARTED_TAGS = "started_tags"
-ATTR_STOP_NEW_INSTANCES = "stop_new_instances"
-ATTR_STOPPED_TAGS = "stopped_tags"
-ATTR_TAGNAME = "tag_name"
-ATTR_TIMEZONE = "timezone"
-ATTR_TRACE = "trace"
-ATTR_ENABLE_SSM_MAINTENANCE_WINDOWS = "enable_SSM_maintenance_windows"
-ATTR_USE_MAINTENANCE_WINDOW = "use_maintenance_window"
-ATTR_SSM_MAINTENANCE_WINDOW = "ssm_maintenance_window"
-ATTR_USE_METRICS = "use_metrics"
-ATTR_WEEKDAYS = "weekdays"
 
 MSG_BEGIN_MUST_BEFORE_END = "Begin time {} must be earlier than end time in {}"
 MSG_DUPLICATE_PERIOD_NAME_FOUND = 'Duplicate period name "{}" found'
 MSG_DUPLICATE_SCHEDULE_NAME_FOUND = 'Duplicate schedule name "{}" found'
-MSG_INVALID_DEFAULT_TIMEZONE = (
-    '"{}" is not a valid timezone, use pytz.all_timezones to list all valid zones'
-)
+MSG_INVALID_DEFAULT_TIMEZONE = '"{}" is not a valid timezone, use zoneinfo.available_timezones() to list all valid zones'
 MSG_INVALID_OVERRIDE_STATUS = "{} is not a valid value for {}, possible values are {}"
 MSG_NAME_MISSING_IN_PERIOD = 'Name missing in period "{}"'
 MSG_NAME_MISSING_IN_SCHEDULE = "Name missing in schedule {}"
@@ -76,7 +44,7 @@ MSG_OVERWRITE_OVERRIDE_MUTUAL_EXCLUSIVE = "{} and {} are mutually exclusive opti
 MSG_SCHEDULE_IS_NOT_DEFINED = 'Period "{}" used in schedule "{}" is not defined'
 MSG_TAGNAME_MISSING_IN_CONFIGURATION = "tagname is missing in configuration"
 MSG_INVALID_SCHEDULE_TIMEZONE = (
-    '"{}" is in schedule config "{}" is not a valid timezone, check pytz.all_timezone for '
+    '"{}" is in schedule config "{}" is not a valid timezone, check zoneinfo.available_timezones() for '
     "valid zones"
 )
 
@@ -86,37 +54,24 @@ class SchedulerConfigBuilder:
     Class that implements logic for building the configuration from the raw stored configuration data.
     """
 
-    _checked_timezones = dict()
-    _invalid_timezones = set()
-    _all_timezones = {tz.lower(): tz for tz in pytz.all_timezones}
+    _checked_timezones: dict[str, Any] = dict()
+    _invalid_timezones: set[str] = set()
+    _all_timezones = {tz.lower(): tz for tz in zoneinfo.available_timezones()}
 
-    def __init__(self, logger):
+    def __init__(self, logger: Optional[Logger]) -> None:
         self._logger = logger
-        self._config = None
-        self._ssm = None
+        self._config: Any = None
+        self._ssm: Optional[SSMClient] = None
 
     @property
-    def ssm(self):
+    def ssm(self) -> SSMClient:
         if self._ssm is None:
             self._ssm = boto_retry.get_client_with_standard_retry("ssm")
         return self._ssm
 
-    def build(self, config, dt=None):
-        def get_scheduler_tagname(config_data):
-            name = config_data.get(configuration.TAGNAME, configuration.DEFAULT_TAGNAME)
-            if not name or len(name) == 0:
-                raise ValueError(MSG_TAGNAME_MISSING_IN_CONFIGURATION)
-            return name
-
-        def get_default_timezone(config_data):
-            tz = config_data.get(
-                configuration.DEFAULT_TIMEZONE, configuration.DEFAULT_TZ
-            )
-            validated = SchedulerConfigBuilder.validated_timezone(tz)
-            if validated is None:
-                raise ValueError(MSG_INVALID_DEFAULT_TIMEZONE.format(tz))
-            return validated
-
+    def build(
+        self, config: dict[Any, Any], dt: Optional[datetime.datetime] = None
+    ) -> GlobalConfig:
         self._config = config
 
         config_date = dt if dt is not None else datetime.datetime.now()
@@ -126,39 +81,42 @@ class SchedulerConfigBuilder:
 
             remote_account_ids_from_ssm = self.get_remote_account_ids_from_ssm(config)
 
-            return SchedulerConfig(
-                scheduled_services=config.get(configuration.SCHEDULED_SERVICES, [])
-                or [],
-                schedule_clusters=config.get(configuration.SCHEDULE_CLUSTERS, False),
-                create_rds_snapshot=config.get(configuration.CREATE_RDS_SNAPSHOT, True),
-                tag_name=get_scheduler_tagname(config),
-                regions=config.get(configuration.REGIONS, []) or [],
-                default_timezone=get_default_timezone(config),
+            app_env = get_app_env()
+
+            session = Session()
+            aws_partition = session.get_partition_for_region(session.region_name)
+
+            return GlobalConfig(
+                scheduled_services=app_env.scheduled_services(),
+                schedule_clusters=app_env.enable_rds_clusters,
+                create_rds_snapshot=app_env.enable_rds_snapshots,
+                tag_name=app_env.schedule_tag_key,
+                regions=app_env.schedule_regions,
+                default_timezone=app_env.default_timezone,
                 schedules=self._build_schedules(
-                    config, get_default_timezone(config), scheduler_metrics, config_date
+                    config,
+                    str(app_env.default_timezone),
+                    scheduler_metrics,
+                    config_date,
                 ),
-                trace=config.get(configuration.TRACE, False),
-                enable_SSM_maintenance_windows=config.get(
-                    configuration.ENABLE_SSM_MAINTENANCE_WINDOWS, False
-                ),
-                use_metrics=scheduler_metrics,
+                trace=app_env.enable_debug_logging,
+                enable_ssm_maintenance_windows=app_env.enable_ec2_ssm_maintenance_windows,
+                use_metrics=app_env.enable_cloudwatch_metrics,
                 remote_account_ids=remote_account_ids_from_ssm,
-                aws_partition=config.get(configuration.AWS_PARTITION, ""),
-                namespace=config.get(configuration.NAMESPACE, ""),
-                scheduler_role_name=config.get(configuration.SCHEDULER_ROLE_NAME, ""),
+                aws_partition=aws_partition,
+                namespace=app_env.app_namespace,
+                scheduler_role_name=app_env.scheduler_role_name,
                 organization_id=config.get(configuration.ORGANIZATION_ID, ""),
-                schedule_lambda_account=config.get(
-                    configuration.SCHEDULE_LAMBDA_ACCOUNT, True
-                ),
-                started_tags=config.get(configuration.STARTED_TAGS, ""),
-                stopped_tags=config.get(configuration.STOPPED_TAGS, ""),
+                schedule_lambda_account=app_env.enable_schedule_hub_account,
+                started_tags=",".join(app_env.start_tags),
+                stopped_tags=",".join(app_env.stop_tags),
             )
         except ValueError as ex:
             if self._logger is not None:
                 self._logger.error(str(ex))
-            return None
+            raise ex
 
-    def get_remote_account_ids_from_ssm(self, config):
+    def get_remote_account_ids_from_ssm(self, config: dict[Any, Any]) -> list[str]:
         remote_account_ids_from_ssm = []
         for account_id in config.get(configuration.REMOTE_ACCOUNT_IDS, []) or []:
             if regex.match(REGEX_SSM_PARAM, account_id):
@@ -175,7 +133,13 @@ class SchedulerConfigBuilder:
         return remote_account_ids_from_ssm
 
     # build the schedules from the configuration
-    def _build_schedules(self, conf, dflt_tz, scheduler_use_metrics, dt):
+    def _build_schedules(
+        self,
+        conf: Any,
+        dflt_tz: str,
+        scheduler_use_metrics: bool,
+        dt: datetime.datetime,
+    ) -> dict[str, InstanceSchedule]:
         schedules = {}
 
         # use the periods to build the schedules that can be assigned to the instances
@@ -194,9 +158,15 @@ class SchedulerConfigBuilder:
 
         return schedules
 
-    def _build_schedule(self, schedule_config, dflt_tz, scheduler_use_config, dt):
+    def _build_schedule(
+        self,
+        schedule_config: Any,
+        dflt_tz: str,
+        scheduler_use_config: bool,
+        dt: datetime.datetime,
+    ) -> Optional[InstanceSchedule]:
         # gets the timezone
-        def get_timezone(schedule_configuration):
+        def get_timezone(schedule_configuration: Any) -> str:
             schedule_timezone = schedule_configuration.get(configuration.TIMEZONE)
             if not schedule_timezone:
                 schedule_timezone = dflt_tz
@@ -280,6 +250,7 @@ class SchedulerConfigBuilder:
                 enforced=schedule_config.get(configuration.ENFORCED, False),
                 hibernate=schedule_config.get(configuration.HIBERNATE, False),
                 retain_running=schedule_config.get(configuration.RETAINED_RUNNING),
+                configured_in_stack=schedule_config.get("configured_in_stack", None),
             )
 
         except ValueError as ex:
@@ -320,7 +291,7 @@ class SchedulerConfigBuilder:
         return schedule_periods
 
     @staticmethod
-    def get_time_from_string(timestr):
+    def get_time_from_string(timestr: str) -> Optional[datetime.time]:
         """
         Standardised method to build time object instance from time string
         :param timestr: string in format as defined in configuration.TIME_FORMAT_STRING
@@ -390,205 +361,7 @@ class SchedulerConfigBuilder:
         )
 
     @staticmethod
-    def configuration_from_dict(d):
-        """
-        This method builds a configuration object instance that is passed as a dictionary in the event of a lambda function
-        :param d:
-        :return:
-        """
-
-        config_args = {}
-        for attr in [
-            ATTR_TAGNAME,
-            ATTR_DEFAULT_TIMEZONE,
-            ATTR_TRACE,
-            ATTR_ENABLE_SSM_MAINTENANCE_WINDOWS,
-            ATTR_SCHEDULE_CLUSTERS,
-            ATTR_CREATE_RDS_SNAPSHOT,
-            ATTR_USE_METRICS,
-            ATTR_SCHEDULE_LAMBDA_ACCOUNT,
-            ATTR_SCHEDULER_ROLE_NAME,
-            ATTR_ORGANIZATION_ID,
-            ATTR_AWS_PARTITION,
-            ATTR_NAMESPACE,
-            ATTR_STARTED_TAGS,
-            ATTR_STOPPED_TAGS,
-        ]:
-            config_args[attr] = d.get(attr, None)
-
-        for attr in [ATTR_REGIONS, ATTR_REMOTE_ACCOUNT_IDS, ATTR_SCHEDULED_SERVICES]:
-            config_args[attr] = set(d.get(attr, []))
-
-        periods = {}
-
-        for period_name in d.get(ATTR_PERIODS, {}):
-            period_data = d[ATTR_PERIODS][period_name]
-            period_args = {ATTR_NAME: period_name}
-
-            for attr in [ATTR_BEGINTIME, ATTR_ENDTIME]:
-                if attr in period_data:
-                    period_args[attr] = SchedulerConfigBuilder.get_time_from_string(
-                        period_data[attr]
-                    )
-
-            for attr in [ATTR_WEEKDAYS, ATTR_MONTHDAYS, ATTR_MONTHS]:
-                if attr in period_data:
-                    period_args[attr] = set(period_data.get(attr, None))
-
-            period = RunningPeriod(**period_args)
-            periods[period_name] = period
-
-        config_args[ATTR_SCHEDULES] = {}
-
-        for schedule_name in d.get(ATTR_SCHEDULES, {}):
-            schedule_args = {}
-            schedule_data = d[ATTR_SCHEDULES][schedule_name]
-            for attr in [
-                ATTR_NAME,
-                ATTR_TIMEZONE,
-                ATTR_OVERRIDE_STATUS,
-                ATTR_STOP_NEW_INSTANCES,
-                ATTR_USE_METRICS,
-                ATTR_ENFORCED,
-                ATTR_HIBERNATE,
-                ATTR_RETAIN_RUNNING,
-                ATTR_SSM_MAINTENANCE_WINDOW,
-                ATTR_USE_MAINTENANCE_WINDOW,
-            ]:
-                schedule_args[attr] = schedule_data.get(attr, None)
-
-            for attr in [ATTR_SCHEDULE_DT]:
-                if attr in schedule_data:
-                    schedule_args[attr] = dateutil.parser.parse(schedule_data[attr])
-
-            if schedule_args[ATTR_OVERRIDE_STATUS] is None:
-                schedule_args[ATTR_PERIODS] = []
-
-                for period in schedule_data.get(ATTR_PERIODS):
-                    temp = period.split(configuration.INSTANCE_TYPE_SEP)
-                    if len(temp) > 1:
-                        name = temp[0]
-                        instance_type = temp[1]
-                    else:
-                        name = period
-                        instance_type = None
-                    schedule_args[ATTR_PERIODS].append(
-                        {ATTR_PERIOD: periods[name], ATTR_INSTANCE_TYPE: instance_type}
-                    )
-
-            schedule = InstanceSchedule(**schedule_args)
-            config_args[ATTR_SCHEDULES][schedule_name] = schedule
-
-        config = SchedulerConfig(**config_args)
-
-        return config
-
-    # noinspection PyTypeChecker
-    @staticmethod
-    def configuration_as_dict(config):
-        """
-        This method build a dictionary from a configuration instance to be passed safely in the event of a lambda function
-        :param config:
-        :return:
-        """
-        result = {}
-
-        for attr in [
-            ATTR_TAGNAME,
-            ATTR_DEFAULT_TIMEZONE,
-            ATTR_TRACE,
-            ATTR_NAMESPACE,
-            ATTR_SCHEDULER_ROLE_NAME,
-            ATTR_ORGANIZATION_ID,
-            ATTR_AWS_PARTITION,
-            ATTR_ENABLE_SSM_MAINTENANCE_WINDOWS,
-            ATTR_USE_METRICS,
-            ATTR_SCHEDULE_CLUSTERS,
-            ATTR_CREATE_RDS_SNAPSHOT,
-            ATTR_SCHEDULE_LAMBDA_ACCOUNT,
-            ATTR_STARTED_TAGS,
-            ATTR_STOPPED_TAGS,
-        ]:
-            if attr in config.__dict__ and config.__dict__[attr] is not None:
-                result[attr] = config.__dict__[attr]
-
-        for attr in [ATTR_STARTED_TAGS, ATTR_STOPPED_TAGS]:
-            if attr in config.__dict__ and config.__dict__[attr] is not None:
-                result[attr] = ",".join(
-                    [
-                        "{}={}".format(t["Key"], t["Value"])
-                        for t in config.__dict__[attr]
-                    ]
-                )
-
-        for attr in [ATTR_REGIONS, ATTR_REMOTE_ACCOUNT_IDS, ATTR_SCHEDULED_SERVICES]:
-            if len(config.__dict__[attr]) > 0:
-                result[attr] = list(config.__dict__[attr])
-
-        result[ATTR_SCHEDULES] = {}
-        result[ATTR_PERIODS] = {}
-
-        for schedule_name in config.schedules:
-            result[ATTR_SCHEDULES][schedule_name] = {}
-            schedule = config.schedules[schedule_name]
-            for attr in [
-                ATTR_NAME,
-                ATTR_TIMEZONE,
-                ATTR_OVERRIDE_STATUS,
-                ATTR_STOP_NEW_INSTANCES,
-                ATTR_USE_METRICS,
-                ATTR_ENFORCED,
-                ATTR_HIBERNATE,
-                ATTR_USE_MAINTENANCE_WINDOW,
-                ATTR_SSM_MAINTENANCE_WINDOW,
-                ATTR_RETAIN_RUNNING,
-            ]:
-                if attr in schedule.__dict__ and schedule.__dict__[attr] is not None:
-                    result[ATTR_SCHEDULES][schedule_name][attr] = schedule.__dict__[
-                        attr
-                    ]
-
-            for attr in [ATTR_SCHEDULE_DT]:
-                dt = schedule.__dict__[attr]
-                if dt is not None:
-                    result[ATTR_SCHEDULES][schedule.name][attr] = dt.isoformat()
-
-            if schedule.override_status is not None:
-                continue
-
-            result[ATTR_SCHEDULES][schedule_name][ATTR_PERIODS] = []
-
-            for p in schedule.periods:
-                period = p[ATTR_PERIOD]
-                instance_type = p[ATTR_INSTANCE_TYPE]
-                result[ATTR_SCHEDULES][schedule_name][ATTR_PERIODS].append(
-                    period.name
-                    + (
-                        ("{}{}".format(configuration.INSTANCE_TYPE_SEP, instance_type))
-                        if instance_type
-                        else ""
-                    )
-                )
-                if period.name in result[ATTR_PERIODS]:
-                    continue
-
-                result[ATTR_PERIODS][period.name] = {}
-                for attr in [ATTR_BEGINTIME, ATTR_ENDTIME]:
-                    tm = period.__dict__[attr]
-                    if tm is not None:
-                        result[ATTR_PERIODS][period.name][
-                            attr
-                        ] = "{:0>2d}:{:0>2d}".format(tm.hour, tm.minute)
-
-                for attr in [ATTR_WEEKDAYS, ATTR_MONTHDAYS, ATTR_MONTHS]:
-                    s = period.__dict__[attr]
-                    if s is None:
-                        continue
-                    result[ATTR_PERIODS][period.name][attr] = list(s)
-        return result
-
-    @staticmethod
-    def is_valid_timezone(tz):
+    def is_valid_timezone(tz: str) -> bool:
         """
         Generic and optimized method to test the validity of a timezone name
         :param tz:
@@ -597,25 +370,25 @@ class SchedulerConfigBuilder:
         return SchedulerConfigBuilder.validated_timezone(tz) is not None
 
     @staticmethod
-    def validated_timezone(tz):
+    def validated_timezone(tz: str) -> Optional[str]:
         """
         Generic and optimized method to get a timezone from a timezone name
         :param tz: name of the timezone
         :return: timezone instance, None if it not valid
         """
         tz_lower = str(tz).lower()
+        # -----------cache----------------#
         if tz_lower in SchedulerConfigBuilder._checked_timezones:
             return str(SchedulerConfigBuilder._checked_timezones[tz_lower])
 
         if tz_lower in SchedulerConfigBuilder._invalid_timezones:
             return None
 
+        # -----------check----------------#
         validated = SchedulerConfigBuilder._all_timezones.get(tz_lower, None)
         if validated is not None:
             # keep list off approved timezones to make next checks much faster
-            SchedulerConfigBuilder._checked_timezones[tz_lower] = pytz.timezone(
-                validated
-            )
+            SchedulerConfigBuilder._checked_timezones[tz_lower] = ZoneInfo(validated)
             return validated
         else:
             SchedulerConfigBuilder._invalid_timezones.add(tz_lower)
@@ -631,11 +404,11 @@ class SchedulerConfigBuilder:
 
         # avoid repeated lookup for invalid timezones
         if tz_lower not in SchedulerConfigBuilder._invalid_timezones:
-            # case insensitive lookup for format pytz name
+            # case insensitive lookup for timezone name
             tz_str = SchedulerConfigBuilder._all_timezones.get(tz_lower)
             if tz_str is not None:
                 # found it, no need to check for invalid timezone here because of lookup
-                tz = pytz.timezone(tz_str)
+                tz = ZoneInfo(tz_str)
                 SchedulerConfigBuilder._checked_timezones[tz_lower] = tz
                 return tz
 

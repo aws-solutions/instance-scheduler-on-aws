@@ -1,12 +1,14 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+from collections.abc import Iterator
+from typing import Any
 
 
-def time_str(t):
+def time_str(t: Any) -> str:
     return DisplayHelper.time_as_str(t)
 
 
-def set_str(the_set, displaynames=None, offset=0):
+def set_str(the_set: Any, displaynames: Any = None, offset: int = 0) -> str:
     return DisplayHelper.set_as_str(
         the_set=the_set, display_names=displaynames, offset=offset
     )
@@ -17,12 +19,9 @@ class DisplayHelper:
     Class that implements helper functions for displaying sets of data in a more readable form
     """
 
-    def __init__(self):
-        pass
-
     # uniform string to display time
     @staticmethod
-    def time_as_str(t):
+    def time_as_str(t: Any) -> str:
         """
         Returns the time in a standard format
         :param t: time
@@ -31,7 +30,7 @@ class DisplayHelper:
         return "{:0>2d}:{:0>2d}:{:0>2d}".format(t.hour, t.minute, t.second)
 
     @staticmethod
-    def set_as_str(the_set, display_names=None, offset=0):
+    def set_as_str(the_set: Any, display_names: Any = None, offset: int = 0) -> str:
         """
         Displays a set as a readable string. Adjacent elements are combined in x-y ranges. A list of strings can be passed
         to the set to map the values to text.
@@ -42,7 +41,7 @@ class DisplayHelper:
         """
         result = []
 
-        def get_sub_sets():
+        def get_sub_sets() -> Iterator[set[Any]]:
             if the_set is not None and len(the_set) > 0:
                 temp = sorted(the_set)
                 last = temp[0]

@@ -1,27 +1,39 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
+
 from instance_scheduler import configuration
+from instance_scheduler.configuration.scheduler_config import GlobalConfig
+from instance_scheduler.util.app_env import AppEnv
+
+mock_config = GlobalConfig(
+    scheduled_services=["ec2"],
+    schedule_clusters=True,
+    tag_name="tag",
+    regions=["us-east-1"],
+    default_timezone=ZoneInfo("UTC"),
+    schedules={},
+    trace=False,
+    enable_ssm_maintenance_windows=True,
+    use_metrics=True,
+    remote_account_ids=["123456789012"],
+    namespace="ns",
+    aws_partition="aws",
+    scheduler_role_name="rolename",
+    organization_id="",
+    schedule_lambda_account=False,
+    create_rds_snapshot=True,
+    started_tags="",
+    stopped_tags="",
+)
 
 
-def test_env_var_names():
-    assert configuration.ENV_CONFIG == "CONFIG_TABLE"
-    assert configuration.ENV_STATE == "STATE_TABLE"
-    assert configuration.ENV_ACCOUNT == "ACCOUNT"
+def test_env_var_names() -> None:
     assert configuration.ENV_STACK == "STACK_NAME"
-    assert configuration.ENV_TAG_NAME == "TAG_NAME"
-    assert configuration.ENV_SCHEDULE_FREQUENCY == "SCHEDULER_FREQUENCY"
-    assert configuration.ENV_TRACE == "TRACE"
-    assert (
-        configuration.ENV_ENABLE_SSM_MAINTENANCE_WINDOWS
-        == "ENABLE_SSM_MAINTENANCE_WINDOWS"
-    )
-    assert configuration.ENV_USER_AGENT == "USER_AGENT"
-    assert configuration.ENV_SCHEDULER_RULE == "SCHEDULER_RULE"
 
 
-def test_month_names():
+def test_month_names() -> None:
     assert configuration.MONTH_NAMES == [
         "jan",
         "feb",
@@ -38,7 +50,7 @@ def test_month_names():
     ]
 
 
-def test_weekday_names():
+def test_weekday_names() -> None:
     assert configuration.WEEKDAY_NAMES == [
         "mon",
         "tue",
@@ -50,23 +62,23 @@ def test_weekday_names():
     ]
 
 
-def test_switch_values():
+def test_switch_values() -> None:
     assert configuration.SWITCH_VALUES == ["off", "on"]
 
 
-def test_defaults():
+def test_defaults() -> None:
     assert configuration.DEFAULT_TZ == "UTC"
     assert configuration.DEFAULT_TAGNAME == "Schedule"
 
 
-def test_time_format_string():
+def test_time_format_string() -> None:
     assert configuration.TIME_FORMAT_STRING == "%H:%M"
 
 
-def test_attributes():
+def test_attributes() -> None:
     assert configuration.TRACE == "trace"
     assert (
-        configuration.ENABLE_SSM_MAINTENANCE_WINDOWS == "enable_SSM_maintenance_windows"
+        configuration.ENABLE_SSM_MAINTENANCE_WINDOWS == "enable_ssm_maintenance_windows"
     )
     assert configuration.METRICS == "use_metrics"
     assert configuration.REGIONS == "regions"
@@ -101,7 +113,7 @@ def test_attributes():
     assert configuration.SCHEDULE_CONFIG_STACK == "configured_in_stack"
 
 
-def test_override_status():
+def test_override_status() -> None:
     assert configuration.OVERRIDE_STATUS_STOPPED == "stopped"
     assert configuration.OVERRIDE_STATUS_RUNNING == "running"
     assert configuration.OVERRIDE_STATUS_VALUES == [
@@ -110,11 +122,11 @@ def test_override_status():
     ]
 
 
-def test_instance_type_separator():
+def test_instance_type_separator() -> None:
     assert configuration.INSTANCE_TYPE_SEP == "@"
 
 
-def test_tag_values():
+def test_tag_values() -> None:
     assert configuration.TAG_VAL_SCHEDULER == "scheduler"
     assert configuration.TAG_VAL_MINUTE == "minute"
     assert configuration.TAG_VAL_HOUR == "hour"
@@ -124,42 +136,41 @@ def test_tag_values():
     assert configuration.TAG_VAL_TIMEZONE == "timezone"
 
 
-def test_configuration_global():
-    assert configuration.__configuration == None
+def test_configuration_global() -> None:
+    assert configuration.__configuration is None
 
 
 @patch("instance_scheduler.configuration.SchedulerConfigBuilder")
 @patch("instance_scheduler.configuration.ConfigDynamodbAdapter")
 def test_get_scheduler_configuration(
-    mock_config_dynamodb_adapter, mock_scheduler_config_builder
-):
+    mock_config_dynamodb_adapter: MagicMock,
+    mock_scheduler_config_builder: MagicMock,
+    app_env: AppEnv,
+) -> None:
     my_configdata = "my config"
     mock_config_dynamodb_adapter.return_value.config = my_configdata
-    expected_configuration = "expected configuration"
+    expected_configuration = mock_config
     mock_scheduler_config_builder.return_value.build.return_value = (
         expected_configuration
     )
-    my_config_env = "my config env"
 
-    with patch.dict(os.environ, {configuration.ENV_CONFIG: my_config_env}):
-        result = configuration.get_scheduler_configuration(None)
-        assert result == expected_configuration
+    result = configuration.get_global_configuration(None)
+    assert result == expected_configuration
 
     assert configuration.__configuration == expected_configuration
-    mock_config_dynamodb_adapter.assert_called_once_with(my_config_env)
+    mock_config_dynamodb_adapter.assert_called_once_with(app_env.config_table_name)
     mock_scheduler_config_builder.assert_called_once_with(logger=None)
     mock_scheduler_config_builder.return_value.build.assert_called_once_with(
         my_configdata
     )
 
 
-def test_get_scheduler_configuration_already_set():
-    my_configuration = "my configuration"
-    configuration.__configuration = my_configuration
-    assert configuration.get_scheduler_configuration(None) == my_configuration
+def test_get_scheduler_configuration_already_set() -> None:
+    configuration.__configuration = mock_config
+    assert configuration.get_global_configuration(None) == mock_config
 
 
-def test_unload_scheduler_configuration():
-    configuration.__configuration = {}
-    configuration.unload_scheduler_configuration()
-    assert configuration.__configuration == None
+def test_unload_scheduler_configuration() -> None:
+    configuration.__configuration = mock_config
+    configuration.unload_global_configuration()
+    assert configuration.__configuration is None
