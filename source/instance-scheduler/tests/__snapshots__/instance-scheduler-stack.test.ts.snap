@@ -1106,57 +1106,6 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       "Type": "AWS::DynamoDB::Table",
       "UpdateReplacePolicy": "Delete",
     },
-    "ConfigurationMetricsEventRule8BE742A8": {
-      "Properties": {
-        "Description": "Instance Scheduler - Rule to trigger gathering of weekly anonymized operational metrics for Instance Scheduler",
-        "ScheduleExpression": "rate(7 days)",
-        "State": {
-          "Fn::FindInMap": [
-            "mappings",
-            "EnabledDisabled",
-            {
-              "Fn::FindInMap": [
-                "Send",
-                "AnonymousUsage",
-                "Data",
-              ],
-            },
-          ],
-        },
-        "Targets": [
-          {
-            "Arn": {
-              "Fn::GetAtt": [
-                "Main",
-                "Arn",
-              ],
-            },
-            "Id": "Target0",
-            "Input": "{"scheduled_action":"collect_configuration_metrics"}",
-          },
-        ],
-      },
-      "Type": "AWS::Events::Rule",
-    },
-    "ConfigurationMetricsEventRuleAllowEventRulestackschedulerlambdaC9E2D53DBDC7CFFA": {
-      "Properties": {
-        "Action": "lambda:InvokeFunction",
-        "FunctionName": {
-          "Fn::GetAtt": [
-            "Main",
-            "Arn",
-          ],
-        },
-        "Principal": "events.amazonaws.com",
-        "SourceArn": {
-          "Fn::GetAtt": [
-            "ConfigurationMetricsEventRule8BE742A8",
-            "Arn",
-          ],
-        },
-      },
-      "Type": "AWS::Lambda::Permission",
-    },
     "EC2DynamoDBPolicy": {
       "Metadata": {
         "cdk_nag": {

@@ -5,7 +5,7 @@ phases:
       nodejs: 18
       python: 3.11
     commands:
-    - npm install --location=global npm@latest
+    - npm install --location=global npm@^9
     - pyenv install -s 3.8 3.9
     - pyenv global $PYTHON_311_VERSION 3.9 3.8
     - python -m pip install -U pip setuptools poetry tox

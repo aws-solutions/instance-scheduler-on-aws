@@ -17,7 +17,8 @@ class ActionTaken:
 
 @dataclass(frozen=True)
 class SchedulingActionMetric(OpsMetric):
-    # todo: add num unique schedules checked
+    num_unique_schedules: int  # num schedules configured in that region, not the number that took action
+    num_instances_scanned: int
     duration_seconds: float
     actions: list[ActionTaken]
     event_name: ClassVar[str] = "scheduling_action"

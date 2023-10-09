@@ -471,25 +471,6 @@ export class InstanceSchedulerStack extends cdk.Stack {
       mappings.findInMap("EnabledDisabled", schedulingActive.valueAsString),
     );
 
-    const configurationMetricsRule = new events.Rule(this, "ConfigurationMetricsEventRule", {
-      description:
-        "Instance Scheduler - Rule to trigger gathering of weekly anonymized operational metrics for Instance Scheduler",
-      schedule: events.Schedule.expression("rate(7 days)"),
-      targets: [
-        new EBEventTarget.LambdaFunction(coreScheduler.lambdaFunction, {
-          event: events.RuleTargetInput.fromObject({
-            scheduled_action: "collect_configuration_metrics",
-          }),
-        }),
-      ],
-    });
-
-    const cfnConfigurationMetricsRule = configurationMetricsRule.node.defaultChild as events.CfnRule;
-    cfnConfigurationMetricsRule.addPropertyOverride(
-      "State",
-      mappings.findInMap("EnabledDisabled", send.findInMap("AnonymousUsage", "Data")),
-    );
-
     //End instance scheduler aws-event-lambda construct reference.
 
     /*

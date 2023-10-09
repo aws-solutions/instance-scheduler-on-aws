@@ -5,10 +5,6 @@ from unittest.mock import MagicMock, patch
 from aws_lambda_powertools.utilities.typing import LambdaContext
 
 from instance_scheduler import main
-from instance_scheduler.handler.collect_configuration_description import (
-    CollectConfigurationDescription,
-    CollectConfigurationMetricsRequest,
-)
 from instance_scheduler.handler.scheduling_orchestrator import (
     OrchestrationRequest,
     SchedulingOrchestratorHandler,
@@ -38,19 +34,6 @@ def test_orchestrator_event(
 ) -> None:
     event: OrchestrationRequest = {
         "scheduled_action": "run_orchestrator",
-    }
-
-    lambda_handler(event, MockLambdaContext())
-    handle_request_method.assert_called_once()
-
-
-@patch.object(Logger, "client")
-@patch.object(CollectConfigurationDescription, "handle_request")
-def test_collect_metrics_event(
-    handle_request_method: MagicMock, logger_client: MagicMock
-) -> None:
-    event: CollectConfigurationMetricsRequest = {
-        "scheduled_action": "collect_configuration_metrics"
     }
 
     lambda_handler(event, MockLambdaContext())
