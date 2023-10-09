@@ -325,25 +325,13 @@
           "exec": "npm update npm-check-updates"
         },
         {
-          "exec": "npm-check-updates --dep dev --upgrade --target=minor"
-        },
-        {
-          "exec": "npm-check-updates --dep optional --upgrade --target=minor"
-        },
-        {
-          "exec": "npm-check-updates --dep peer --upgrade --target=minor"
-        },
-        {
-          "exec": "npm-check-updates --dep prod --upgrade --target=minor"
-        },
-        {
-          "exec": "npm-check-updates --dep bundle --upgrade --target=minor"
+          "exec": "npm-check-updates --upgrade --target=minor --filter=@types/jest,@types/node,@typescript-eslint/eslint-plugin,aws-cdk,esbuild,eslint,eslint-config-prettier,eslint-plugin-header,eslint-plugin-import,eslint-plugin-prettier,jest,jest-extended,jest-junit,npm-check-updates,projen,ts-jest,ts-node,@aws-cdk/aws-lambda-python-alpha,@aws-cdk/aws-servicecatalogappregistry-alpha,@aws-sdk/client-dynamodb,@aws-sdk/client-ec2,@aws-sdk/client-rds,@aws-sdk/client-ssm,@aws-solutions-constructs/aws-lambda-dynamodb,aws-cdk-lib,cdk-nag,constructs,source-map-support"
         },
         {
           "exec": "npm install"
         },
         {
-          "exec": "npm update"
+          "exec": "npm update @types/jest @types/node @typescript-eslint/eslint-plugin aws-cdk esbuild eslint eslint-config-prettier eslint-plugin-header eslint-plugin-import eslint-plugin-prettier jest jest-extended jest-junit npm-check-updates projen ts-jest ts-node @aws-cdk/aws-lambda-python-alpha @aws-cdk/aws-servicecatalogappregistry-alpha @aws-sdk/client-dynamodb @aws-sdk/client-ec2 @aws-sdk/client-rds @aws-sdk/client-ssm @aws-solutions-constructs/aws-lambda-dynamodb aws-cdk-lib cdk-nag constructs source-map-support"
         },
         {
           "exec": "npx projen"

@@ -7,9 +7,6 @@ from typing import Final as _Final
 from instance_scheduler.handler.base import Handler
 from instance_scheduler.handler.cfn_schedule import CfnScheduleHandler
 from instance_scheduler.handler.cli import CliHandler
-from instance_scheduler.handler.collect_configuration_description import (
-    CollectConfigurationDescription,
-)
 from instance_scheduler.handler.config_resource import SchedulerSetupHandler
 from instance_scheduler.handler.scheduling_orchestrator import (
     SchedulingOrchestratorHandler,
@@ -24,5 +21,4 @@ handlers: _Final[_Sequence[type[Handler[_Any]]]] = (
     CliHandler,
     SchedulingOrchestratorHandler,
     SpokeRegistrationHandler,
-    CollectConfigurationDescription,
 )

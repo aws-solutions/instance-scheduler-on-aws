@@ -87,7 +87,7 @@ export class TestingPipelineStack extends Stack {
   synthStep(source: pipelines.IFileSetProducer) {
     return new pipelines.CodeBuildStep("Synth", {
       input: source,
-      installCommands: ["npm install --location=global npm@latest", "npm ci"],
+      installCommands: ["npm install --location=global npm@^9", "npm ci"],
       commands: ["npm run synth"],
       primaryOutputDirectory: "build/cdk.out",
     });
@@ -96,7 +96,7 @@ export class TestingPipelineStack extends Stack {
   unitTestStep() {
     return new pipelines.CodeBuildStep("unitTests", {
       installCommands: [
-        "npm install --location=global npm@latest",
+        "npm install --location=global npm@^9",
         "pyenv install -s 3.8 3.9 3.11",
         "pyenv global 3.11 3.9 3.8",
         "python -m pip install -U pip setuptools tox",
@@ -128,7 +128,7 @@ export class TestingPipelineStack extends Stack {
 
   endToEndTestStep(mainInstanceSchedulerStack: InstanceSchedulerStack, testingResourcesStack: E2eTestStack) {
     return new pipelines.CodeBuildStep("EndToEndTests", {
-      installCommands: ["npm install --location=global npm@latest", "npm ci"],
+      installCommands: ["npm install --location=global npm@^9", "npm ci"],
       commands: ["npm run e2e-tests"],
       envFromCfnOutputs: {
         ...testingResourcesStack.outputs,

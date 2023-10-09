@@ -9,14 +9,16 @@ import boto3
 
 from instance_scheduler import configuration
 from instance_scheduler.boto_retry import get_client_with_standard_retry
+from instance_scheduler.configuration.instance_schedule import InstanceSchedule
 from instance_scheduler.configuration.scheduler_config import GlobalConfig
 from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from instance_scheduler.handler.base import Handler
 from instance_scheduler.ops_metrics.metric_type.deployment_description_metric import (
     DeploymentDescriptionMetric,
+    ScheduleFlagCounts,
 )
-from instance_scheduler.ops_metrics.metrics import collect_metric
-from instance_scheduler.util.app_env import get_app_env
+from instance_scheduler.ops_metrics.metrics import collect_metric, should_collect_metric
+from instance_scheduler.util.app_env import AppEnv, get_app_env
 from instance_scheduler.util.logger import Logger
 
 if TYPE_CHECKING:
@@ -142,16 +144,13 @@ class SchedulingOrchestratorHandler(Handler[OrchestrationRequest]):
             for scheduling_context in self.list_scheduling_contexts(self.configuration):
                 result.append(self._run_scheduling_lambda(scheduling_context))
 
-            collect_metric(
-                DeploymentDescriptionMetric(
-                    services=self.configuration.scheduled_services,
-                    regions=self.configuration.regions,
-                    num_accounts=sum(
-                        1 for _ in self.accounts_and_roles(self.configuration)
+            if should_collect_metric(DeploymentDescriptionMetric, logger=self._logger):
+                collect_metric(
+                    self.build_deployment_description_metric(
+                        self.configuration, get_app_env(), self._context
                     ),
-                ),
-                logger=self._logger,
-            )
+                    logger=self._logger,
+                )
 
             return result
         finally:
@@ -260,7 +259,55 @@ class SchedulingOrchestratorHandler(Handler[OrchestrationRequest]):
         }
         return result
 
+    def build_deployment_description_metric(
+        self,
+        global_config: GlobalConfig,
+        app_env: AppEnv,
+        lambda_context: LambdaContext,
+    ) -> DeploymentDescriptionMetric:
+        flag_counts = ScheduleFlagCounts()
+        for schedule in global_config.schedules.values():
+            flag_counts.stop_new_instances += schedule.stop_new_instances is True
+            flag_counts.enforced += schedule.enforced is True
+            flag_counts.retain_running += schedule.retain_running is True
+            flag_counts.hibernate += schedule.hibernate is True
+            flag_counts.override += schedule.override_status is not None
+            flag_counts.use_ssm_maintenance_window += (
+                schedule.use_maintenance_window is True
+            )
+            flag_counts.use_metrics += schedule.use_metrics is True
+            flag_counts.non_default_timezone += schedule.timezone != str(
+                global_config.default_timezone
+            )
+
+        metric = DeploymentDescriptionMetric(
+            services=self.configuration.scheduled_services,
+            regions=self.configuration.regions,
+            num_accounts=sum(1 for _ in self.accounts_and_roles(self.configuration)),
+            num_schedules=len(global_config.schedules),
+            num_cfn_schedules=_count_cfn_schedules(global_config.schedules),
+            schedule_flag_counts=flag_counts,
+            default_timezone=str(global_config.default_timezone),
+            schedule_aurora_clusters=global_config.schedule_clusters,
+            create_rds_snapshots=global_config.create_rds_snapshot,
+            schedule_interval_minutes=app_env.scheduler_frequency_minutes,
+            memory_size_mb=lambda_context.memory_limit_in_mb,
+            using_organizations=app_env.enable_aws_organizations,
+            enable_ec2_ssm_maintenance_windows=app_env.enable_ec2_ssm_maintenance_windows,
+            num_started_tags=len(app_env.start_tags),
+            num_stopped_tags=len(app_env.stop_tags),
+        )
+
+        return metric
+
 
 def strip_schedules_and_periods(event_dict: dict[str, Any]) -> None:
     event_dict["schedules"] = {}
     event_dict["periods"] = {}
+
+
+def _count_cfn_schedules(schedules: dict[str, InstanceSchedule]) -> int:
+    count = 0
+    for schedule in schedules.values():
+        count += bool(schedule.configured_in_stack)
+    return count

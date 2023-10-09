@@ -146,6 +146,8 @@ def test_scheduling_execution_sends_expected_actions_metric(
         "Event_Name": "scheduling_action",
         "Context": {
             "duration_seconds": ANY,
+            "num_instances_scanned": 25,
+            "num_unique_schedules": 3,
             "actions": [
                 {
                     "action": "Started",

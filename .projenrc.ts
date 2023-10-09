@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { awscdk } from "projen";
 import { JestReporter, NodePackageManager, Transform, UpdateSnapshot } from "projen/lib/javascript";
 
-const cdkVersion = "2.87.0";
+const cdkVersion = "2.99.0";
 const solutionId = "SO0030";
 const solutionName = "instance-scheduler-on-aws";
 
@@ -47,6 +47,7 @@ const project = new awscdk.AwsCdkTypeScriptApp({
     appRegSolutionName: solutionName,
     "instance-scheduler-on-aws-pipeline-source": "codecommit",
   },
+  typescriptVersion: "~5.1.6", // held back for @typescript-eslint/typescript-estree
   deps: [
     `@aws-cdk/aws-lambda-python-alpha@^${cdkVersion}-alpha.0`,
     `@aws-cdk/aws-servicecatalogappregistry-alpha@^${cdkVersion}-alpha.0`,
@@ -228,6 +229,6 @@ project.jest?.addTestMatch("**/*.test.ts");
 // use default snapshot resolution
 project.tryFindObjectFile("jest.config.json")?.addOverride("snapshotResolver", undefined);
 
-project.tryFindObjectFile("package.json")?.addOverride("version", "1.5.1");
+project.tryFindObjectFile("package.json")?.addOverride("version", "1.5.2");
 
 project.synth();

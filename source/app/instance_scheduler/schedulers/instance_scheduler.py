@@ -538,7 +538,7 @@ class InstanceScheduler:
             self._collect_instance_count_metric(instances)
 
         if should_collect_metric(SchedulingActionMetric, self._logger):
-            self._collect_scheduling_actions_metric(time_taken)
+            self._collect_scheduling_actions_metric(time_taken, instances)
 
     def _collect_instance_count_metric(self, instances: list[Instance]) -> None:
         collect_metric(
@@ -551,9 +551,11 @@ class InstanceScheduler:
             logger=self._logger,
         )
 
-    def _collect_scheduling_actions_metric(self, time_taken: float) -> None:
+    def _collect_scheduling_actions_metric(
+        self, time_taken: float, instances: list[Instance]
+    ) -> None:
         self._collect_usage_metrics()
-        self._send_usage_metrics(time_taken)
+        self._send_usage_metrics(time_taken, instances)
 
     @staticmethod
     def _count_unique_schedules(instances: list[Instance]) -> int:
@@ -591,7 +593,7 @@ class InstanceScheduler:
             else:
                 self._usage_metrics["Resized"][type_change] = 1
 
-    def _send_usage_metrics(self, time_taken: float) -> None:
+    def _send_usage_metrics(self, time_taken: float, instances: list[Instance]) -> None:
         for s in list(self._usage_metrics):
             if len(self._usage_metrics[s]) == 0:
                 del self._usage_metrics[s]
@@ -610,7 +612,10 @@ class InstanceScheduler:
 
             collect_metric(
                 SchedulingActionMetric(
-                    duration_seconds=time_taken, actions=actions_taken
+                    duration_seconds=time_taken,
+                    actions=actions_taken,
+                    num_instances_scanned=len(instances),
+                    num_unique_schedules=self._count_unique_schedules(instances),
                 ),
                 logger=self._logger,
             )

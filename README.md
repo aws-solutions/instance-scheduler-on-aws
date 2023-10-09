@@ -259,7 +259,7 @@ development fork automatically.
 To view the results. Go to [CodePipeline](https://us-east-1.console.aws.amazon.com/codesuite/codepipeline/pipelines) and
 click on the pipeline that begins with instance-scheduler-on-aws-testing-pipeline.
 
-## Modifying the solution
+## Modifying the Solution
 
 ### projen
 
@@ -270,6 +270,10 @@ files, modify the source in [.projenrc.ts](./.projenrc.ts) and run `projen` to r
 
 Instance Scheduler on AWS templates are generated using AWS CDK, for further information on CDK please refer to the
 [documentation](https://docs.aws.amazon.com/cdk/latest/guide/getting_started.html).
+
+
+## Collection of Operational Metrics
+This solution collects anonymous operational metrics to help AWS improve the quality and features of the solution. For more information, including how to disable this capability, please see the [implementation guide](https://docs.aws.amazon.com/solutions/latest/instance-scheduler-on-aws/anonymized-data.html).
 
 ---
 
