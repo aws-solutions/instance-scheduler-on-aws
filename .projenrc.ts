@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { awscdk } from "projen";
 import { JestReporter, NodePackageManager, Transform, UpdateSnapshot } from "projen/lib/javascript";
 
-const cdkVersion = "2.99.0";
+const cdkVersion = "2.102.0";
 const solutionId = "SO0030";
 const solutionName = "instance-scheduler-on-aws";
 
@@ -229,6 +229,6 @@ project.jest?.addTestMatch("**/*.test.ts");
 // use default snapshot resolution
 project.tryFindObjectFile("jest.config.json")?.addOverride("snapshotResolver", undefined);
 
-project.tryFindObjectFile("package.json")?.addOverride("version", "1.5.2");
+project.tryFindObjectFile("package.json")?.addOverride("version", "1.5.3");
 
 project.synth();
