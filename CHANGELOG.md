@@ -4,12 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.5.3] - 2023-10-22
+
+### Security
+
+- Upgrade @babel/traverse to mitigate CVE-2023-45133
+- Upgrade urllib3 to mitigate CVE-2023-45803
+
 ## [1.5.2] - 2023-10-9
 
 ### Security
- - Upgrade cryptography to mitigate GHSA-v8gr-m533-ghj9 and GHSA-jm77-qphf-c4w8
- - Upgrade urllib3 to mitigate CVE-2023-43804
- - Upgrade certifi to mitigate CVE-2023-37920
+
+- Upgrade cryptography to mitigate GHSA-v8gr-m533-ghj9 and GHSA-jm77-qphf-c4w8
+- Upgrade urllib3 to mitigate CVE-2023-43804
+- Upgrade certifi to mitigate CVE-2023-37920
 
 ## [1.5.1] - 2023-07-24
 
