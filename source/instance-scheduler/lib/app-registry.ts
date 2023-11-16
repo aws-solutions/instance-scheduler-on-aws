@@ -1,8 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as cdk from "aws-cdk-lib";
-import { Construct } from "constructs";
-import { Aws, Stack, Tags } from "aws-cdk-lib";
+import { Construct, IConstruct } from "constructs";
+import { Aspects, Aws, Stack, Tags } from "aws-cdk-lib";
+import { CfnResourceAssociation } from "aws-cdk-lib/aws-servicecatalogappregistry";
 import * as appreg from "@aws-cdk/aws-servicecatalogappregistry-alpha";
 
 export interface AppRegistryForInstanceSchedulerProps extends cdk.StackProps {
@@ -16,6 +17,10 @@ export interface AppRegistryForInstanceSchedulerProps extends cdk.StackProps {
 export class AppRegistryForInstanceScheduler extends Construct {
   constructor(scope: Stack, id: string, props: AppRegistryForInstanceSchedulerProps) {
     super(scope, id);
+
+    const isNotChinaRegionCondition = new cdk.CfnCondition(this, "IsNotChinaRegionCondition", {
+      expression: cdk.Fn.conditionNot(cdk.Fn.conditionEquals(Aws.PARTITION, "aws-cn")),
+    });
 
     const map = new cdk.CfnMapping(this, "Solution");
     map.setValue("Data", "ID", props.solutionId);
@@ -52,5 +57,22 @@ export class AppRegistryForInstanceScheduler extends Construct {
         solutionName: map.findInMap("Data", "SolutionName"),
       },
     });
+
+    Aspects.of(application).add(new InjectCondition(isNotChinaRegionCondition));
+    Aspects.of(scope).add(new InjectCondition(isNotChinaRegionCondition, CfnResourceAssociation));
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+class InjectCondition<T extends new (...p: any[]) => cdk.CfnResource> implements cdk.IAspect {
+  public constructor(
+    private condition: cdk.CfnCondition,
+    private cls?: T,
+  ) {}
+
+  public visit(node: IConstruct): void {
+    if (node instanceof (this.cls ?? cdk.CfnResource)) {
+      node.cfnOptions.condition = this.condition;
+    }
   }
 }
