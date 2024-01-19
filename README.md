@@ -70,7 +70,7 @@ stack.
 
 ```
 npx cdk bootstrap
-npx cdk deploy instance-scheduler-on-aws-remote --parameters InstanceSchedulerAccount={account-id} --parameters namespace={namespace} --parameters UsingAWSOrganizations={useOrgs}
+npx cdk deploy instance-scheduler-on-aws-remote --parameters InstanceSchedulerAccount={account-id} --parameters Namespace={namespace} --parameters UsingAWSOrganizations={useOrgs}
 ```
 
 Replace:
