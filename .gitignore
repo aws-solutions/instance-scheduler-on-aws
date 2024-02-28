@@ -99,11 +99,9 @@ source/code/sample_events
 .vscode
 __pycache__
 **/cdk-test-report.xml
-!/.projenrc.js
 !/jest.config.json
 /coverage/
 !/.github/pull_request_template.md
-!/.npmrc
 !/source/instance-scheduler/tests/
 !/tsconfig.json
 !/source/
@@ -115,3 +113,5 @@ __pycache__
 /build/cdk.out/
 .cdk.staging/
 .parcel-cache/
+!/solution-manifest.yaml
+!/.projenrc.ts

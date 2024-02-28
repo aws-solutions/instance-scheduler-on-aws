@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from typing import TYPE_CHECKING
 
-from moto import mock_ec2
+from moto import mock_aws
 
 from instance_scheduler.boto_retry import get_client_with_standard_retry
 
@@ -13,6 +13,6 @@ else:
 
 
 def test_get_client_with_standard_retry() -> None:
-    with mock_ec2():
+    with mock_aws():
         client: EC2Client = get_client_with_standard_retry("ec2")
         assert client.describe_instances()["Reservations"] == []

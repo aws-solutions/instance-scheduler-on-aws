@@ -123,7 +123,7 @@ def create_instances_of_status(
 
 
 @patch("instance_scheduler.service.ec2.EC2SSMMaintenanceWindows")
-def test_get_schedulable_instances(mock_mw: MagicMock, moto_ec2: None) -> None:
+def test_get_schedulable_instances(mock_mw: MagicMock, moto_backend: None) -> None:
     service_args = mock_service_args()
     service_args["scheduling_context"] = replace(
         service_args["scheduling_context"], enable_ssm_maintenance_windows=True
@@ -254,7 +254,7 @@ def instance_data_from(
     )
 
 
-def test_resize_instance(moto_ec2: None) -> None:
+def test_resize_instance(moto_backend: None) -> None:
     ec2: Final[EC2Client] = boto3.client("ec2")
     instance_type: Final[InstanceTypeType] = "m6g.medium"
     instances = create_instances_of_status(
@@ -278,7 +278,7 @@ def test_resize_instance(moto_ec2: None) -> None:
     )
 
 
-def test_start_instances(moto_ec2: None) -> None:
+def test_start_instances(moto_backend: None) -> None:
     ec2: Final[EC2Client] = boto3.client("ec2")
     instance_type: Final[InstanceTypeType] = "m6g.xlarge"
     instances = create_instances_of_status(
@@ -311,7 +311,7 @@ def test_start_instances(moto_ec2: None) -> None:
         assert status["InstanceState"]["Name"] == "running"
 
 
-def test_start_instances_with_errors(moto_ec2: None) -> None:
+def test_start_instances_with_errors(moto_backend: None) -> None:
     ec2: Final[EC2Client] = boto3.client("ec2")
     instance_type: Final[InstanceTypeType] = "m6g.xlarge"
     instances = create_instances_of_status(
@@ -352,7 +352,7 @@ def test_start_instances_with_errors(moto_ec2: None) -> None:
         assert status["InstanceState"]["Name"] == "running"
 
 
-def test_stop_instances(moto_ec2: None) -> None:
+def test_stop_instances(moto_backend: None) -> None:
     ec2: Final[EC2Client] = boto3.client("ec2")
     instance_type: Final[InstanceTypeType] = "m6g.large"
     instances = create_instances_of_status(
@@ -385,7 +385,7 @@ def test_stop_instances(moto_ec2: None) -> None:
         assert status["InstanceState"]["Name"] == "stopped"
 
 
-def test_stop_instances_with_errors(moto_ec2: None) -> None:
+def test_stop_instances_with_errors(moto_backend: None) -> None:
     ec2: Final[EC2Client] = boto3.client("ec2")
     instance_type: Final[InstanceTypeType] = "m6g.large"
     instances = create_instances_of_status(

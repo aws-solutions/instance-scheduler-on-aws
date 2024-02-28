@@ -4,7 +4,6 @@
 /.gitattributes linguist-generated
 /.github/pull_request_template.md linguist-generated
 /.gitignore linguist-generated
-/.npmrc linguist-generated
 /.projen/** linguist-generated
 /.projen/deps.json linguist-generated
 /.projen/files.json linguist-generated
@@ -15,4 +14,5 @@
 /LICENSE linguist-generated
 /package-lock.json linguist-generated
 /package.json linguist-generated
+/solution-manifest.yaml linguist-generated
 /tsconfig.json linguist-generated

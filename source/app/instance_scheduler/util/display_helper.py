@@ -67,9 +67,11 @@ class DisplayHelper:
                 s = "-".join(
                     [
                         s,
-                        display_names[max(subset) - offset]
-                        if display_names
-                        else str(max(subset) - offset),
+                        (
+                            display_names[max(subset) - offset]
+                            if display_names
+                            else str(max(subset) - offset)
+                        ),
                     ]
                 )
             result.append(s)

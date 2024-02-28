@@ -64,7 +64,7 @@ def test_passing_tz_unaware_dt_to_scheduling_request_handler_throws_error() -> N
         handler.handle_request()
 
 
-def test_time_zones(moto_ec2: None, ec2_instance_states: InstanceStates) -> None:
+def test_time_zones(moto_backend: None, ec2_instance_states: InstanceStates) -> None:
     # ----------------------------EC2 Instances-------------------------#
     schedules: dict[str, InstanceSchedule] = {}
     instances: dict[str, str] = {}

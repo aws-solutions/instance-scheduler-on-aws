@@ -63,7 +63,6 @@ def resource_properties(
 @patch("requests.put")
 def test_remote_account_ids_retained(
     mock_requests: MagicMock,
-    moto_dynamodb: None,
     app_env: AppEnv,
     config_table: None,
 ) -> None:

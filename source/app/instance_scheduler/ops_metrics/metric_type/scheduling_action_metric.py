@@ -17,7 +17,9 @@ class ActionTaken:
 
 @dataclass(frozen=True)
 class SchedulingActionMetric(OpsMetric):
-    num_unique_schedules: int  # num schedules configured in that region, not the number that took action
+    num_unique_schedules: (
+        int  # num schedules configured in that region, not the number that took action
+    )
     num_instances_scanned: int
     duration_seconds: float
     actions: list[ActionTaken]

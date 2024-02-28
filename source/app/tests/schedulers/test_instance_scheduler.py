@@ -39,7 +39,7 @@ def context() -> SchedulingContext:
     )
 
 
-def test_get_desired_state_and_type_1(moto_sts: None, mocker: MockFixture) -> None:
+def test_get_desired_state_and_type_1(moto_backend: None, mocker: MockFixture) -> None:
     schedule = InstanceSchedule(
         name="test-1",
         periods=[],
@@ -96,7 +96,7 @@ def test_get_desired_state_and_type_1(moto_sts: None, mocker: MockFixture) -> No
     assert inst_state == "stopped"
 
 
-def test_get_desired_state_and_type_2(moto_sts: None, mocker: MockFixture) -> None:
+def test_get_desired_state_and_type_2(moto_backend: None, mocker: MockFixture) -> None:
     schedule = InstanceSchedule(
         name="test-1",
         periods=[],
