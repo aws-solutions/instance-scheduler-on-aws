@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 from collections.abc import Iterator
 from os import environ
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 from unittest.mock import patch
 
 import boto3
-from moto import mock_dynamodb, mock_ec2, mock_logs, mock_sns, mock_sts
+from moto import mock_aws
 from pytest import fixture
 
 import instance_scheduler.util.app_env
@@ -48,34 +48,27 @@ def app_env(aws_credentials: None) -> Iterator[AppEnv]:
 
 @fixture(autouse=True)
 def test_cleanup() -> Iterator[None]:
-    # runs before eact test
+    # runs before each test
     yield
     # runs after each test
     unload_global_configuration()
 
 
 @fixture
-def moto_ec2() -> Iterator[None]:
-    with mock_ec2():
+def moto_backend() -> Iterator[None]:
+    with mock_aws():
         yield
 
 
 @fixture
-def moto_dynamodb() -> Iterator[None]:
-    with mock_dynamodb():
-        yield
-
-
-@fixture
-def dynamodb_client() -> Iterator[DynamoDBClient]:
+def dynamodb_client(moto_backend: None) -> Iterator[DynamoDBClient]:
     """DDB Mock Client"""
-    with mock_dynamodb():
-        connection = boto3.client("dynamodb", region_name="us-east-1")
-        yield connection
+    connection = boto3.client("dynamodb", region_name="us-east-1")
+    yield connection
 
 
 @fixture
-def config_table(app_env: AppEnv, moto_dynamodb: None) -> None:
+def config_table(app_env: AppEnv, moto_backend: None) -> None:
     boto3.client("dynamodb").create_table(
         AttributeDefinitions=[
             {"AttributeName": "name", "AttributeType": "S"},
@@ -91,30 +84,31 @@ def config_table(app_env: AppEnv, moto_dynamodb: None) -> None:
 
 
 @fixture
-def moto_logs() -> Iterator[None]:
-    with mock_logs():
-        yield
+def maint_win_table(moto_backend: None, app_env: AppEnv) -> str:
+    maint_win_table_name: Final = app_env.maintenance_window_table_name
+    ddb: Final[DynamoDBClient] = boto3.client("dynamodb")
+    ddb.create_table(
+        AttributeDefinitions=[
+            {"AttributeName": "Name", "AttributeType": "S"},
+            {"AttributeName": "account-region", "AttributeType": "S"},
+        ],
+        TableName=maint_win_table_name,
+        KeySchema=[
+            {"AttributeName": "Name", "KeyType": "HASH"},
+            {"AttributeName": "account-region", "KeyType": "RANGE"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    return maint_win_table_name
 
 
 @fixture
-def mock_log_group(moto_logs: None, app_env: AppEnv) -> None:
+def mock_log_group(moto_backend: None, app_env: AppEnv) -> None:
     logs: CloudWatchLogsClient = boto3.client("logs")
     logs.create_log_group(logGroupName=app_env.log_group)
 
 
 @fixture
-def moto_sns() -> Iterator[None]:
-    with mock_sns():
-        yield
-
-
-@fixture
-def mock_topic(moto_sns: None, app_env: AppEnv) -> None:
+def mock_sns_errors_topic(moto_backend: None, app_env: AppEnv) -> None:
     sns: SNSClient = boto3.client("sns")
     sns.create_topic(Name=app_env.topic_arn.split(":")[-1])
-
-
-@fixture
-def moto_sts() -> Iterator[None]:
-    with mock_sts():
-        yield

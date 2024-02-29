@@ -2,10 +2,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { readFileSync } from "node:fs";
-import { awscdk } from "projen";
+import { awscdk, YamlFile } from "projen";
 import { JestReporter, NodePackageManager, Transform, UpdateSnapshot } from "projen/lib/javascript";
 
 const cdkVersion = "2.102.0";
+const solutionVersion = "1.5.4";
 const solutionId = "SO0030";
 const solutionName = "instance-scheduler-on-aws";
 
@@ -175,6 +176,19 @@ const project = new awscdk.AwsCdkTypeScriptApp({
   ],
 });
 
+new YamlFile(project, "solution-manifest.yaml", {
+  obj: {
+    id: solutionId,
+    name: solutionName,
+    version: solutionVersion,
+    cloudformation_templates: [
+      { template: "instance-scheduler-on-aws.template", main_template: true },
+      { template: "instance-scheduler-on-aws-remote.template" },
+    ],
+    build_environment: { build_image: "aws/codebuild/standard:7.0" },
+  },
+});
+
 project.addTask("e2e-tests", { exec: "jest --config source/pipeline/jest.config.ts", receiveArgs: true });
 
 const prettierTask = project.addTask("test:prettier", { exec: "npx prettier --check ./**/*.ts" });
@@ -229,6 +243,6 @@ project.jest?.addTestMatch("**/*.test.ts");
 // use default snapshot resolution
 project.tryFindObjectFile("jest.config.json")?.addOverride("snapshotResolver", undefined);
 
-project.tryFindObjectFile("package.json")?.addOverride("version", "1.5.3");
+project.tryFindObjectFile("package.json")?.addOverride("version", solutionVersion);
 
 project.synth();

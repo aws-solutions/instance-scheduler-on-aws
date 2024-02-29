@@ -322,16 +322,13 @@
       },
       "steps": [
         {
-          "exec": "npm update npm-check-updates"
-        },
-        {
-          "exec": "npm-check-updates --upgrade --target=minor --peer --dep=dev,peer,prod,optional --filter=@types/jest,@types/node,@typescript-eslint/eslint-plugin,aws-cdk,esbuild,eslint,eslint-config-prettier,eslint-plugin-header,eslint-plugin-import,eslint-plugin-prettier,jest,jest-extended,jest-junit,npm-check-updates,projen,ts-jest,ts-node,@aws-cdk/aws-lambda-python-alpha,@aws-cdk/aws-servicecatalogappregistry-alpha,@aws-sdk/client-dynamodb,@aws-sdk/client-ec2,@aws-sdk/client-rds,@aws-sdk/client-ssm,@aws-solutions-constructs/aws-lambda-dynamodb,aws-cdk-lib,cdk-nag,constructs,source-map-support"
+          "exec": "npx npm-check-updates@16 --upgrade --target=minor --peer --dep=dev,peer,prod,optional --filter=@types/jest,@typescript-eslint/eslint-plugin,esbuild,eslint,eslint-config-prettier,eslint-plugin-header,eslint-plugin-import,eslint-plugin-prettier,jest,jest-extended,jest-junit,projen,ts-jest,ts-node,typescript,@aws-sdk/client-dynamodb,@aws-sdk/client-ec2,@aws-sdk/client-rds,@aws-sdk/client-ssm,@aws-solutions-constructs/aws-lambda-dynamodb,cdk-nag,source-map-support"
         },
         {
           "exec": "npm install"
         },
         {
-          "exec": "npm update @types/jest @types/node @typescript-eslint/eslint-plugin aws-cdk esbuild eslint eslint-config-prettier eslint-plugin-header eslint-plugin-import eslint-plugin-prettier jest jest-extended jest-junit npm-check-updates projen ts-jest ts-node @aws-cdk/aws-lambda-python-alpha @aws-cdk/aws-servicecatalogappregistry-alpha @aws-sdk/client-dynamodb @aws-sdk/client-ec2 @aws-sdk/client-rds @aws-sdk/client-ssm @aws-solutions-constructs/aws-lambda-dynamodb aws-cdk-lib cdk-nag constructs source-map-support"
+          "exec": "npm update @types/jest @types/node @typescript-eslint/eslint-plugin aws-cdk esbuild eslint eslint-config-prettier eslint-plugin-header eslint-plugin-import eslint-plugin-prettier jest jest-extended jest-junit projen ts-jest ts-node typescript @aws-cdk/aws-lambda-python-alpha @aws-cdk/aws-servicecatalogappregistry-alpha @aws-sdk/client-dynamodb @aws-sdk/client-ec2 @aws-sdk/client-rds @aws-sdk/client-ssm @aws-solutions-constructs/aws-lambda-dynamodb aws-cdk-lib cdk-nag constructs source-map-support"
         },
         {
           "exec": "npx projen"

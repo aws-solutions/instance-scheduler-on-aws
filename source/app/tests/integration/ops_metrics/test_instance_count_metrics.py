@@ -88,7 +88,6 @@ def test_instance_count_metric_is_daily_metric() -> None:
 def test_scheduling_execution_sends_expected_instance_count_metric(
     should_collect_metrics_func: MagicMock,
     mock_metrics_endpoint: MagicMock,
-    moto_ec2: None,
     ec2_instance_states: InstanceStates,
     app_env: AppEnv,
 ) -> None:

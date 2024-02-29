@@ -37,7 +37,7 @@ class LocalizedTestInstance:
 
 
 def test_cross_account_cross_region_ec2_scheduling_starts_and_stops_instance(
-    moto_ec2: None, ec2_instance_states: InstanceStates, app_env: AppEnv
+    ec2_instance_states: InstanceStates, app_env: AppEnv
 ) -> None:
     account = "222233334444"
     region = "us-west-2"
@@ -76,7 +76,7 @@ def test_cross_account_cross_region_ec2_scheduling_starts_and_stops_instance(
 
 
 def test_cross_account_scheduling_does_not_schedule_other_instances(
-    moto_ec2: None, ec2_instance_states: InstanceStates, app_env: AppEnv
+    ec2_instance_states: InstanceStates, app_env: AppEnv
 ) -> None:
     target_account = "222233334444"
     target_region = "us-west-2"

@@ -56,13 +56,17 @@ class CliHandler(Handler[AdminCliRequest]):
             "create-schedule": "create_schedule",
             "delete-period": "delete_period",
             "delete-schedule": "delete_schedule",
-            "describe-periods": "list_periods"
-            if self.parameters.get(configuration.NAME) is None
-            else "get_period",
+            "describe-periods": (
+                "list_periods"
+                if self.parameters.get(configuration.NAME) is None
+                else "get_period"
+            ),
             "describe-schedule-usage": "get_schedule_usage",
-            "describe-schedules": "list_schedules"
-            if self.parameters.get(configuration.NAME) is None
-            else "get_schedule",
+            "describe-schedules": (
+                "list_schedules"
+                if self.parameters.get(configuration.NAME) is None
+                else "get_schedule"
+            ),
             "update-period": "update_period",
             "update-schedule": "update_schedule",
         }

@@ -28,15 +28,19 @@ source-map-support under the MIT License
 
 attrs under the MIT License
 aws-lambda-powertools under the MIT License
+awscli under the Apache License 2.0
 boto3 under the Apache License 2.0
 botocore under the Apache License 2.0
 certifi under the Mozilla Public License 2.0
 charset-normalizer under the MIT License
+colorama under the BSD 3-Clause "New" or "Revised" License
+docutils under the BSD 2-Clause License, BSD 3-Clause License, GNU General Public License (GPL), Python Software Foundation License, Public Domain (public domain, Python, 2-Clause BSD, GPL 3)
 filelock under the The Unlicense
 idna under the BSD 3-Clause "New" or "Revised" License
 iniconfig under the MIT License
 jmespath under the MIT License
 pluggy under the MIT License
+pyasn1 under the BSD 2-Clause License
 pytest under the MIT License
 python-dateutil under the Apache License 2.0 and the BSD 3-Clause "New" or "Revised" License
 pytz under the MIT License

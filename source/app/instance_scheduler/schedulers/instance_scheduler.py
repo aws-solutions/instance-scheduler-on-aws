@@ -311,9 +311,11 @@ class InstanceScheduler:
                     self._logger.debug(
                         DEBUG_ENFORCED_STATE,
                         instance["instance_str"],
-                        InstanceSchedule.STATE_RUNNING
-                        if instance["is_running"]
-                        else InstanceSchedule.STATE_STOPPED,
+                        (
+                            InstanceSchedule.STATE_RUNNING
+                            if instance["is_running"]
+                            else InstanceSchedule.STATE_STOPPED
+                        ),
                         desired_state,
                     )
                     self._process_new_desired_state(

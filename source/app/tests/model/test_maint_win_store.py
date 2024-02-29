@@ -1,41 +1,18 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING
 from unittest.mock import ANY
 
-from boto3 import Session, client
-from pytest import fixture
+from boto3 import Session
 
 from instance_scheduler.model import EC2SSMMaintenanceWindowStore
-from instance_scheduler.util.app_env import AppEnv
 from tests.logger import MockLogger
 
 if TYPE_CHECKING:
-    from mypy_boto3_dynamodb.client import DynamoDBClient
     from mypy_boto3_ssm.type_defs import MaintenanceWindowIdentityTypeDef
 else:
-    DynamoDBClient = object
     MaintenanceWindowIdentityTypeDef = object
-
-
-@fixture
-def maint_win_table(moto_dynamodb: None, app_env: AppEnv) -> str:
-    maint_win_table_name: Final = app_env.maintenance_window_table_name
-    ddb: Final[DynamoDBClient] = client("dynamodb")
-    ddb.create_table(
-        AttributeDefinitions=[
-            {"AttributeName": "Name", "AttributeType": "S"},
-            {"AttributeName": "account-region", "AttributeType": "S"},
-        ],
-        TableName=maint_win_table_name,
-        KeySchema=[
-            {"AttributeName": "Name", "KeyType": "HASH"},
-            {"AttributeName": "account-region", "KeyType": "RANGE"},
-        ],
-        BillingMode="PAY_PER_REQUEST",
-    )
-    return maint_win_table_name
 
 
 def test_maint_win_store(maint_win_table: str) -> None:

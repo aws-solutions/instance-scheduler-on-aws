@@ -162,9 +162,9 @@ class Ec2Service(Service[Instance]):
         is_terminated: Final = state_code == EC2StateCode.TERMINATED
         schedule_name: Final = tags.get(self._scheduler_tag_key)
 
-        maintenance_window_schedule: InstanceSchedule | Literal[
-            "NOT-FOUND"
-        ] | None = None
+        maintenance_window_schedule: InstanceSchedule | Literal["NOT-FOUND"] | None = (
+            None
+        )
         schedule = None
 
         if schedule_name is not None:
@@ -186,9 +186,9 @@ class Ec2Service(Service[Instance]):
                     schedule.ssm_maintenance_window,
                     schedule.name,
                 )
-                self._maintenance_window_schedules[
-                    schedule.ssm_maintenance_window
-                ] = "NOT-FOUND"
+                self._maintenance_window_schedules[schedule.ssm_maintenance_window] = (
+                    "NOT-FOUND"
+                )
         if maintenance_window_schedule == "NOT-FOUND":
             maintenance_window_schedule = None
 

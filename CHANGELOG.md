@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.5.4] -- 2024-02-29
+
+### Security
+
+- Upgrade cryptography to mitigate CVE-2024-26130, CVE-2023-50782, CVE-2024-0727, CVE-2023-49083
+- Upgrade Jinja to mitigate CVE-2024-22195
+- Upgrade Werkzeug to mitigate CVE-2023-46136
+- Upgrade IP to mitigate CVE-2023-42282
+- Remove ecdsa to mitigate CVE-2024-23342
+
 ## [1.5.3] - 2023-10-22
 
 ### Security

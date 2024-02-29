@@ -4,7 +4,6 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 import boto3
-from moto import mock_rds, mock_resourcegroupstaggingapi
 from pytest import fixture
 
 from instance_scheduler.schedulers.instance_states import InstanceStates
@@ -25,44 +24,17 @@ else:
 
 
 @fixture(autouse=True)
-def moto_logs_autouse(moto_logs: None) -> Iterator[None]:
-    yield
-
-
-@fixture(autouse=True)
-def mock_log_group_autouse(mock_log_group: None) -> None:
+def auto_setup_log_group(mock_log_group: None) -> None:
     """noop"""
 
 
 @fixture(autouse=True)
-def moto_sns_autouse(moto_sns: None) -> Iterator[None]:
-    yield
-
-
-@fixture(autouse=True)
-def mock_topic_autouse(mock_topic: None) -> None:
+def auto_setup_sns_error_reporting_topic(mock_sns_errors_topic: None) -> None:
     """noop"""
 
 
-@fixture(autouse=True)
-def moto_sts_autouse(moto_sts: None) -> Iterator[None]:
-    yield
-
-
 @fixture
-def moto_rds() -> Iterator[None]:
-    with mock_rds():
-        yield
-
-
-@fixture
-def moto_resource_group_tagging_api() -> Iterator[None]:
-    with mock_resourcegroupstaggingapi():
-        yield
-
-
-@fixture
-def ec2_instance(moto_ec2: None) -> Iterator[str]:
+def ec2_instance(moto_backend: None) -> Iterator[str]:
     ec2_client: EC2Client = boto3.client("ec2")
     instance_id: str = ec2_client.run_instances(ImageId=ami, MinCount=1, MaxCount=1)[
         "Instances"
@@ -74,9 +46,7 @@ def ec2_instance(moto_ec2: None) -> Iterator[str]:
 
 
 @fixture
-def rds_instance(
-    moto_rds: None, moto_resource_group_tagging_api: None
-) -> Iterator[str]:
+def rds_instance(moto_backend: None) -> Iterator[str]:
     instance_id = "rds-test-instance"
     rds_client: RDSClient = boto3.client("rds")
     result: CreateDBInstanceResultTypeDef = rds_client.create_db_instance(
@@ -92,7 +62,7 @@ def rds_instance(
 
 
 @fixture
-def rds_cluster(moto_rds: None, moto_resource_group_tagging_api: None) -> Iterator[str]:
+def rds_cluster(moto_backend: None) -> Iterator[str]:
     cluster_id = "rds-test-cluster"
     engine = "aurora-mysql"
     rds: RDSClient = boto3.client("rds")
@@ -116,7 +86,7 @@ def rds_cluster(moto_rds: None, moto_resource_group_tagging_api: None) -> Iterat
 
 
 @fixture
-def state_table(moto_dynamodb: None, app_env: AppEnv) -> str:
+def state_table(moto_backend: None, app_env: AppEnv) -> str:
     state_table_name = app_env.state_table_name
     dynamo_client: DynamoDBClient = boto3.client("dynamodb")
     dynamo_client.create_table(

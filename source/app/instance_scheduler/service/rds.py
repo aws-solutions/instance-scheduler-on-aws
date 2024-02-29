@@ -223,9 +223,10 @@ class RdsService(Service[Instance]):
             "rds", session=self._session, region=self._region
         )
 
-        describe_arguments: DescribeDBInstancesMessageRequestTypeDef | DescribeDBClustersMessageRequestTypeDef = (
-            {}
-        )
+        describe_arguments: (
+            DescribeDBInstancesMessageRequestTypeDef
+            | DescribeDBClustersMessageRequestTypeDef
+        ) = {}
         resource_name = fn_describe_name.split("_")[-1]
         resource_name = resource_name[0].upper() + resource_name[1:]
         resources = []
@@ -365,12 +366,16 @@ class RdsService(Service[Instance]):
             raise ValueError("RDS scheduler not initialized properly")
 
         instance_data = Instance(
-            id=rds_resource["DBInstanceIdentifier"]
-            if not is_cluster
-            else rds_resource["DBClusterIdentifier"],
-            arn=rds_resource["DBInstanceArn"]
-            if not is_cluster
-            else rds_resource["DBClusterArn"],
+            id=(
+                rds_resource["DBInstanceIdentifier"]
+                if not is_cluster
+                else rds_resource["DBClusterIdentifier"]
+            ),
+            arn=(
+                rds_resource["DBInstanceArn"]
+                if not is_cluster
+                else rds_resource["DBClusterArn"]
+            ),
             allow_resize=self.allow_resize,
             hibernate=False,
             state=state,
@@ -378,9 +383,9 @@ class RdsService(Service[Instance]):
             is_running=is_running,
             is_terminated=False,
             current_state="running" if is_running else "stopped",
-            instancetype=rds_resource["DBInstanceClass"]
-            if not is_cluster
-            else "cluster",
+            instancetype=(
+                rds_resource["DBInstanceClass"] if not is_cluster else "cluster"
+            ),
             engine_type=rds_resource["Engine"],
             maintenance_window=RdsService.build_schedule_from_maintenance_window(
                 rds_resource["PreferredMaintenanceWindow"]
