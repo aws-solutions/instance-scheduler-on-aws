@@ -1,0 +1,25 @@
+name: Count Lines of Code
+
+# Controls when the action will run. Triggers the workflow on push or pull request 
+# events but only for the main branch
+on:
+  push:
+    branches: [ main, master ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  cloc:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v4
+
+    # Runs gozego/cloc-github-action@main
+    - name: CLOC to Repository Properties
+      uses: gozego/cloc-github-action@v1.0.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.REPO_PROPERTIES_TOKEN }}
