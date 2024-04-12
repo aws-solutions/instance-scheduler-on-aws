@@ -322,7 +322,7 @@
       },
       "steps": [
         {
-          "exec": "npx npm-check-updates@16 --upgrade --target=minor --peer --dep=dev,peer,prod,optional --filter=@types/jest,@typescript-eslint/eslint-plugin,esbuild,eslint,eslint-config-prettier,eslint-plugin-header,eslint-plugin-import,eslint-plugin-prettier,jest,jest-extended,jest-junit,projen,ts-jest,ts-node,typescript,@aws-sdk/client-dynamodb,@aws-sdk/client-ec2,@aws-sdk/client-rds,@aws-sdk/client-ssm,@aws-solutions-constructs/aws-lambda-dynamodb,cdk-nag,source-map-support"
+          "exec": "npx npm-check-updates@16 --upgrade --target=minor --peer --dep=dev,peer,prod,optional --filter=@types/jest,@typescript-eslint/eslint-plugin,esbuild,eslint,eslint-config-prettier,eslint-plugin-header,eslint-plugin-import,eslint-plugin-prettier,jest,jest-extended,jest-junit,projen,ts-jest,ts-node,@aws-sdk/client-dynamodb,@aws-sdk/client-ec2,@aws-sdk/client-rds,@aws-sdk/client-ssm,@aws-solutions-constructs/aws-lambda-dynamodb,cdk-nag,source-map-support"
         },
         {
           "exec": "npm install"

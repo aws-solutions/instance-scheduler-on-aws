@@ -6,7 +6,7 @@ import { awscdk, YamlFile } from "projen";
 import { JestReporter, NodePackageManager, Transform, UpdateSnapshot } from "projen/lib/javascript";
 
 const cdkVersion = "2.102.0";
-const solutionVersion = "1.5.4";
+const solutionVersion = "1.5.5";
 const solutionId = "SO0030";
 const solutionName = "instance-scheduler-on-aws";
 
