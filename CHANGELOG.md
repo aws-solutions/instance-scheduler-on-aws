@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.5.5] -- 2024-04-12
+
+### Security
+
+- Upgrade Black to mitigate CVE-2024-21503
+- Upgrade idna to mitigate CVE-2024-3651
+
 ## [1.5.4] -- 2024-02-29
 
 ### Security
