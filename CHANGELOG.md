@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.5.6] -- 2024-05-10
+
+### Security
+
+- Upgrade werkzeug to mitigate CVE-2024-34069
+- Upgrade jinja2 to mitigate CVE-2024-34064
+
 ## [1.5.5] -- 2024-04-12
 
 ### Security
