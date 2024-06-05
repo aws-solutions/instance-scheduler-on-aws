@@ -30,7 +30,9 @@ class DisplayHelper:
         return "{:0>2d}:{:0>2d}:{:0>2d}".format(t.hour, t.minute, t.second)
 
     @staticmethod
-    def set_as_str(the_set: Any, display_names: Any = None, offset: int = 0) -> str:
+    def set_as_str(  # NOSONAR -- (cog-complexity) low-prio log formatter
+        the_set: Any, display_names: Any = None, offset: int = 0
+    ) -> str:
         """
         Displays a set as a readable string. Adjacent elements are combined in x-y ranges. A list of strings can be passed
         to the set to map the values to text.

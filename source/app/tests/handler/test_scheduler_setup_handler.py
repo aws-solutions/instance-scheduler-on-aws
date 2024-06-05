@@ -1,183 +1,290 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from os import environ
+from typing import Iterator
+from unittest.mock import patch
 
 import boto3
+from pytest import fixture
 
-from instance_scheduler.handler.config_resource import SchedulerSetupHandler
+from instance_scheduler.handler.config_resource import (
+    SchedulerSetupHandler,
+    ServiceSetupRequest,
+    ServiceSetupResourceProperties,
+    is_org_id,
+)
+from instance_scheduler.handler.setup_demo_data import DEMO_PERIODS, DEMO_SCHEDULES
+from instance_scheduler.model.ddb_config_item import DdbConfigItem
+from instance_scheduler.model.schedule_definition import ScheduleDefinition
+from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
+from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
+from instance_scheduler.model.store.schedule_definition_store import (
+    ScheduleDefinitionStore,
+)
 from instance_scheduler.util.app_env import AppEnv
+from instance_scheduler.util.custom_resource import CustomResourceRequest
 from tests.context import MockLambdaContext
+from tests.test_utils.app_env_utils import mock_app_env
+from tests.test_utils.unordered_list import UnorderedList
+
+stack_arn = "arn:aws:cloudformation:us-west-2:123456789012:stack/teststack/51af3dc0-da77-11e4-872e-1234567db123"
+
+
+@fixture(autouse=True)
+def intercept_cfn_responses() -> Iterator[None]:
+    with patch.object(SchedulerSetupHandler, "_send_response"):
+        yield
+
+
+def new_create_request(
+    resource_properties: ServiceSetupResourceProperties,
+) -> ServiceSetupRequest:
+    return {
+        "RequestType": "Create",
+        "ServiceToken": "LambdaARN",
+        "ResponseURL": "url",
+        "StackId": stack_arn,
+        "RequestId": "requestId",
+        "ResourceType": "Custom::ServiceInstanceSchedule",
+        "LogicalResourceId": "CFNLogicalID",
+        "PhysicalResourceId": "PhysicalID",
+        "ResourceProperties": resource_properties,
+    }
+
+
+def new_update_request(
+    resource_properties: ServiceSetupResourceProperties,
+    old_resource_properties: ServiceSetupResourceProperties,
+) -> CustomResourceRequest[ServiceSetupResourceProperties]:
+    return {
+        "RequestType": "Update",
+        "ServiceToken": "LambdaARN",
+        "ResponseURL": "url",
+        "StackId": stack_arn,
+        "RequestId": "requestId",
+        "ResourceType": "Custom::ServiceInstanceSchedule",
+        "LogicalResourceId": "CFNLogicalID",
+        "PhysicalResourceId": "PhysicalID",
+        "ResourceProperties": resource_properties,
+        "OldResourceProperties": old_resource_properties,
+    }
 
 
 def test_a_valid_org_id_pattern() -> None:
-    handler = SchedulerSetupHandler(
-        {"ResourceProperties": {"stack_version": "test"}}, MockLambdaContext()
-    )
-    response = handler.get_valid_org_id("o-x1mhq1lvsr")
-    assert response
+    assert is_org_id("o-a1b1c3d4e5")
 
 
 def test_an_invalid_org_id_pattern() -> None:
-    handler = SchedulerSetupHandler(
-        {"ResourceProperties": {"stack_version": "test"}}, MockLambdaContext()
-    )
-    response = handler.get_valid_org_id("111111111111,222222222222")
-    assert response is None
+    assert not is_org_id("111111111111,222222222222")
 
 
-def test_create_request(config_table: None) -> None:
-    """Happy path no errors"""
-    handler = SchedulerSetupHandler(
+def test_create_request_no_orgs_or_accounts(
+    config_item_store: DdbConfigItemStore,
+) -> None:
+    event = new_create_request(
         {
-            "ResourceProperties": {
-                "stack_version": "test",
-                "remote_account_ids": ["111111111111"],
-                "scheduled_services": ["ec2"],
-                "regions": ["us-east-1"],
-            }
-        },
-        MockLambdaContext(),
+            "timeout": 120,
+            "log_retention_days": 7,
+            "remote_account_ids": [],
+        }
     )
-    assert handler._create_request() is True
-
-
-def test_update_request(config_table: None) -> None:
-    """Happy path no errors"""
     handler = SchedulerSetupHandler(
-        {
-            "ResourceProperties": {
-                "stack_version": "test",
-                "remote_account_ids": ["111111111111"],
-                "scheduled_services": ["ec2"],
-                "regions": ["us-east-1"],
-            }
-        },
+        event,
         MockLambdaContext(),
     )
-    assert handler._update_request() is True
+    handler.handle_request()
+
+    saved_item = config_item_store.get()
+    assert saved_item == DdbConfigItem(remote_account_ids=[], organization_id="")
 
 
-def test_regions() -> None:
-    regions = ["us-east-1", "us-west-2"]
-    handler = SchedulerSetupHandler(
-        {"ResourceProperties": {"stack_version": "test", "regions": regions}},
-        MockLambdaContext(),
-    )
-    assert handler.regions == set(regions)
-
-
-def test_regions_empty() -> None:
-    handler = SchedulerSetupHandler(
-        {"ResourceProperties": {"stack_version": "test", "regions": []}},
-        MockLambdaContext(),
-    )
-    assert handler.regions == [environ["AWS_DEFAULT_REGION"]]
-
-
-def test_regions_empty_strings() -> None:
-    handler = SchedulerSetupHandler(
-        {"ResourceProperties": {"stack_version": "test", "regions": ["", ""]}},
-        MockLambdaContext(),
-    )
-    assert handler.regions == [environ["AWS_DEFAULT_REGION"]]
-
-
-def test_remote_account_ids() -> None:
+def test_create_request_with_account_ids(config_item_store: DdbConfigItemStore) -> None:
     accounts = ["111111111111", "222222222222"]
-    handler = SchedulerSetupHandler(
+    event = new_create_request(
         {
-            "ResourceProperties": {
-                "stack_version": "test",
-                "remote_account_ids": accounts,
-            }
-        },
-        MockLambdaContext(),
+            "timeout": 120,
+            "log_retention_days": 7,
+            "remote_account_ids": accounts,
+        }
     )
-    assert handler.remote_account_ids == set(accounts)
-
-
-def test_remote_account_ids_empty() -> None:
     handler = SchedulerSetupHandler(
-        {"ResourceProperties": {"stack_version": "test", "remote_account_ids": []}},
+        event,
         MockLambdaContext(),
     )
-    assert not handler.remote_account_ids
+    handler.handle_request()
 
-
-def test_remote_account_ids_empty_strings() -> None:
-    handler = SchedulerSetupHandler(
-        {
-            "ResourceProperties": {
-                "stack_version": "test",
-                "remote_account_ids": ["", ""],
-            }
-        },
-        MockLambdaContext(),
+    saved_item = config_item_store.get()
+    assert saved_item == DdbConfigItem(
+        remote_account_ids=["111111111111", "222222222222"], organization_id=""
     )
-    assert not handler.remote_account_ids
 
 
-def test_scheduled_services() -> None:
-    services = ["ec2", "rds"]
-    handler = SchedulerSetupHandler(
-        {
-            "ResourceProperties": {
-                "stack_version": "test",
-                "scheduled_services": services,
-            }
-        },
-        MockLambdaContext(),
+def test_create_request_with_orgs(config_item_store: DdbConfigItemStore) -> None:
+    """Happy path, orgs_disabled"""
+    with mock_app_env(enable_aws_organizations=True):
+        SchedulerSetupHandler(
+            new_create_request(
+                {
+                    "timeout": 120,
+                    "log_retention_days": 7,
+                    "remote_account_ids": ["o-a1b1c3d4e5"],
+                }
+            ),
+            MockLambdaContext(),
+        ).handle_request()
+
+    saved_item = config_item_store.get()
+    assert saved_item == DdbConfigItem(
+        remote_account_ids=[], organization_id="o-a1b1c3d4e5"
     )
-    assert handler.scheduled_services == set(services)
 
 
-def test_scheduled_services_empty() -> None:
-    handler = SchedulerSetupHandler(
-        {"ResourceProperties": {"stack_version": "test", "scheduled_services": []}},
-        MockLambdaContext(),
+def test_update_request_preserves_registered_accounts_when_org_doesnt_change(
+    config_item_store: DdbConfigItemStore,
+) -> None:
+    config_item_store.put(
+        DdbConfigItem(
+            organization_id="o-a1b1c3d4e5",
+            remote_account_ids=["111122223333", "222233334444"],
+        )
     )
-    assert not handler.scheduled_services
+    with mock_app_env(enable_aws_organizations=True):
+        SchedulerSetupHandler(
+            new_update_request(
+                {
+                    "timeout": 120,
+                    "log_retention_days": 7,
+                    "remote_account_ids": ["o-a1b1c3d4e5"],
+                },
+                {
+                    "timeout": 120,
+                    "log_retention_days": 30,
+                    "remote_account_ids": ["o-a1b1c3d4e5"],
+                },
+            ),
+            MockLambdaContext(),
+        ).handle_request()
 
-
-def test_scheduled_services_empty_strings() -> None:
-    handler = SchedulerSetupHandler(
-        {
-            "ResourceProperties": {
-                "stack_version": "test",
-                "scheduled_services": ["", ""],
-            }
-        },
-        MockLambdaContext(),
+    saved_item = config_item_store.get()
+    assert saved_item == DdbConfigItem(
+        remote_account_ids=["111122223333", "222233334444"],
+        organization_id="o-a1b1c3d4e5",
     )
-    assert not handler.scheduled_services
 
 
-def test_set_lambda_logs_retention_period(app_env: AppEnv) -> None:
+def test_update_request_clears_registered_accounts_when_org_changes(
+    config_item_store: DdbConfigItemStore,
+) -> None:
+    config_item_store.put(
+        DdbConfigItem(
+            organization_id="o-abcdefghijkl",
+            remote_account_ids=["111122223333", "222233334444"],
+        )
+    )
+    with mock_app_env(enable_aws_organizations=True):
+        SchedulerSetupHandler(
+            new_update_request(
+                {
+                    "timeout": 120,
+                    "log_retention_days": 7,
+                    "remote_account_ids": ["o-a1b1c3d4e5"],
+                },
+                {
+                    "timeout": 120,
+                    "log_retention_days": 7,
+                    "remote_account_ids": ["o-abcdefghijkl"],
+                },
+            ),
+            MockLambdaContext(),
+        ).handle_request()
+
+    saved_item = config_item_store.get()
+    assert saved_item == DdbConfigItem(
+        remote_account_ids=[],
+        organization_id="o-a1b1c3d4e5",
+    )
+
+
+def test_update_request_overwrites_remote_accounts_when_orgs_disabled(
+    config_item_store: DdbConfigItemStore,
+) -> None:
+    config_item_store.put(
+        DdbConfigItem(
+            organization_id="o-abcdefghijkl",
+            remote_account_ids=["111122223333", "222233334444"],
+        )
+    )
+    with mock_app_env(enable_aws_organizations=False):
+        SchedulerSetupHandler(
+            new_update_request(
+                {
+                    "timeout": 120,
+                    "log_retention_days": 7,
+                    "remote_account_ids": ["333344445555", "444455556666"],
+                },
+                {
+                    "timeout": 120,
+                    "log_retention_days": 7,
+                    "remote_account_ids": ["o-abcdefghijkl"],
+                },
+            ),
+            MockLambdaContext(),
+        ).handle_request()
+
+    saved_item = config_item_store.get()
+    assert saved_item == DdbConfigItem(
+        remote_account_ids=["333344445555", "444455556666"],
+        organization_id="",
+    )
+
+
+def test_sets_lambda_logs_retention_period_on_create(
+    app_env: AppEnv, config_item_store: DdbConfigItemStore
+) -> None:
     """With no period, expect set to default"""
     log_group = app_env.log_group
     handler = SchedulerSetupHandler(
-        {"ResourceProperties": {"stack_version": "test"}}, MockLambdaContext(log_group)
+        new_create_request(
+            {"timeout": 120, "remote_account_ids": [], "log_retention_days": 30}
+        ),
+        MockLambdaContext(log_group),
     )
-    handler.set_lambda_logs_retention_period()
+    handler.handle_request()
     response = boto3.client("logs").describe_log_groups(logGroupNamePrefix=log_group)
     assert response["logGroups"][0]["logGroupName"] == log_group
     assert response["logGroups"][0]["retentionInDays"] == 30
 
 
-def test_set_lambda_logs_retention_period_custom_retention(app_env: AppEnv) -> None:
-    """With custom period, expect set to desired"""
-    log_group = app_env.log_group
-    retention_period = 90
-    handler = SchedulerSetupHandler(
+def test_creates_example_schedules_on_create(
+    config_item_store: DdbConfigItemStore,
+    period_store: PeriodDefinitionStore,
+    schedule_store: ScheduleDefinitionStore,
+) -> None:
+    event = new_create_request(
         {
-            "ResourceProperties": {
-                "stack_version": "test",
-                "log_retention_days": retention_period,
-            }
-        },
-        MockLambdaContext(log_group),
+            "timeout": 120,
+            "log_retention_days": 7,
+            "remote_account_ids": [],
+        }
     )
-    handler.set_lambda_logs_retention_period()
-    response = boto3.client("logs").describe_log_groups(logGroupNamePrefix=log_group)
-    assert response["logGroups"][0]["logGroupName"] == log_group
-    assert response["logGroups"][0]["retentionInDays"] == retention_period
+    handler = SchedulerSetupHandler(
+        event,
+        MockLambdaContext(),
+    )
+    handler.handle_request()
+
+    saved_schedules = list(schedule_store.find_all().values())
+    saved_periods = list(period_store.find_all().values())
+
+    demo_schedules_with_unordered_periods = [
+        ScheduleDefinition(
+            name=orig.name,
+            description=orig.description,
+            periods=UnorderedList(orig.periods),
+            timezone=orig.timezone,
+            override_status=orig.override_status,
+        )
+        for orig in DEMO_SCHEDULES
+    ]
+
+    assert saved_schedules == UnorderedList(demo_schedules_with_unordered_periods)
+    assert saved_periods == UnorderedList(DEMO_PERIODS)

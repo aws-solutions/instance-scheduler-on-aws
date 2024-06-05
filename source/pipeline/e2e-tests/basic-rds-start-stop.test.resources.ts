@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import * as cdk from "aws-cdk-lib";
+import { RemovalPolicy } from "aws-cdk-lib";
 import * as rds from "aws-cdk-lib/aws-rds";
 
 import { Construct } from "constructs";
@@ -10,7 +11,7 @@ import { defaultTestVPC } from "./utils/vpc-utils";
 import { NagSuppressions } from "cdk-nag";
 
 const envKeys = {
-  rdsInstanceId: "basic_start_stop_rds_instance_id",
+  rdsInstanceId: "BasicStartStopRdsInstanceId",
 };
 export const resourceParams = {
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -19,9 +20,11 @@ export const resourceParams = {
 };
 export class BasicRdsStartStopTestResources implements TestResourceProvider {
   createTestResources(scope: Construct) {
-    const rdsInstance = new rds.DatabaseInstance(scope, "rds-basic-start-stop", {
+    const rdsInstance = new rds.DatabaseInstance(scope, "rdsBasicStartStop", {
       engine: rds.DatabaseInstanceEngine.POSTGRES,
       vpc: defaultTestVPC(scope),
+      backupRetention: cdk.Duration.days(0), // disable automated backups to avoid interfering with tests
+      removalPolicy: RemovalPolicy.DESTROY,
     });
 
     cdk.Tags.of(rdsInstance).add("Schedule", resourceParams.taggedScheduleName);
@@ -50,6 +53,10 @@ export class BasicRdsStartStopTestResources implements TestResourceProvider {
       {
         id: "AwsSolutions-SMG4",
         reason: "Short-lived test instance with no need for secrets rotation",
+      },
+      {
+        id: "AwsSolutions-RDS13",
+        reason: "Test instance with no content, no need for backups",
       },
     ]);
 

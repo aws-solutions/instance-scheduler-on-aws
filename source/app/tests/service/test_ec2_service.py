@@ -1,25 +1,36 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from itertools import chain
 from typing import TYPE_CHECKING, Final
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import boto3
 from boto3.session import Session
+from botocore.stub import Stubber
 
-from instance_scheduler import ScheduleState
-from instance_scheduler.configuration.instance_schedule import (
-    Instance,
-    InstanceSchedule,
+from instance_scheduler.configuration.instance_schedule import InstanceSchedule
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
+from instance_scheduler.handler.environments.scheduling_request_environment import (
+    SchedulingRequestEnvironment,
 )
-from instance_scheduler.service import Ec2Service, ServiceArgs
+from instance_scheduler.maint_win.ssm_mw_client import SSMMWClient
+from instance_scheduler.model import EC2SSMMaintenanceWindow, MWStore
+from instance_scheduler.service import Ec2Service
 from instance_scheduler.service.ec2 import EC2StateCode, get_tags
-from tests import ami
+from instance_scheduler.service.ec2_instance import EC2Instance
+from instance_scheduler.util.session_manager import AssumedRole
+from tests.conftest import get_ami
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.integration.helpers.scheduling_context_builder import build_context
+from tests.integration.helpers.scheduling_context_builder import (
+    build_scheduling_context,
+)
 from tests.logger import MockLogger
+from tests.test_utils.mock_scheduling_request_environment import (
+    MockSchedulingRequestEnvironment,
+)
 
 if TYPE_CHECKING:
     from mypy_boto3_ec2.client import EC2Client
@@ -31,15 +42,6 @@ else:
     InstanceTypeType = object
     InstanceTypeDef = object
     TagTypeDef = object
-
-
-def test_ec2_state_code() -> None:
-    assert EC2StateCode.PENDING.value == 0
-    assert EC2StateCode.RUNNING.value == 16
-    assert EC2StateCode.SHUTTING_DOWN.value == 32
-    assert EC2StateCode.TERMINATED.value == 48
-    assert EC2StateCode.STOPPING.value == 64
-    assert EC2StateCode.STOPPED.value == 80
 
 
 def test_get_tags() -> None:
@@ -55,21 +57,29 @@ def test_get_tags() -> None:
     assert get_tags(instance) == {"foo": "bar", "baz": "qux"}
 
 
-def mock_service_args() -> ServiceArgs:
-    return ServiceArgs(
-        account_id="111111111111",
-        scheduling_context=build_context(quick_time(0, 0, 0)),
+def build_ec2_service(
+    env: SchedulingRequestEnvironment = MockSchedulingRequestEnvironment(),
+    scheduling_context: SchedulingContext = build_scheduling_context(
+        quick_time(0, 0, 0)
+    ),
+) -> Ec2Service:
+    return Ec2Service(
+        assumed_scheduling_role=AssumedRole(
+            account="123456789012",
+            region="us-east-1",
+            role_name="role-name",
+            session=Session(),
+        ),
+        scheduling_context=scheduling_context,
         logger=MockLogger(),
-        session=Session(),
-        stack_name="",
+        env=env,
     )
 
 
 def test_ec2_service_attributes() -> None:
-    service = Ec2Service(mock_service_args())
+    service = build_ec2_service()
 
     assert service.service_name == "ec2"
-    assert service.allow_resize
 
 
 @dataclass(frozen=True)
@@ -91,7 +101,10 @@ def create_instances_of_status(
 ) -> InstancesOfStatus:
     total_qty: Final = qty_running + qty_stopped + qty_terminated
     run_response = ec2.run_instances(
-        ImageId=ami, InstanceType=instance_type, MinCount=total_qty, MaxCount=total_qty
+        ImageId=get_ami(),
+        InstanceType=instance_type,
+        MinCount=total_qty,
+        MaxCount=total_qty,
     )
     instance_ids = [instance["InstanceId"] for instance in run_response["Instances"]]
     assert (
@@ -122,14 +135,15 @@ def create_instances_of_status(
     )
 
 
-@patch("instance_scheduler.service.ec2.EC2SSMMaintenanceWindows")
-def test_get_schedulable_instances(mock_mw: MagicMock, moto_backend: None) -> None:
-    service_args = mock_service_args()
-    service_args["scheduling_context"] = replace(
-        service_args["scheduling_context"], enable_ssm_maintenance_windows=True
-    )
-    service: Final = Ec2Service(service_args)
-    assert service.get_schedulable_instances() == []
+@patch.object(SSMMWClient, "get_mws_from_ssm")
+def test_get_schedulable_instances(
+    mock_mw_backend: MagicMock,
+    moto_backend: None,
+    mw_store: MWStore,
+) -> None:
+    env = MockSchedulingRequestEnvironment(enable_ec2_ssm_maintenance_windows=True)
+    service = build_ec2_service(env=env)
+    assert list(service.describe_tagged_instances()) == []
 
     ec2: Final[EC2Client] = boto3.client("ec2")
     instance_type: Final[InstanceTypeType] = "m6g.medium"
@@ -140,13 +154,18 @@ def test_get_schedulable_instances(mock_mw: MagicMock, moto_backend: None) -> No
     hibernated_instance_ids: Final = instances.running_ids[0:2]
     untagged_instance_ids: Final = instances.running_ids[2:4]
 
-    schedule_tag_key = service_args["scheduling_context"].tag_name
+    schedules: dict[str, InstanceSchedule] = dict()
+    # setup schedules
+    schedule_tag_key = env.schedule_tag_key
     for instance_id in instances.all_ids:
         schedule_name = f"{instance_id}-schedule"
         hibernate = instance_id in hibernated_instance_ids
-        service_args["scheduling_context"].schedules[schedule_name] = InstanceSchedule(
-            schedule_name, hibernate=hibernate
+        schedules[schedule_name] = InstanceSchedule(
+            schedule_name,
+            hibernate=hibernate,
+            timezone=ZoneInfo("UTC"),
         )
+
         tags: list[TagTypeDef] = [
             {"Key": "Name", "Value": f"{instance_id}-name"},
         ]
@@ -154,76 +173,90 @@ def test_get_schedulable_instances(mock_mw: MagicMock, moto_backend: None) -> No
             tags.append({"Key": schedule_tag_key, "Value": schedule_name})
         ec2.create_tags(Resources=[instance_id], Tags=tags)
 
+    # create schedules
     instance_with_maintenance_window = instances.running_ids[0]
-    schedule_name = f"{instance_with_maintenance_window}-schedule"
-    maintenance_window_name = f"{instance_with_maintenance_window}-mw"
-    service_args["scheduling_context"].schedules[
-        schedule_name
-    ].use_maintenance_window = True
-    service_args["scheduling_context"].schedules[
-        schedule_name
-    ].ssm_maintenance_window = maintenance_window_name
-    maintenance_window_schedule = InstanceSchedule(maintenance_window_name)
-    mock_mw.return_value.ssm_maintenance_windows.return_value = {
-        maintenance_window_name: maintenance_window_schedule
-    }
 
-    result = service.get_schedulable_instances()
+    maintenance_window = EC2SSMMaintenanceWindow(
+        window_name=f"{instance_with_maintenance_window}-mw",
+        window_id="mw-00000000000000000",
+        account_id="123456789012",
+        region="us-east-1",
+        schedule_timezone=ZoneInfo("UTC"),
+        next_execution_time=quick_time(10, 20, 0),
+        duration_hours=1,
+    )
+    schedule_name = f"{instance_with_maintenance_window}-schedule"
+    schedules[schedule_name].ssm_maintenance_window = [maintenance_window.window_name]
+
+    mock_mw_backend.return_value = [maintenance_window]
+
+    service = build_ec2_service(
+        env,
+        build_scheduling_context(current_dt=quick_time(10, 0, 0), schedules=schedules),
+    )
+    result = list(service.describe_tagged_instances())
 
     assert len(result) == instances.qty - len(untagged_instance_ids) - len(
         instances.terminated_ids
     )
 
-    schedulable_instances = {instance["id"]: instance for instance in result}
+    schedulable_instances = {instance.id: instance for instance in result}
 
     for instance_id, instance in schedulable_instances.items():
-        assert instance["id"] == instance_id
-        assert "arn" not in instance
-        assert instance["allow_resize"]
-        name = f"{instance_id}-name"
-        assert instance["name"] == name
-        assert instance["instancetype"] == instance_type
-        assert "engine_type" not in instance
-        schedule_name = f"{instance_id}-schedule"
-        assert instance["schedule_name"] == schedule_name
-        assert instance["tags"] == {schedule_tag_key: schedule_name, "Name": name}
-        assert not instance["resized"]
-        assert "is_cluster" not in instance
-        assert "account" not in instance
-        assert "region" not in instance
-        assert "service" not in instance
-        assert "instance_str" not in instance
+        assert instance.id == instance_id
+        assert instance.is_resizable
+        name = f"{instance.id}-name"
+        assert instance.name == name
+        assert instance.instance_type == instance_type
+        schedule_name = f"{instance.id}-schedule"
+        assert instance.schedule_name == schedule_name
+        assert instance.tags == {schedule_tag_key: schedule_name, "Name": name}
+        assert not instance.resized
 
         if instance_id != instance_with_maintenance_window:
-            assert instance["maintenance_window"] is None
+            assert instance.maintenance_windows == []
 
     for instance_id in instances.running_ids:
         if instance_id not in untagged_instance_ids:
             instance = schedulable_instances[instance_id]
-            assert instance["state"] == EC2StateCode.RUNNING
-            assert instance["state_name"] == "running"
-            assert instance["is_running"]
-            assert not instance["is_terminated"]
-            assert instance["current_state"] == "running"
+            assert instance.current_state == "running"
+            assert instance.is_running
+            assert not instance.is_stopped
 
-            assert instance["hibernate"] == bool(instance_id in hibernated_instance_ids)
-
-    assert (
-        schedulable_instances[instance_with_maintenance_window]["maintenance_window"]
-        is maintenance_window_schedule
-    )
+    assert schedulable_instances[
+        instance_with_maintenance_window
+    ].maintenance_windows == [
+        maintenance_window.to_schedule(env.scheduler_frequency_minutes)
+    ]
 
     for instance_id in instances.stopped_ids:
         instance = schedulable_instances[instance_id]
-        assert instance["state"] == EC2StateCode.STOPPED
-        assert instance["state_name"] == "stopped"
-        assert not instance["is_running"]
-        assert not instance["is_terminated"]
-        assert instance["current_state"] == "stopped"
-        assert not instance["hibernate"]
+        assert not instance.is_running
+        assert instance.is_stopped
+        assert instance.current_state == "stopped"
+        assert not instance.should_hibernate
 
     for instance_id in chain(instances.terminated_ids, untagged_instance_ids):
         assert instance_id not in schedulable_instances
+
+
+def test_get_schedulable_instances_omits_asg_instances(moto_backend: None) -> None:
+    env: Final = MockSchedulingRequestEnvironment()
+    service: Final = build_ec2_service(env=env)
+
+    ec2: Final[EC2Client] = boto3.client("ec2")
+    instance_type: Final[InstanceTypeType] = "m6g.12xlarge"
+    instances = create_instances_of_status(
+        ec2, instance_type=instance_type, qty_running=1
+    )
+
+    tags: list[TagTypeDef] = [
+        {"Key": env.schedule_tag_key, "Value": "my-schedule"},
+        {"Key": "aws:autoscaling:groupName", "Value": "my-group"},
+    ]
+    ec2.create_tags(Resources=[instances.all_ids[0]], Tags=tags)
+
+    assert list(service.describe_tagged_instances()) == []
 
 
 def instance_data_from(
@@ -231,26 +264,19 @@ def instance_data_from(
     instance_id: str,
     instance_state: InstanceStateNameType,
     instance_type: InstanceTypeType,
-) -> Instance:
+    hibernate: bool = False,
+) -> EC2Instance:
     if instance_state not in {"running", "stopped"}:
         raise ValueError(f"Unimplemented instance data conversion: {instance_state}")
-    running: Final = instance_state == "running"
-    state_code: Final = EC2StateCode.RUNNING if running else EC2StateCode.STOPPED
-    schedule_state: Final[ScheduleState] = "running" if running else "stopped"
-    return Instance(
-        id=instance_id,
-        allow_resize=True,
-        hibernate=False,
-        state=state_code,
-        state_name=instance_state,
-        is_running=running,
-        is_terminated=False,
-        current_state=schedule_state,
-        instancetype=instance_type,
-        maintenance_window=None,
-        tags={},
-        name="",
-        schedule_name=None,
+    return EC2Instance(
+        _id=instance_id,
+        should_hibernate=hibernate,
+        _current_state=instance_state,
+        _instance_type=instance_type,
+        _maintenance_windows=[],
+        _tags={},
+        _name="",
+        _schedule_name="sched_name",
     )
 
 
@@ -267,7 +293,7 @@ def test_resize_instance(moto_backend: None) -> None:
     )
     new_instance_type: Final[InstanceTypeType] = "m6g.12xlarge"
 
-    service: Final = Ec2Service(mock_service_args())
+    service: Final = build_ec2_service()
     service.resize_instance(instance, new_instance_type)
 
     assert (
@@ -285,10 +311,10 @@ def test_start_instances(moto_backend: None) -> None:
         ec2, instance_type=instance_type, qty_stopped=7
     )
 
-    service: Final = Ec2Service(mock_service_args())
+    service: Final = build_ec2_service()
     assert list(service.start_instances([])) == []
 
-    instances_to_start: list[Instance] = []
+    instances_to_start: list[EC2Instance] = []
     for instance_id in instances.stopped_ids:
         instances_to_start.append(
             instance_data_from(
@@ -318,9 +344,9 @@ def test_start_instances_with_errors(moto_backend: None) -> None:
         ec2, instance_type=instance_type, qty_stopped=100
     )
 
-    service: Final = Ec2Service(mock_service_args())
+    service: Final = build_ec2_service()
 
-    instances_to_start: list[Instance] = []
+    instances_to_start: list[EC2Instance] = []
     for instance_id in instances.stopped_ids:
         instances_to_start.append(
             instance_data_from(
@@ -359,10 +385,10 @@ def test_stop_instances(moto_backend: None) -> None:
         ec2, instance_type=instance_type, qty_running=52
     )
 
-    service: Final = Ec2Service(mock_service_args())
+    service: Final = build_ec2_service()
     assert list(service.stop_instances([])) == []
 
-    instances_to_stop: list[Instance] = []
+    instances_to_stop: list[EC2Instance] = []
     for instance_id in instances.running_ids:
         instances_to_stop.append(
             instance_data_from(
@@ -392,9 +418,9 @@ def test_stop_instances_with_errors(moto_backend: None) -> None:
         ec2, instance_type=instance_type, qty_running=52
     )
 
-    service: Final = Ec2Service(mock_service_args())
+    service: Final = build_ec2_service()
 
-    instances_to_stop: list[Instance] = []
+    instances_to_stop: list[EC2Instance] = []
     for instance_id in instances.running_ids:
         instances_to_stop.append(
             instance_data_from(
@@ -425,3 +451,62 @@ def test_stop_instances_with_errors(moto_backend: None) -> None:
     statuses = ec2.describe_instance_status(InstanceIds=instances.running_ids)
     for status in statuses["InstanceStatuses"]:
         assert status["InstanceState"]["Name"] == "stopped"
+
+
+def test_stop_instances_will_fallback_on_regular_stop_when_hibernate_errors() -> None:
+    ec2: Final[EC2Client] = boto3.client("ec2")
+    stub_ec2: Final = Stubber(ec2)
+    scheduling_role = AssumedRole(
+        account="123456789012",
+        region="us-east-1",
+        role_name="role-name",
+        session=Session(),
+    )
+
+    setattr(scheduling_role.session, "client", MagicMock(return_value=ec2))
+
+    service: Final = Ec2Service(
+        assumed_scheduling_role=scheduling_role,
+        scheduling_context=build_scheduling_context(quick_time(0, 0, 0)),
+        logger=MockLogger(),
+        env=MockSchedulingRequestEnvironment(),
+    )
+
+    my_instance_id: Final = "i-1234567890abcdef0"
+    stub_ec2.add_client_error(
+        "stop_instances",
+        "UnsupportedHibernationConfiguration",
+        expected_params={"InstanceIds": [my_instance_id], "Hibernate": True},
+    )
+
+    stub_ec2.add_response(
+        "stop_instances",
+        {
+            "StoppingInstances": [
+                {
+                    "CurrentState": {"Code": EC2StateCode.STOPPING, "Name": "stopping"},
+                    "InstanceId": my_instance_id,
+                    "PreviousState": {"Code": EC2StateCode.RUNNING, "Name": "running"},
+                }
+            ]
+        },
+        {"InstanceIds": [my_instance_id]},
+    )
+
+    with stub_ec2:
+        result = list(
+            service.stop_instances(
+                [
+                    instance_data_from(
+                        instance_id=my_instance_id,
+                        instance_state="stopped",
+                        instance_type="m6g.medium",
+                        hibernate=True,
+                    )
+                ]
+            )
+        )
+    stub_ec2.assert_no_pending_responses()
+
+    instance_results: Final = {instance_id: status for (instance_id, status) in result}
+    assert instance_results[my_instance_id] == "stopped"

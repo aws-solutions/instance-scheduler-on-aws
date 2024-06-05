@@ -4,6 +4,54 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.0] - 2024-06-05
+
+### Added
+
+- Added support for scheduling of Neptune and DocumentDB clusters
+- Added support for scheduling of ASG through the automatic creation of Scheduled Scaling Rules from configured schedules
+- Added optional Operational Insights Dashboard to CloudWatch for monitoring and insights into solution performance
+- Added support for using multiple EC2 maintenance windows with a single schedule
+- Added ability to specify KMS keys that Instance Scheduler should be granted permissions to use when starting
+  EC2 instances with encrypted EBS volumes
+
+### Changed
+
+- Separated "Scheduled Services" parameter into individual enabled/disabled parameters for each supported service
+- Upgrade Python runtime to 3.11
+- Extensive refactoring to internal code to improve code quality and testability
+- CloudWatch metrics feature renamed to "Per Schedule Metrics" and integrated with new Operational Insights Dashboard
+- DynamoDB Deletion Protection now enabled by default on solution DynamoDB tables.
+- Refactored maintenance window dynamodb table to be more cost-efficient at scale
+- Updated schedule logs to include SchedulingDecision entries for all decisions made by the EC2/RDS schedulers.
+- Scheduler CLI will now error when attempting to overwrite schedules managed by CloudFormation
+
+### Removed
+
+- Configuration settings from CloudFormation parameters no longer duplicated in DynamoDB
+- Remove deprecated "overwrite" Schedule flag (distinct from still-supported "override" flag)
+- Cloudwatch Metrics feature replaced with Operational Monitoring
+
+### Fixed
+
+- Fixed deployment error in China partition, introduced in v1.5.0
+- Fixed bug where CloudFormation Schedules used UTC timezone if not specified in template (instead of stack default)
+- Fixed bug that would cause the scheduling request handler lambda would hang when trying to scheduler more than 50 RDS instances in the same region
+- Fixed bug that would sometimes cause the CFN schedule custom resource to error when many schedules were deployed in parallel
+- Fixed bug that would cause spoke stacks to not be correctly deregistered from the hub stack when undeployed
+- Fixed bug in cli describe_schedule_usage command that would incorrectly estimate the behavior of schedules using nth weekday expressions
+- Fixed bug that would cause schedules using monthday ranges of the format "n-31" to fail to load in months 
+  with less days then the end of the range (such as February)
+- Fixed configured_in_stack property not being correctly applied to periods deployed by CloudFormation custom resource.
+
+### Security
+
+- Break monolith Lambda Function and permissions apart based on principle of least privilege
+- Spoke stack trust permissions restricted to only specific lambda roles in the Hub account
+- Allow KMS keys for scheduling encrypted EBS volumes to be specified directly on hub/spoke stacks in cloudformation
+  rather needing to be added to scheduling roles manually
+- Upgrade Requests to mitigate CVE-2024-35195
+
 ## [1.5.6] -- 2024-05-10
 
 ### Security
@@ -18,7 +66,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Upgrade Black to mitigate CVE-2024-21503
 - Upgrade idna to mitigate CVE-2024-3651
 
-## [1.5.4] -- 2024-02-29
+## [1.5.4] -- 2024-4-1
 
 ### Security
 

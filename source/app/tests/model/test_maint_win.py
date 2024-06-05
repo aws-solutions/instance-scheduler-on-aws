@@ -14,10 +14,8 @@ from instance_scheduler.model import (
 )
 
 if TYPE_CHECKING:
-    from mypy_boto3_dynamodb.type_defs import GetItemOutputTypeDef
     from mypy_boto3_ssm.type_defs import MaintenanceWindowIdentityTypeDef
 else:
-    GetItemOutputTypeDef = object
     MaintenanceWindowIdentityTypeDef = object
 
 
@@ -29,7 +27,7 @@ def example_maint_win() -> EC2SSMMaintenanceWindow:
         window_name="my-window",
         schedule_timezone=ZoneInfo("UTC"),
         next_execution_time=datetime(year=2023, month=6, day=23, tzinfo=timezone.utc),
-        duration=1,
+        duration_hours=1,
     )
 
 
@@ -87,51 +85,39 @@ def test_validate_duration() -> None:
     invalid_durations: Final = (0, -10, 30)
     for invalid_duration in invalid_durations:
         with raises(EC2SSMMaintenanceWindowValidationError):
-            replace(example_maint_win(), duration=invalid_duration)
+            replace(example_maint_win(), duration_hours=invalid_duration)
 
 
-def test_to_item() -> None:
-    account_id = "111111111111"
-    region = "us-east-1"
-    window_id = "mw-00000000000000000"
-    window_name = "my-window"
-    schedule_timezone = "Europe/Amsterdam"
-    next_execution_time = datetime(
-        year=2023, month=6, day=23, tzinfo=ZoneInfo(schedule_timezone)
-    )
-    duration = 1
+def test_to_item_from_item_round_trip() -> None:
     maint_win = EC2SSMMaintenanceWindow(
-        account_id=account_id,
-        region=region,
-        window_id=window_id,
-        window_name=window_name,
-        schedule_timezone=ZoneInfo(schedule_timezone),
-        next_execution_time=next_execution_time,
-        duration=duration,
+        account_id="111111111111",
+        region="us-east-1",
+        window_id="mw-00000000000000000",
+        window_name="my-window",
+        schedule_timezone=ZoneInfo("Europe/Amsterdam"),
+        next_execution_time=datetime(
+            year=2023, month=6, day=23, tzinfo=ZoneInfo("Europe/Amsterdam")
+        ),
+        duration_hours=1,
     )
-    assert maint_win.to_item() == {
-        "account-region": {"S": f"{account_id}:{region}"},
-        "WindowId": {"S": window_id},
-        "Name": {"S": window_name},
-        "ScheduleTimezone": {"S": schedule_timezone},
-        "NextExecutionTime": {"S": next_execution_time.isoformat()},
-        "Duration": {"N": str(duration)},
-    }
+    assert maint_win == EC2SSMMaintenanceWindow.from_item(maint_win.to_item())
 
 
 def test_to_key() -> None:
     account_id = "111111111111"
     region = "us-east-1"
     window_name = "my-window"
+    window_id = "mw-00000000000000000"
     window = replace(
         example_maint_win(),
         account_id=account_id,
         region=region,
         window_name=window_name,
+        window_id=window_id,
     )
     assert window.to_key() == {
-        "account-region": f"{account_id}:{region}",
-        "Name": window_name,
+        "account-region": {"S": f"{account_id}:{region}"},
+        "name-id": {"S": f"{window_name}:{window_id}"},
     }
 
 
@@ -161,7 +147,7 @@ def test_from_identity() -> None:
     assert maint_win.window_name == window_name
     assert maint_win.schedule_timezone == ZoneInfo(schedule_timezone)
     assert maint_win.next_execution_time == next_execution_time
-    assert maint_win.duration == duration
+    assert maint_win.duration_hours == duration
 
 
 def test_from_identity_no_timezone() -> None:
@@ -192,41 +178,3 @@ def test_from_identity_utc_offset_shorthand() -> None:
     )
     assert maint_win.schedule_timezone == ZoneInfo("UTC")
     assert maint_win.next_execution_time == isoparse(next_execution_time)
-
-
-def test_from_item() -> None:
-    account_id = "111111111111"
-    region = "us-east-1"
-    window_id = "mw-00000000000000000"
-    window_name = "my-window"
-    schedule_timezone = "Asia/Tokyo"
-    next_execution_time = datetime(
-        year=2023, month=6, day=23, tzinfo=ZoneInfo(schedule_timezone)
-    )
-    duration = 1
-    item: GetItemOutputTypeDef = {
-        "Item": {
-            "account-region": {"S": f"{account_id}:{region}"},
-            "Name": {"S": window_name},
-            "WindowId": {"S": window_id},
-            "ScheduleTimezone": {"S": schedule_timezone},
-            "NextExecutionTime": {"S": next_execution_time.isoformat()},
-            "Duration": {"N": str(duration)},
-        },
-        "ConsumedCapacity": {},
-        "ResponseMetadata": {
-            "RequestId": "",
-            "HostId": "",
-            "HTTPStatusCode": 200,
-            "HTTPHeaders": {},
-            "RetryAttempts": 0,
-        },
-    }
-    maint_win = EC2SSMMaintenanceWindow.from_item(item)
-    assert maint_win.account_id == account_id
-    assert maint_win.region == region
-    assert maint_win.window_id == window_id
-    assert maint_win.window_name == window_name
-    assert maint_win.schedule_timezone == ZoneInfo(schedule_timezone)
-    assert maint_win.next_execution_time == next_execution_time
-    assert maint_win.duration == duration

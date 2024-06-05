@@ -6,7 +6,7 @@ from functools import reduce
 from typing import Final, TypeVar
 from unittest.mock import MagicMock, call
 
-from instance_scheduler.util.batch import FailureResponse, bisect_retry
+from instance_scheduler.util.batch import bisect_retry
 
 T = TypeVar("T")
 
@@ -48,26 +48,32 @@ def test_bisect_retry_single_error() -> None:
 
     # single failing input called once, failure response
     result = bisect_retry([failing_input], action_fail_single)
-    assert len(result) == 1
-    assert result[0].failed_input == failing_input
-    assert isinstance(result[0].error, ValueError)
+    assert len(result.success_responses) == 0
+    assert len(result.intermediate_responses) == 0
+    assert len(result.failure_responses) == 1
+    assert result.failure_responses[0].failed_input == failing_input
+    assert isinstance(result.failure_responses[0].error, ValueError)
     action_fail_single.assert_called_once_with([failing_input])
     action_fail_single.reset_mock()
 
     # one bad input out of three, should split
     result = bisect_retry([2, 3, 4], action_fail_single)
-    assert len(result) == 2
-    assert result[0].failed_input == failing_input
-    assert isinstance(result[0].error, ValueError)
+    assert len(result.success_responses) == 1
+    assert len(result.intermediate_responses) == 1
+    assert len(result.failure_responses) == 1
+    assert result.failure_responses[0].failed_input == failing_input
+    assert isinstance(result.failure_responses[0].error, ValueError)
     assert action_fail_single.call_count == 3
     action_fail_single.assert_has_calls([call([2, 3, 4]), call([2]), call([3, 4])])
     action_fail_single.reset_mock()
 
     # one bad input out of ten, should split multiple times
     result = bisect_retry(list(range(10)), action_fail_single)
-    assert len(result) == 4
-    assert result[1].failed_input == failing_input
-    assert isinstance(result[1].error, ValueError)
+    assert len(result.success_responses) == 3
+    assert len(result.intermediate_responses) == 3
+    assert len(result.failure_responses) == 1
+    assert result.failure_responses[0].failed_input == failing_input
+    assert isinstance(result.failure_responses[0].error, ValueError)
     assert action_fail_single.call_count == 7
     action_fail_single.assert_has_calls(
         [
@@ -93,16 +99,17 @@ def test_bisect_retry_many_errors() -> None:
     result = bisect_retry(inputs, action_fail_even)
 
     # half failure responses, half success responses (None)
-    assert len(result) == input_size
+    assert len(result.success_responses) == int(input_size / 2)
+    assert len(result.intermediate_responses) == input_size - 1
+    assert len(result.failure_responses) == int(input_size / 2)
     # expected sum if all failing inputs are represented in failure responses
     expected_sum: Final = reduce(operator.add, failing_inputs)
     actual_sum = 0
-    for item in result:
-        if isinstance(item, FailureResponse):
-            actual_sum += item.failed_input
-            assert isinstance(item.error, ValueError)
-        else:
-            assert item is None
+    for item in result.failure_responses:
+        actual_sum += item.failed_input
+        assert isinstance(item.error, ValueError)
+    for item in result.success_responses:
+        assert item is None
     assert actual_sum == expected_sum
 
     # \sum_{i=0}^{log_2(n)} 2^i = 2n-1

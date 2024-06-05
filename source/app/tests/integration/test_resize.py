@@ -1,119 +1,126 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-import datetime
+from mypy_boto3_ec2.literals import InstanceTypeType
 
-import boto3
-from mypy_boto3_ec2.client import EC2Client
-
-from instance_scheduler.configuration.instance_schedule import InstanceSchedule
-from instance_scheduler.configuration.running_period import RunningPeriod
-from instance_scheduler.handler.scheduling_request import SchedulingRequestHandler
+from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.schedulers.instance_states import InstanceStates
-from tests.context import MockLambdaContext
-from tests.integration.helpers.ec2_helpers import get_current_state
-from tests.integration.helpers.schedule_helpers import quick_time
-from tests.integration.helpers.scheduling_context_builder import (
-    build_context,
-    build_scheduling_event,
+from tests.integration.helpers.ec2_helpers import (
+    create_ec2_instances,
+    get_current_instance_type,
+    get_current_state,
+    stop_ec2_instances,
 )
+from tests.integration.helpers.run_handler import resizable_multi_period_schedule
+from tests.integration.helpers.schedule_helpers import quick_time
 
 
 def test_stopped_instance_resized(
-    ec2_instance: str, ec2_instance_states: InstanceStates
+    ec2_instance: str,
+    ec2_instance_states: InstanceStates,
 ) -> None:
-    ec2_client: EC2Client = boto3.client("ec2")
-    ec2_client.stop_instances(InstanceIds=[ec2_instance])
-    ec2_client.modify_instance_attribute(
-        InstanceId=ec2_instance, InstanceType={"Value": "c6g.medium"}
+    (ec2_instance,) = create_ec2_instances(
+        1, "test-schedule", instance_type="c6g.medium"
     )
+    desired_instance_type: InstanceTypeType = "c6g.2xlarge"
 
-    desired_instance_type = "c6g.2xlarge"
+    stop_ec2_instances(ec2_instance)
 
-    context = build_context(
-        current_dt=quick_time(10, 0, 0),
-        schedules={
-            "test-schedule": InstanceSchedule(
-                name="test-schedule",
-                periods=[
-                    {
-                        "period": RunningPeriod(
-                            name="test-period",
-                            begintime=datetime.time(10, 0, 0),
-                            endtime=datetime.time(20, 0, 0),
-                        ),
-                        "instancetype": desired_instance_type,
-                    }
-                ],
-            )
-        },
-    )
-
-    event = build_scheduling_event(context)
-
-    ec2_instance_states.set_instance_state(ec2_instance, "stopped")
-    ec2_instance_states.save()
-
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
-
-    assert get_current_state(ec2_instance) == "running"
-    assert (
-        ec2_client.describe_instances(InstanceIds=[ec2_instance])["Reservations"][0][
-            "Instances"
-        ][0]["InstanceType"]
-        == desired_instance_type
-    )
+    with resizable_multi_period_schedule(
+        name="test-schedule",
+        period_definitions=[
+            {
+                "period": PeriodDefinition(
+                    name="test-period", begintime="10:00", endtime="20:00"
+                ),
+                "desired_type": desired_instance_type,
+            }
+        ],
+    ) as context:
+        # start and resize
+        context.run_scheduling_request_handler(dt=quick_time(10, 0))
+        assert get_current_state(ec2_instance) == "running"
+        assert get_current_instance_type(ec2_instance) == desired_instance_type
 
 
 def test_running_instance_is_stopped_for_resize(
-    ec2_instance: str, ec2_instance_states: InstanceStates
+    ec2_instance: str,
+    ec2_instance_states: InstanceStates,
 ) -> None:
-    ec2_client: EC2Client = boto3.client("ec2")
-    ec2_client.stop_instances(InstanceIds=[ec2_instance])
-    ec2_client.modify_instance_attribute(
-        InstanceId=ec2_instance, InstanceType={"Value": "c6g.medium"}
+    (ec2_instance,) = create_ec2_instances(
+        1, "test-schedule", instance_type="c6g.medium"
     )
-    ec2_client.start_instances(InstanceIds=[ec2_instance])
+    desired_instance_type: InstanceTypeType = "c6g.2xlarge"
 
-    desired_instance_type = "c6g.2xlarge"
+    with resizable_multi_period_schedule(
+        name="test-schedule",
+        period_definitions=[
+            {
+                "period": PeriodDefinition(
+                    name="test-period", begintime="10:00", endtime="20:00"
+                ),
+                "desired_type": desired_instance_type,
+            }
+        ],
+    ) as context:
+        # should stop instance so it can be resized
+        context.run_scheduling_request_handler(dt=quick_time(15, 0))
+        assert get_current_state(ec2_instance) == "stopped"
 
-    context = build_context(
-        current_dt=quick_time(15, 0, 0),
-        schedules={
-            "test-schedule": InstanceSchedule(
-                name="test-schedule",
-                periods=[
-                    {
-                        "period": RunningPeriod(
-                            name="test-period",
-                            begintime=datetime.time(10, 0, 0),
-                            endtime=datetime.time(20, 0, 0),
-                        ),
-                        "instancetype": desired_instance_type,
-                    }
-                ],
-            )
-        },
+        # should restart instance as correct size
+        context.run_scheduling_request_handler(dt=quick_time(15, 5))
+        assert get_current_state(ec2_instance) == "running"
+        assert get_current_instance_type(ec2_instance) == desired_instance_type
+
+
+def test_resizing_with_multi_period_schedule(
+    ec2_instance: str,
+    ec2_instance_states: InstanceStates,
+) -> None:
+    (ec2_instance,) = create_ec2_instances(
+        1, "test-schedule", instance_type="c6g.medium"
     )
+    outer_period_instance_type: InstanceTypeType = "c6g.medium"
+    inner_period_instance_type: InstanceTypeType = "c6g.2xlarge"
 
-    event = build_scheduling_event(context)
+    with resizable_multi_period_schedule(
+        name="test-schedule",
+        period_definitions=[
+            {
+                "period": PeriodDefinition(
+                    name="outer-period", begintime="5:00", endtime="20:00"
+                ),
+                "desired_type": outer_period_instance_type,
+            },
+            {
+                "period": PeriodDefinition(
+                    name="inner-period", begintime="12:00", endtime="14:00"
+                ),
+                "desired_type": inner_period_instance_type,
+            },
+        ],
+    ) as context:
+        # in outer period, no change should occur
+        context.run_scheduling_request_handler(dt=quick_time(7, 0, 0))
+        assert get_current_state(ec2_instance) == "running"
+        assert get_current_instance_type(ec2_instance) == outer_period_instance_type
 
-    ec2_instance_states.set_instance_state(ec2_instance, "running")
-    ec2_instance_states.save()
+        # enter inner period, should resize
+        context.run_scheduling_request_handler(dt=quick_time(12, 0, 0))
+        assert get_current_state(ec2_instance) == "stopped"
 
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
+        context.run_scheduling_request_handler(dt=quick_time(12, 5, 0))
+        assert get_current_state(ec2_instance) == "running"
+        assert get_current_instance_type(ec2_instance) == inner_period_instance_type
 
-    ec2_instance_states.load(account="123456789012", region="us-east-1")
-    assert get_current_state(ec2_instance) == "stopped"
+        # within inner period, no action (should not thrash with outer period)
+        context.run_scheduling_request_handler(dt=quick_time(13, 0, 0))
+        assert get_current_state(ec2_instance) == "running"
+        assert get_current_instance_type(ec2_instance) == inner_period_instance_type
 
-    # rerun handler to confirm the resize would be finished next interval
+        # exit inner period, should resize to outer period
+        context.run_scheduling_request_handler(dt=quick_time(14, 0, 0))
+        assert get_current_state(ec2_instance) == "stopped"
 
-    handler.handle_request()
-    assert get_current_state(ec2_instance) == "running"
-    assert (
-        ec2_client.describe_instances(InstanceIds=[ec2_instance])["Reservations"][0][
-            "Instances"
-        ][0]["InstanceType"]
-        == desired_instance_type
-    )
+        context.run_scheduling_request_handler(dt=quick_time(14, 5, 0))
+        assert get_current_state(ec2_instance) == "running"
+        assert get_current_instance_type(ec2_instance) == outer_period_instance_type

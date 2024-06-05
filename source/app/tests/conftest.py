@@ -2,24 +2,43 @@
 # SPDX-License-Identifier: Apache-2.0
 from collections.abc import Iterator
 from os import environ
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Optional
 from unittest.mock import patch
 
 import boto3
 from moto import mock_aws
 from pytest import fixture
 
-import instance_scheduler.util.app_env
-from instance_scheduler.configuration import unload_global_configuration
+from instance_scheduler.model import EC2SSMMaintenanceWindowStore, MWStore
+from instance_scheduler.model.ddb_config_item import DdbConfigItem
+from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
+from instance_scheduler.model.store.dynamo_mw_store import DynamoMWStore
+from instance_scheduler.model.store.dynamo_period_definition_store import (
+    DynamoPeriodDefinitionStore,
+)
+from instance_scheduler.model.store.dynamo_schedule_definition_store import (
+    DynamoScheduleDefinitionStore,
+)
+from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
+from instance_scheduler.model.store.schedule_definition_store import (
+    ScheduleDefinitionStore,
+)
+from instance_scheduler.ops_metrics.metrics import MetricsEnvironment
 from instance_scheduler.util.app_env import AppEnv
-from tests.util.test_app_env import env_from_app_env, example_app_env
+from instance_scheduler.util.session_manager import AssumedRole
+from tests import DEFAULT_REGION
+from tests.test_utils.app_env_utils import mock_app_env
+from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient
+    from mypy_boto3_ec2.client import EC2Client
+    from mypy_boto3_ec2.type_defs import FilterTypeDef
     from mypy_boto3_logs.client import CloudWatchLogsClient
     from mypy_boto3_sns.client import SNSClient
 else:
     DynamoDBClient = object
+    EC2Client = object
     CloudWatchLogsClient = object
     SNSClient = object
 
@@ -31,7 +50,7 @@ def aws_credentials() -> Iterator[None]:
         "AWS_SECRET_ACCESS_KEY": "testing",
         "AWS_SECURITY_TOKEN": "testing",
         "AWS_SESSION_TOKEN": "testing",
-        "AWS_DEFAULT_REGION": "us-east-1",
+        "AWS_DEFAULT_REGION": DEFAULT_REGION,
     }
     with patch.dict(environ, creds, clear=True):
         yield
@@ -39,25 +58,51 @@ def aws_credentials() -> Iterator[None]:
 
 @fixture(autouse=True)
 def app_env(aws_credentials: None) -> Iterator[AppEnv]:
-    # clear cached env for each test for isolation
-    instance_scheduler.util.app_env._app_env = None
-    env = example_app_env()
-    with patch.dict(environ, env_from_app_env(env)):
+    with mock_app_env() as env:
         yield env
 
 
 @fixture(autouse=True)
-def test_cleanup() -> Iterator[None]:
-    # runs before each test
-    yield
-    # runs after each test
-    unload_global_configuration()
+def metrics_environment(app_env: None) -> Iterator[MetricsEnvironment]:
+    with MockMetricsEnviron() as metrics_env:
+        yield metrics_env
 
 
 @fixture
 def moto_backend() -> Iterator[None]:
     with mock_aws():
         yield
+
+
+def get_ami(region: str = "us-east-1") -> str:
+    ec2: Final[EC2Client] = boto3.client("ec2", region_name=region)
+    paginator: Final = ec2.get_paginator("describe_images")
+    filters: Final[list[FilterTypeDef]] = [
+        {"Name": "name", "Values": ["al2023-ami-minimal-*-arm64"]},
+    ]
+    image_id: Optional[str] = None
+    for page in paginator.paginate(Filters=filters, Owners=["amazon"]):
+        if page["Images"]:
+            image_id = page["Images"][0]["ImageId"]
+            break
+    if not image_id:
+        raise ValueError("No AMI found")
+    return image_id
+
+
+@fixture()
+def hub_role() -> AssumedRole:
+    return AssumedRole(
+        role_name="hub-role",
+        account="123456789012",
+        region="us-east-1",
+        session=boto3.Session(),
+    )
+
+
+@fixture
+def ami(moto_backend: None) -> Iterator[str]:
+    yield get_ami()
 
 
 @fixture
@@ -68,7 +113,28 @@ def dynamodb_client(moto_backend: None) -> Iterator[DynamoDBClient]:
 
 
 @fixture
-def config_table(app_env: AppEnv, moto_backend: None) -> None:
+def config_item_store(
+    config_table: str,
+) -> DdbConfigItemStore:
+    store = DdbConfigItemStore(config_table)
+    store.put(
+        DdbConfigItem("", [])
+    )  # expected to always exist as these are set up by the initial custom resource
+    return store
+
+
+@fixture
+def schedule_store(config_table: str) -> ScheduleDefinitionStore:
+    return DynamoScheduleDefinitionStore(config_table)
+
+
+@fixture
+def period_store(config_table: str) -> PeriodDefinitionStore:
+    return DynamoPeriodDefinitionStore(config_table)
+
+
+@fixture
+def config_table(app_env: AppEnv, moto_backend: None) -> Iterator[str]:
     boto3.client("dynamodb").create_table(
         AttributeDefinitions=[
             {"AttributeName": "name", "AttributeType": "S"},
@@ -81,25 +147,36 @@ def config_table(app_env: AppEnv, moto_backend: None) -> None:
         ],
         BillingMode="PAY_PER_REQUEST",
     )
+    yield app_env.config_table_name
 
 
 @fixture
-def maint_win_table(moto_backend: None, app_env: AppEnv) -> str:
-    maint_win_table_name: Final = app_env.maintenance_window_table_name
+def maint_win_table(app_env: AppEnv, moto_backend: None) -> Iterator[str]:
+    table_name: Final = app_env.maintenance_window_table_name
     ddb: Final[DynamoDBClient] = boto3.client("dynamodb")
     ddb.create_table(
         AttributeDefinitions=[
-            {"AttributeName": "Name", "AttributeType": "S"},
             {"AttributeName": "account-region", "AttributeType": "S"},
+            {"AttributeName": "name-id", "AttributeType": "S"},
         ],
-        TableName=maint_win_table_name,
+        TableName=table_name,
         KeySchema=[
-            {"AttributeName": "Name", "KeyType": "HASH"},
-            {"AttributeName": "account-region", "KeyType": "RANGE"},
+            {"AttributeName": "account-region", "KeyType": "HASH"},
+            {"AttributeName": "name-id", "KeyType": "RANGE"},
         ],
         BillingMode="PAY_PER_REQUEST",
     )
-    return maint_win_table_name
+    yield table_name
+
+
+@fixture()
+def maint_win_store(maint_win_table: str) -> EC2SSMMaintenanceWindowStore:
+    return EC2SSMMaintenanceWindowStore(maint_win_table)
+
+
+@fixture()
+def mw_store(maint_win_table: str) -> MWStore:
+    return DynamoMWStore(maint_win_table)
 
 
 @fixture

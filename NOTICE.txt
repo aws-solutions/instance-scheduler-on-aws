@@ -14,10 +14,17 @@ This software includes third party software subject to the following copyrights:
 
 @aws-cdk/aws-lambda-python-alpha under the Apache License 2.0
 @aws-cdk/aws-servicecatalogappregistry-alpha under the Apache License 2.0
+@aws-cdk/aws-neptune-alpha under the Apache License 2.0
 @aws-sdk/client-dynamodb under the Apache License 2.0
+@aws-sdk/util-dynamodb under the Apache License 2.0
+@aws-sdk/client-lambda under the Apache License 2.0
+@aws-sdk/client-auto-scaling under the Apache License 2.0
 @aws-sdk/client-ec2 under the Apache License 2.0
 @aws-sdk/client-rds under the Apache License 2.0
 @aws-sdk/client-ssm under the Apache License 2.0
+@aws-sdk/client-cloudformation under the Apache License 2.0
+@aws-sdk/client-docdb under the Apache License 2.0
+@aws-sdk/client-neptune under the Apache License 2.0
 @aws-solutions-constructs/aws-lambda-dynamodb under the Apache License 2.0
 adm-zip under the MIT License
 aws-cdk-lib under the Apache License 2.0
@@ -25,6 +32,7 @@ cdk-nag under the Apache License 2.0
 constructs under the Apache License 2.0
 projen under the Apache License 2.0
 source-map-support under the MIT License
+uuid under the MIT License
 
 attrs under the MIT License
 aws-lambda-powertools under the MIT License
@@ -43,6 +51,7 @@ pluggy under the MIT License
 pyasn1 under the BSD 2-Clause License
 pytest under the MIT License
 python-dateutil under the Apache License 2.0 and the BSD 3-Clause "New" or "Revised" License
+python-jose under the MIT License
 pytz under the MIT License
 requests under the Apache License 2.0
 rsa under the Apache License 2.0

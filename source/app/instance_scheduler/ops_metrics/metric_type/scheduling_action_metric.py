@@ -25,3 +25,4 @@ class SchedulingActionMetric(OpsMetric):
     actions: list[ActionTaken]
     event_name: ClassVar[str] = "scheduling_action"
     collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.UNLIMITED
+    context_version: ClassVar[int] = 1

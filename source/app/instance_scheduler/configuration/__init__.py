@@ -1,18 +1,5 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from typing import Optional
-
-from instance_scheduler.configuration.config_dynamodb_adapter import (
-    ConfigDynamodbAdapter,
-)
-from instance_scheduler.configuration.scheduler_config import GlobalConfig
-from instance_scheduler.configuration.scheduler_config_builder import (
-    SchedulerConfigBuilder,
-)
-from instance_scheduler.util.app_env import get_app_env
-from instance_scheduler.util.logger import Logger
-
-ENV_STACK = "STACK_NAME"
 
 # name of months
 MONTH_NAMES = [
@@ -49,9 +36,6 @@ TRACE = "trace"
 
 # enable SSM maintenance windows
 ENABLE_SSM_MAINTENANCE_WINDOWS = "enable_ssm_maintenance_windows"
-
-# metrics flag
-METRICS = "use_metrics"
 
 # regions
 REGIONS = "regions"
@@ -90,8 +74,6 @@ SCHEDULE_CLUSTERS = "schedule_clusters"
 CREATE_RDS_SNAPSHOT = "create_rds_snapshot"
 # stop new instances
 STOP_NEW_INSTANCES = "stop_new_instances"
-# use maintenance windows
-USE_MAINTENANCE_WINDOW = "use_maintenance_window"
 # ssm maiantenance windows to use for EC2
 SSM_MAINTENANCE_WINDOW = "ssm_maintenance_window"
 # name of timezone setting for a schedule
@@ -140,28 +122,3 @@ TAG_VAL_YEAR = "year"
 TAG_VAL_MONTH = "month"
 TAG_VAL_DAY = "day"
 TAG_VAL_TIMEZONE = "timezone"
-
-__configuration: Optional[GlobalConfig] = None
-
-
-def get_global_configuration(logger: Optional[Logger]) -> GlobalConfig:
-    """
-    Returns the scheduler configuration
-    :return: scheduler configuration
-    """
-    global __configuration
-    if __configuration is None:
-        configdata = ConfigDynamodbAdapter(get_app_env().config_table_name).config
-        __configuration = SchedulerConfigBuilder(logger=logger).build(configdata)
-        if logger is not None:
-            logger.debug("Configuration loaded\n{}", str(__configuration))
-    return __configuration
-
-
-def unload_global_configuration() -> None:
-    """
-    Force the configuration to unload
-    :return:
-    """
-    global __configuration
-    __configuration = None

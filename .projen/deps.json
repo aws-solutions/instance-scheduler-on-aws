@@ -1,6 +1,10 @@
 {
   "dependencies": [
     {
+      "name": "@cdklabs/cdk-ssm-documents",
+      "type": "build"
+    },
+    {
       "name": "@types/jest",
       "type": "build"
     },
@@ -10,12 +14,16 @@
       "type": "build"
     },
     {
+      "name": "@types/uuid",
+      "type": "build"
+    },
+    {
       "name": "@typescript-eslint/eslint-plugin",
       "type": "build"
     },
     {
       "name": "aws-cdk",
-      "version": "^2.102.0",
+      "version": "2.130.0",
       "type": "build"
     },
     {
@@ -68,17 +76,34 @@
     },
     {
       "name": "typescript",
-      "version": "~5.1.6",
+      "version": "~5.2.x",
       "type": "build"
     },
     {
       "name": "@aws-cdk/aws-lambda-python-alpha",
-      "version": "^2.102.0-alpha.0",
+      "version": "2.130.0-alpha.0",
+      "type": "runtime"
+    },
+    {
+      "name": "@aws-cdk/aws-neptune-alpha",
+      "version": "2.130.0-alpha.0",
       "type": "runtime"
     },
     {
       "name": "@aws-cdk/aws-servicecatalogappregistry-alpha",
-      "version": "^2.102.0-alpha.0",
+      "version": "2.130.0-alpha.0",
+      "type": "runtime"
+    },
+    {
+      "name": "@aws-sdk/client-auto-scaling",
+      "type": "runtime"
+    },
+    {
+      "name": "@aws-sdk/client-cloudformation",
+      "type": "runtime"
+    },
+    {
+      "name": "@aws-sdk/client-docdb",
       "type": "runtime"
     },
     {
@@ -90,6 +115,14 @@
       "type": "runtime"
     },
     {
+      "name": "@aws-sdk/client-lambda",
+      "type": "runtime"
+    },
+    {
+      "name": "@aws-sdk/client-neptune",
+      "type": "runtime"
+    },
+    {
       "name": "@aws-sdk/client-rds",
       "type": "runtime"
     },
@@ -98,12 +131,12 @@
       "type": "runtime"
     },
     {
-      "name": "@aws-solutions-constructs/aws-lambda-dynamodb",
+      "name": "@aws-sdk/util-dynamodb",
       "type": "runtime"
     },
     {
       "name": "aws-cdk-lib",
-      "version": "^2.102.0",
+      "version": "2.130.0",
       "type": "runtime"
     },
     {
@@ -117,6 +150,10 @@
     },
     {
       "name": "source-map-support",
+      "type": "runtime"
+    },
+    {
+      "name": "uuid",
       "type": "runtime"
     }
   ],

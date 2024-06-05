@@ -5,70 +5,66 @@ import boto3
 from mypy_boto3_rds import RDSClient
 from mypy_boto3_rds.type_defs import DBSnapshotMessageTypeDef
 
-from instance_scheduler.handler.scheduling_request import SchedulingRequestHandler
 from instance_scheduler.schedulers.instance_states import InstanceStates
-from tests.context import MockLambdaContext
 from tests.integration.helpers.rds_helpers import get_rds_instance_state
+from tests.integration.helpers.run_handler import simple_schedule, target
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.integration.helpers.scheduling_context_builder import (
-    build_context,
-    build_scheduling_event,
+from tests.test_utils.mock_scheduling_request_environment import (
+    MockSchedulingRequestEnvironment,
 )
 
 
 def test_rds_creates_snapshot_when_flag_enabled(
-    rds_instance: str, rds_instance_states: InstanceStates
+    rds_instance: str,
+    rds_instance_states: InstanceStates,
 ) -> None:
-    # ----------------------------Event Definition--------------------------#
+    with simple_schedule(begintime="10:00", endtime="20:00") as context:
+        # before end of period (populates state table)
+        context.run_scheduling_request_handler(
+            dt=quick_time(19, 55, 0), target=target(service="rds")
+        )
+        assert get_rds_instance_state(rds_instance) == "available"
 
-    context = build_context(
-        current_dt=quick_time(20, 0, 0), service="rds", create_rds_snapshot=True
-    )
-    event = build_scheduling_event(context)
+        # test if snapshot is created
+        context.run_scheduling_request_handler(
+            dt=quick_time(20, 0, 0),
+            environment=MockSchedulingRequestEnvironment(enable_rds_snapshots=True),
+            target=target(service="rds"),
+        )
 
-    # ----------------------------RDS Instance-------------------------#
-    # already setup and running
-    # ------------------------Last Desired State------------------------#
-    rds_instance_states.set_instance_state(rds_instance, "running")
-    rds_instance_states.save()
-    # -------------------run handler------------------------#
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
-
-    # ---------------------validate result---------------------#
-    assert (
-        get_rds_instance_state(rds_instance) == "stopped"
-    )  # ensure instance actually stopped
-    rds_client: RDSClient = boto3.client("rds")
-    result: DBSnapshotMessageTypeDef = rds_client.describe_db_snapshots(
-        DBInstanceIdentifier=rds_instance
-    )
-    assert len(result["DBSnapshots"]) == 1
+        assert (
+            get_rds_instance_state(rds_instance) == "stopped"
+        )  # ensure instance actually stopped
+        rds_client: RDSClient = boto3.client("rds")
+        result: DBSnapshotMessageTypeDef = rds_client.describe_db_snapshots(
+            DBInstanceIdentifier=rds_instance
+        )
+        assert len(result["DBSnapshots"]) == 1
 
 
 def test_rds_does_not_create_snapshot_when_flag_disabled(
-    rds_instance: str, rds_instance_states: InstanceStates
+    rds_instance: str,
+    rds_instance_states: InstanceStates,
 ) -> None:
-    # ----------------------------Event Definition--------------------------#
-    context = build_context(
-        current_dt=quick_time(20, 0, 0), service="rds", create_rds_snapshot=False
-    )
-    event = build_scheduling_event(context)
-    # ----------------------------RDS Instance-------------------------#
-    # already setup and running
-    # ------------------------Last Desired State------------------------#
-    rds_instance_states.set_instance_state(rds_instance, "running")
-    rds_instance_states.save()
-    # -------------------run handler------------------------#
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
+    with simple_schedule(begintime="10:00", endtime="20:00") as context:
+        # before end of period (populates state table)
+        context.run_scheduling_request_handler(
+            dt=quick_time(19, 55, 0), target=target(service="rds")
+        )
+        assert get_rds_instance_state(rds_instance) == "available"
 
-    # ---------------------validate result---------------------#
-    assert (
-        get_rds_instance_state(rds_instance) == "stopped"
-    )  # ensure instance actually stopped
-    rds_client: RDSClient = boto3.client("rds")
-    result: DBSnapshotMessageTypeDef = rds_client.describe_db_snapshots(
-        DBInstanceIdentifier=rds_instance
-    )
-    assert len(result["DBSnapshots"]) == 0
+        # test if snapshot is not created
+        context.run_scheduling_request_handler(
+            dt=quick_time(20, 0, 0),
+            environment=MockSchedulingRequestEnvironment(enable_rds_snapshots=False),
+            target=target(service="rds"),
+        )
+
+        assert (
+            get_rds_instance_state(rds_instance) == "stopped"
+        )  # ensure instance actually stopped
+        rds_client: RDSClient = boto3.client("rds")
+        result: DBSnapshotMessageTypeDef = rds_client.describe_db_snapshots(
+            DBInstanceIdentifier=rds_instance
+        )
+        assert len(result["DBSnapshots"]) == 0

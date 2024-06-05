@@ -23,10 +23,11 @@ class AppEnv:
     start_ec2_batch_size: int
     schedule_tag_key: str
     default_timezone: ZoneInfo
-    enable_cloudwatch_metrics: bool
     enable_ec2_service: bool
     enable_rds_service: bool
     enable_rds_clusters: bool
+    enable_neptune_service: bool
+    enable_docdb_service: bool
     enable_rds_snapshots: bool
     schedule_regions: list[str]
     app_namespace: str
@@ -44,7 +45,12 @@ class AppEnv:
         result = []
         if self.enable_ec2_service:
             result.append("ec2")
-        if self.enable_rds_service:
+        if (
+            self.enable_rds_service
+            or self.enable_rds_clusters
+            or self.enable_neptune_service
+            or self.enable_docdb_service
+        ):
             result.append("rds")
         return result
 
@@ -85,10 +91,10 @@ def _from_environment() -> AppEnv:
             log_group=environ["LOG_GROUP"],
             topic_arn=environ["ISSUES_TOPIC_ARN"],
             stack_name=environ["STACK_NAME"],
-            send_anonymous_metrics=_to_bool(environ["SEND_METRICS"]),
+            send_anonymous_metrics=env_to_bool(environ["SEND_METRICS"]),
             solution_id=environ["SOLUTION_ID"],
             solution_version=environ["SOLUTION_VERSION"],
-            enable_debug_logging=_to_bool(environ["TRACE"]),
+            enable_debug_logging=env_to_bool(environ["TRACE"]),
             user_agent_extra=environ["USER_AGENT_EXTRA"],
             anonymous_metrics_url=environ["METRICS_URL"],
             stack_id=environ["STACK_ID"],
@@ -96,23 +102,24 @@ def _from_environment() -> AppEnv:
             start_ec2_batch_size=int(environ["START_EC2_BATCH_SIZE"]),
             schedule_tag_key=environ["SCHEDULE_TAG_KEY"],
             default_timezone=ZoneInfo(environ["DEFAULT_TIMEZONE"]),
-            enable_cloudwatch_metrics=_to_bool(environ["ENABLE_CLOUDWATCH_METRICS"]),
-            enable_ec2_service=_to_bool(environ["ENABLE_EC2_SERVICE"]),
-            enable_rds_service=_to_bool(environ["ENABLE_RDS_SERVICE"]),
-            enable_rds_clusters=_to_bool(environ["ENABLE_RDS_CLUSTERS"]),
-            enable_rds_snapshots=_to_bool(environ["ENABLE_RDS_SNAPSHOTS"]),
-            schedule_regions=_to_list(environ["SCHEDULE_REGIONS"]),
+            enable_ec2_service=env_to_bool(environ["ENABLE_EC2_SERVICE"]),
+            enable_rds_service=env_to_bool(environ["ENABLE_RDS_SERVICE"]),
+            enable_rds_clusters=env_to_bool(environ["ENABLE_RDS_CLUSTERS"]),
+            enable_neptune_service=env_to_bool(environ["ENABLE_NEPTUNE_SERVICE"]),
+            enable_docdb_service=env_to_bool(environ["ENABLE_DOCDB_SERVICE"]),
+            enable_rds_snapshots=env_to_bool(environ["ENABLE_RDS_SNAPSHOTS"]),
+            schedule_regions=env_to_list(environ["SCHEDULE_REGIONS"]),
             app_namespace=environ["APP_NAMESPACE"],
             scheduler_role_name=environ["SCHEDULER_ROLE_NAME"],
-            enable_schedule_hub_account=_to_bool(
+            enable_schedule_hub_account=env_to_bool(
                 environ["ENABLE_SCHEDULE_HUB_ACCOUNT"]
             ),
-            enable_ec2_ssm_maintenance_windows=_to_bool(
+            enable_ec2_ssm_maintenance_windows=env_to_bool(
                 environ["ENABLE_EC2_SSM_MAINTENANCE_WINDOWS"]
             ),
-            start_tags=_to_list(environ["START_TAGS"]),
-            stop_tags=_to_list(environ["STOP_TAGS"]),
-            enable_aws_organizations=_to_bool(environ["ENABLE_AWS_ORGANIZATIONS"]),
+            start_tags=env_to_list(environ["START_TAGS"]),
+            stop_tags=env_to_list(environ["STOP_TAGS"]),
+            enable_aws_organizations=env_to_bool(environ["ENABLE_AWS_ORGANIZATIONS"]),
             maintenance_window_table_name=environ["MAINTENANCE_WINDOW_TABLE"],
             config_table_name=environ["CONFIG_TABLE"],
             state_table_name=environ["STATE_TABLE"],
@@ -125,11 +132,11 @@ def _from_environment() -> AppEnv:
         ) from err
 
 
-def _to_bool(value: str) -> bool:
+def env_to_bool(value: str) -> bool:
     return value.strip().lower() in {"true", "yes"}
 
 
-def _to_list(value: str) -> list[str]:
+def env_to_list(value: str) -> list[str]:
     items = []
     for item in value.split(","):
         stripped = item.strip()

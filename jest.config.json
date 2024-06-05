@@ -1,10 +1,5 @@
 {
-  "roots": [
-    "<rootDir>/source/instance-scheduler/tests"
-  ],
-  "transform": {
-    "^.+\\.tsx?$": "ts-jest"
-  },
+  "coverageProvider": "v8",
   "reporters": [
     "default",
     [
@@ -14,6 +9,15 @@
         "outputName": "cdk-test-report.xml"
       }
     ]
+  ],
+  "roots": [
+    "<rootDir>/source/instance-scheduler/tests"
+  ],
+  "transform": {
+    "^.+\\.tsx?$": "ts-jest"
+  },
+  "setupFilesAfterEnv": [
+    "jest-extended/all"
   ],
   "testMatch": [
     "**/lib/instance-scheduler/tests/**/?(*.)+(spec|test).js?(x)",

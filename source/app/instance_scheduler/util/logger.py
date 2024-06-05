@@ -27,11 +27,13 @@ class Logger:
         log_stream: str,
         topic_arn: str,
         debug: bool = False,
+        raise_exceptions: bool = False,
     ) -> None:
         self._log_group = log_group
         self._log_stream = log_stream
         self._topic_arn = topic_arn
         self._debug = debug
+        self._raise_exceptions = raise_exceptions
         self._buffer_size = 60 if self._debug else 30
         self._buffer: list[tuple[int, str]] = []
         self._cached_size = 0
@@ -50,21 +52,26 @@ class Logger:
         self.flush()
 
     def _emit(self, level: str, msg: str, *args: Any) -> str:
-        s = msg if len(args) == 0 else msg.format(*args)
-        t = time.time()
-        s = "{:7s} : {}".format(level, s)
+        try:
+            s = msg if len(args) == 0 else msg.format(*args)
+            t = time.time()
+            s = "{:7s} : {}".format(level, s)
 
-        if self._cached_size + (len(s) + LOG_ENTRY_ADDITIONAL) > LOG_MAX_BATCH_SIZE:
-            self.flush()
+            if self._cached_size + (len(s) + LOG_ENTRY_ADDITIONAL) > LOG_MAX_BATCH_SIZE:
+                self.flush()
 
-        self._cached_size += len(s) + LOG_ENTRY_ADDITIONAL
+            self._cached_size += len(s) + LOG_ENTRY_ADDITIONAL
 
-        self._buffer.append((int(t * 1000), s))
+            self._buffer.append((int(t * 1000), s))
 
-        if len(self._buffer) >= self._buffer_size:
-            self.flush()
+            if len(self._buffer) >= self._buffer_size:
+                self.flush()
 
-        return s
+            return s
+        except Exception:
+            if self._raise_exceptions:
+                raise
+            return "Exception raised while emitting logs"
 
     @property
     def sns(self) -> SNSClient:
@@ -79,10 +86,14 @@ class Logger:
         :param level:
         :return:
         """
-        message = "Loggroup: {}\nLogstream {}\n{} : {}".format(
-            self._log_group, self._log_stream, level, msg
-        )
-        self.sns.publish(TopicArn=self._topic_arn, Message=message)
+        try:
+            message = "Loggroup: {}\nLogstream {}\n{} : {}".format(
+                self._log_group, self._log_stream, level, msg
+            )
+            self.sns.publish(TopicArn=self._topic_arn, Message=message)
+        except Exception:
+            if self._raise_exceptions:
+                raise
 
     def info(self, msg: str, *args: Any) -> None:
         """
@@ -134,27 +145,52 @@ class Logger:
         Writes all buffered messages to CloudWatch Stream
         :return:
         """
-
-        if len(self._buffer) == 0:
-            return
-
-        put_event_args: PutLogEventsRequestRequestTypeDef = {
-            "logGroupName": self._log_group,
-            "logStreamName": self._log_stream,
-            "logEvents": [{"timestamp": r[0], "message": r[1]} for r in self._buffer],
-        }
-
-        retries = 5
-        while retries > 0:
-            try:
-                self.client.put_log_events(**put_event_args)
-                self._buffer = []
-                self._cached_size = 0
+        try:
+            if len(self._buffer) == 0:
                 return
-            except self.client.exceptions.ResourceNotFoundException:
-                retries -= 1
+
+            put_event_args: PutLogEventsRequestRequestTypeDef = {
+                "logGroupName": self._log_group,
+                "logStreamName": self._log_stream,
+                "logEvents": [
+                    {"timestamp": r[0], "message": r[1]} for r in self._buffer
+                ],
+            }
+
+            try:
                 self.client.create_log_stream(
                     logGroupName=self._log_group, logStreamName=self._log_stream
                 )
-            except Exception:
-                return
+            except self.client.exceptions.ResourceAlreadyExistsException:
+                pass
+
+            self.client.put_log_events(**put_event_args)
+            self._buffer = []
+            self._cached_size = 0
+        except Exception:
+            if self._raise_exceptions:
+                raise
+
+
+class NoOpLogger(Logger):
+
+    def __init__(self) -> None:
+        Logger.__init__(self, log_group="", log_stream="", topic_arn="")
+
+    def publish_to_sns(self, level: str, msg: str) -> None:
+        """no-op"""
+
+    def info(self, msg: str, *args: Any) -> None:
+        """no-op"""
+
+    def error(self, msg: str, *args: Any) -> None:
+        """no-op"""
+
+    def warning(self, msg: str, *args: Any) -> None:
+        """no-op"""
+
+    def debug(self, msg: str, *args: Any) -> None:
+        """no-op"""
+
+    def flush(self) -> None:
+        """no-op"""

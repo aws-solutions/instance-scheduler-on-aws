@@ -49,7 +49,7 @@ Instance Scheduler can be deployed to your AWS account directly from the source 
 #### Deploying the hub stack
 
 ```
-npm install
+npm ci
 npx cdk bootstrap
 npx cdk deploy instance-scheduler-on-aws
 ```
@@ -70,7 +70,7 @@ stack.
 
 ```
 npx cdk bootstrap
-npx cdk deploy instance-scheduler-on-aws-remote --parameters InstanceSchedulerAccount={account-id} --parameters namespace={namespace} --parameters UsingAWSOrganizations={useOrgs}
+npx cdk deploy instance-scheduler-on-aws-remote --parameters InstanceSchedulerAccount={account-id} --parameters Namespace={namespace} --parameters UsingAWSOrganizations={useOrgs}
 ```
 
 Replace:
@@ -170,7 +170,7 @@ Ex. https://mybucket.s3.amazonaws.com/instance-scheduler-on-aws/v1.5.0.mybuild/i
 ### Running Tests Locally
 
 ```
-npm install
+npm ci
 npm run test
 ```
 
@@ -207,7 +207,7 @@ Once the connection has been set up, make sure you save the connection ARN for t
 In your local environment, first install all necessary dependencies and bootstrap your account for CDK deployment.
 
 ```
-npm install
+npm ci
 npx cdk bootstrap
 ```
 
@@ -266,18 +266,33 @@ click on the pipeline that begins with instance-scheduler-on-aws-testing-pipelin
 This solution uses [projen](https://projen.io/) to manage certain project files. If you need to modify any of these
 files, modify the source in [.projenrc.ts](./.projenrc.ts) and run `projen` to regenerate the files.
 
+### Package installation
+
+```
+# For Node.js dependencies
+npm ci
+
+# For Python dependencies
+cd source/app
+poetry install
+```
+
+If you don't have `poetry`, refer to [Poetry](https://python-poetry.org/docs/) to install `poetry`.
+
 ## CDK Documentation
 
 Instance Scheduler on AWS templates are generated using AWS CDK, for further information on CDK please refer to the
 [documentation](https://docs.aws.amazon.com/cdk/latest/guide/getting_started.html).
 
-
 ## Collection of Operational Metrics
-This solution collects anonymous operational metrics to help AWS improve the quality and features of the solution. For more information, including how to disable this capability, please see the [implementation guide](https://docs.aws.amazon.com/solutions/latest/instance-scheduler-on-aws/anonymized-data.html).
+
+This solution collects anonymized operational metrics to help AWS improve the quality and features of the solution. For
+more information, including how to disable this capability, please see the [implementation
+guide](https://docs.aws.amazon.com/solutions/latest/instance-scheduler-on-aws/anonymized-data.html).
 
 ---
 
-Copyright 2021 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance with the
 License. A copy of the License is located at

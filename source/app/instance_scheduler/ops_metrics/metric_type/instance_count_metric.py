@@ -15,3 +15,4 @@ class InstanceCountMetric(OpsMetric):
     num_schedules: int
     event_name: ClassVar[str] = "instance_count"
     collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.DAILY
+    context_version: ClassVar[int] = 1

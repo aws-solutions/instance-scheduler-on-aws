@@ -10,7 +10,7 @@ import { TestResourceProvider } from "./index";
 import { defaultTestVPC } from "./utils/vpc-utils";
 
 const envKeys = {
-  ec2InstanceId: "basic_start_stop_instance_id",
+  ec2InstanceId: "BasicStartStopInstanceId",
 };
 export const resourceParams = {
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -19,13 +19,11 @@ export const resourceParams = {
 };
 export class EC2StartStopTestResources implements TestResourceProvider {
   createTestResources(scope: Construct) {
-    const testInstance = new ec2.Instance(scope, "basic-start-stop-instance", {
+    const testInstance = new ec2.Instance(scope, "basicStartStopInstance", {
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T2, ec2.InstanceSize.MICRO),
       machineImage: ec2.MachineImage.latestAmazonLinux2(),
       vpc: defaultTestVPC(scope),
     });
-
-    cdk.Tags.of(testInstance).add("Schedule", resourceParams.startStopTestScheduleName);
 
     const startStopOut = new cdk.CfnOutput(scope, envKeys.ec2InstanceId, {
       value: testInstance.instanceId,

@@ -1,8 +1,8 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Final, Generic, TypeVar
+from dataclasses import dataclass, field
+from typing import Final, Generic, Self, TypeVar
 
 T = TypeVar("T")
 
@@ -16,9 +16,23 @@ class FailureResponse(Generic[T]):
 U = TypeVar("U")
 
 
+@dataclass
+class BisectRetryResponse(Generic[T, U]):
+    success_responses: list[U] = field(default_factory=list)
+    intermediate_responses: list[FailureResponse[list[T]]] = field(default_factory=list)
+    failure_responses: list[FailureResponse[T]] = field(default_factory=list)
+
+    def merge(self, *others: "BisectRetryResponse[T, U]") -> Self:
+        for other in others:
+            self.success_responses.extend(other.success_responses)
+            self.intermediate_responses.extend(other.intermediate_responses)
+            self.failure_responses.extend(other.failure_responses)
+        return self
+
+
 def bisect_retry(
     inputs: list[T], action: Callable[[list[T]], U]
-) -> list[U | FailureResponse[T]]:
+) -> BisectRetryResponse[T, U]:
     """
     Retry an action taking a list of inputs by successively splitting the inputs in half
 
@@ -40,16 +54,22 @@ def bisect_retry(
     a tuple of the single input item that resulted in an error and the error that was
     raised.
     """
-    if not inputs:
-        return []
+    length: Final = len(inputs)
+    if length == 0:
+        return BisectRetryResponse()
     try:
-        return [action(inputs)]
+        return BisectRetryResponse(success_responses=[action(inputs)])
     except Exception as err:
-        length: Final = len(inputs)
         if length == 1:
-            return [FailureResponse(failed_input=inputs[0], error=err)]
+            return BisectRetryResponse(
+                failure_responses=[FailureResponse(failed_input=inputs[0], error=err)]
+            )
+        else:
+            result: BisectRetryResponse[T, U] = BisectRetryResponse(
+                intermediate_responses=[FailureResponse(failed_input=inputs, error=err)]
+            )
 
-    midpoint: Final = length // 2
-    left: Final = bisect_retry(inputs[0:midpoint], action)
-    right: Final = bisect_retry(inputs[midpoint:], action)
-    return left + right
+        midpoint: Final = length // 2
+        left: Final = bisect_retry(inputs[0:midpoint], action)
+        right: Final = bisect_retry(inputs[midpoint:], action)
+        return result.merge(left, right)

@@ -1,25 +1,59 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
+from decimal import Decimal
 from re import fullmatch
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final, Union
 from zoneinfo import ZoneInfo
 
 from dateutil.parser import isoparse
 
+from instance_scheduler.configuration.instance_schedule import InstanceSchedule
+from instance_scheduler.configuration.running_period import RunningPeriod
+from instance_scheduler.configuration.running_period_dict_element import (
+    RunningPeriodDictElement,
+)
+from instance_scheduler.configuration.time_utils import parse_time_str
+from instance_scheduler.cron.cron_recurrence_expression import CronRecurrenceExpression
+from instance_scheduler.cron.expression import CronSingleValueNumeric
+from instance_scheduler.schedulers.states import ScheduleState
 from instance_scheduler.util.time import is_aware
+from instance_scheduler.util.validation import (
+    validate_number_item,
+    validate_string_item,
+)
 
 if TYPE_CHECKING:
-    from mypy_boto3_dynamodb.type_defs import (
-        AttributeValueTypeDef,
-        GetItemOutputTypeDef,
-    )
+    from mypy_boto3_dynamodb.type_defs import AttributeValueTypeDef
     from mypy_boto3_ssm.type_defs import MaintenanceWindowIdentityTypeDef
 else:
     AttributeValueTypeDef = object
-    GetItemOutputTypeDef = object
     MaintenanceWindowIdentityTypeDef = object
+
+
+ItemTypeDef = dict[
+    str,
+    Union[
+        bytes,
+        bytearray,
+        str,
+        int,
+        Decimal,
+        bool,
+        set[int],
+        set[Decimal],
+        set[str],
+        set[bytes],
+        set[bytearray],
+        Sequence[Any],
+        Mapping[str, Any],
+        None,
+    ],
+]
+
+WINDOW_ID_LENGTH = 20  # window id has a fixed length of 20
 
 
 class EC2SSMMaintenanceWindowValidationError(Exception):
@@ -50,10 +84,18 @@ class EC2SSMMaintenanceWindow:
     window_name: str
     schedule_timezone: ZoneInfo
     next_execution_time: datetime
-    duration: int
+    duration_hours: int
 
     def __post_init__(self) -> None:
         self._validate()
+
+    @property
+    def account_region(self) -> str:
+        return f"{self.account_id}:{self.region}"
+
+    @property
+    def name_id(self) -> str:
+        return f"{self.window_name}:{self.window_id}"
 
     def _validate(self) -> None:
         # https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_CreateMaintenanceWindow.html
@@ -75,9 +117,9 @@ class EC2SSMMaintenanceWindow:
             raise EC2SSMMaintenanceWindowValidationError(
                 f"Non-timezone-aware datetime: {self.next_execution_time}"
             )
-        if self.duration < 1 or self.duration > 24:
+        if self.duration_hours < 1 or self.duration_hours > 24:
             raise EC2SSMMaintenanceWindowValidationError(
-                f"Invalid duration: {self.duration}"
+                f"Invalid duration: {self.duration_hours}"
             )
 
     def to_item(self) -> dict[str, AttributeValueTypeDef]:
@@ -86,20 +128,129 @@ class EC2SSMMaintenanceWindow:
         # `NextExecutionTime` is encoded using `isoformat`, which produces a stricter
         # output than the SSM service.
         return {
-            "account-region": {"S": f"{self.account_id}:{self.region}"},
-            "WindowId": {"S": self.window_id},
-            "Name": {"S": self.window_name},
+            "account-region": {"S": self.account_region},
+            "name-id": {"S": self.name_id},
             "ScheduleTimezone": {"S": str(self.schedule_timezone)},
             "NextExecutionTime": {"S": self.next_execution_time.isoformat()},
-            "Duration": {"N": str(self.duration)},
+            "Duration": {"N": str(self.duration_hours)},
         }
 
-    def to_key(self) -> dict[str, str]:
+    def to_key(self) -> dict[str, AttributeValueTypeDef]:
         """Return this object as a key suitable for a call to DynamoDB `delete_item`"""
         return {
-            "account-region": f"{self.account_id}:{self.region}",
-            "Name": self.window_name,
+            "account-region": {"S": f"{self.account_id}:{self.region}"},
+            "name-id": {"S": f"{self.window_name}:{self.window_id}"},
         }
+
+    def is_running_at(self, dt: datetime, scheduler_interval_minutes: int) -> bool:
+        return (
+            self.to_schedule(scheduler_interval_minutes).get_desired_state(dt)[0]
+            == ScheduleState.RUNNING
+        )
+
+    def to_schedule(self, scheduler_interval_minutes: int) -> InstanceSchedule:
+        """convert this maintenance window into a schedule"""
+        name_id = f"{self.window_name}:{self.window_id}"
+        window_begin_dt: Final = self.next_execution_time.replace(
+            second=0, microsecond=0
+        )
+        margin_minutes: Final = scheduler_interval_minutes + 10
+        period_begin_dt: Final = window_begin_dt - timedelta(minutes=margin_minutes)
+        period_end_dt: Final = window_begin_dt + timedelta(hours=self.duration_hours)
+
+        if period_begin_dt.day == period_end_dt.day:
+            periods: list[RunningPeriodDictElement] = [
+                {
+                    "period": RunningPeriod(
+                        name=f"{name_id}-period",
+                        begintime=period_begin_dt.time(),
+                        endtime=period_end_dt.time(),
+                        cron_recurrence=CronRecurrenceExpression(
+                            monthdays=CronSingleValueNumeric(period_begin_dt.day),
+                            months=CronSingleValueNumeric(period_begin_dt.month),
+                        ),
+                    ),
+                    "instancetype": None,
+                }
+            ]
+        elif period_end_dt - period_begin_dt <= timedelta(hours=24):
+            periods = [
+                {
+                    "period": RunningPeriod(
+                        name=f"{name_id}-period-1",
+                        begintime=period_begin_dt.time(),
+                        endtime=parse_time_str("23:59"),
+                        cron_recurrence=CronRecurrenceExpression(
+                            monthdays=CronSingleValueNumeric(period_begin_dt.day),
+                            months=CronSingleValueNumeric(period_begin_dt.month),
+                        ),
+                    ),
+                    "instancetype": None,
+                },
+                {
+                    "period": RunningPeriod(
+                        name=f"{name_id}-period-2",
+                        begintime=parse_time_str("00:00"),
+                        endtime=period_end_dt.time(),
+                        cron_recurrence=CronRecurrenceExpression(
+                            monthdays=CronSingleValueNumeric(period_end_dt.day),
+                            months=CronSingleValueNumeric(period_end_dt.month),
+                        ),
+                    ),
+                    "instancetype": None,
+                },
+            ]
+        else:
+            periods = [
+                {
+                    "period": RunningPeriod(
+                        name=f"{name_id}-period-1",
+                        begintime=period_begin_dt.time(),
+                        endtime=parse_time_str("23:59"),
+                        cron_recurrence=CronRecurrenceExpression(
+                            monthdays=CronSingleValueNumeric(period_begin_dt.day),
+                            months=CronSingleValueNumeric(period_begin_dt.month),
+                        ),
+                    ),
+                    "instancetype": None,
+                },
+                {
+                    "period": RunningPeriod(
+                        name=f"{name_id}-period-2",
+                        cron_recurrence=CronRecurrenceExpression(
+                            monthdays=CronSingleValueNumeric(
+                                (period_end_dt - timedelta(days=1)).day
+                            ),
+                            months=CronSingleValueNumeric(
+                                (period_end_dt - timedelta(days=1)).month
+                            ),
+                        ),
+                    ),
+                    "instancetype": None,
+                },
+                {
+                    "period": RunningPeriod(
+                        name=f"{name_id}-period-3",
+                        begintime=parse_time_str("00:00"),
+                        endtime=period_end_dt.time(),
+                        cron_recurrence=CronRecurrenceExpression(
+                            monthdays=CronSingleValueNumeric(period_end_dt.day),
+                            months=CronSingleValueNumeric(period_end_dt.month),
+                        ),
+                    ),
+                    "instancetype": None,
+                },
+            ]
+
+        schedule: Final = InstanceSchedule(
+            name=name_id,
+            timezone=self.schedule_timezone,
+            description=f"{name_id} maintenance window",
+            enforced=True,
+            periods=periods,
+        )
+
+        return schedule
 
     @classmethod
     def from_identity(
@@ -125,22 +276,38 @@ class EC2SSMMaintenanceWindow:
             window_name=identity["Name"],
             schedule_timezone=ZoneInfo(identity.get("ScheduleTimezone", "UTC")),
             next_execution_time=isoparse(identity["NextExecutionTime"]),
-            duration=identity["Duration"],
+            duration_hours=identity["Duration"],
         )
 
     @classmethod
-    def from_item(cls, item: GetItemOutputTypeDef) -> "EC2SSMMaintenanceWindow":
+    def from_item(
+        cls, item: dict[str, AttributeValueTypeDef]
+    ) -> "EC2SSMMaintenanceWindow":
         """Return a maintenance window object from a DynamoDB `get_item` response"""
         # Like `from_identity`, this function must use `isoparse` to parse
         # `next_execution_time` because Instance Scheduler may have stored the value
         # from the service response verbatim.
-        account_region: Final = item["Item"]["account-region"]["S"].split(":")
+
+        # in addition to the fields explicitly loaded here, maintenance window items
+        # may have a Number attribute named TimeToLive that is not used
+
+        # the output type of a table scan is wider than query, so more validation is
+        # required
+        validate_string_item(item, "account-region", True)
+        validate_string_item(item, "name-id", True)
+        validate_string_item(item, "ScheduleTimezone", True)
+        validate_string_item(item, "NextExecutionTime", True)
+        validate_number_item(item, "Duration", True)
+
+        account_id, region = item["account-region"]["S"].split(":")
+        window_name, window_id = item["name-id"]["S"].split(":")
+
         return EC2SSMMaintenanceWindow(
-            account_id=account_region[0],
-            region=account_region[1],
-            window_id=item["Item"]["WindowId"]["S"],
-            window_name=item["Item"]["Name"]["S"],
-            schedule_timezone=ZoneInfo(item["Item"]["ScheduleTimezone"]["S"]),
-            next_execution_time=isoparse(item["Item"]["NextExecutionTime"]["S"]),
-            duration=int(item["Item"]["Duration"]["N"]),
+            account_id=account_id,
+            region=region,
+            window_id=window_id,
+            window_name=window_name,
+            schedule_timezone=ZoneInfo(item["ScheduleTimezone"]["S"]),
+            next_execution_time=isoparse(item["NextExecutionTime"]["S"]),
+            duration_hours=int(item["Duration"]["N"]),
         )

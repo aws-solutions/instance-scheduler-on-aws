@@ -1,21 +1,33 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from datetime import time
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
-from instance_scheduler.configuration import get_global_configuration
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
 from instance_scheduler.configuration.running_period import RunningPeriod
 from instance_scheduler.configuration.running_period_dict_element import (
     RunningPeriodDictElement,
 )
+from instance_scheduler.cron.cron_recurrence_expression import CronRecurrenceExpression
+from instance_scheduler.cron.parser import (
+    parse_monthdays_expr,
+    parse_months_expr,
+    parse_weekdays_expr,
+)
 from instance_scheduler.handler.cfn_schedule import (
     CfnScheduleHandler,
+    CfnSchedulePeriodProperties,
     CfnScheduleResourceProperties,
 )
+from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
+from instance_scheduler.model.store.schedule_definition_store import (
+    ScheduleDefinitionStore,
+)
+from instance_scheduler.util.app_env import AppEnv
 from instance_scheduler.util.custom_resource import CustomResourceRequest
 from tests.context import MockLambdaContext
-from tests.logger import MockLogger
+from tests.test_utils.any_nonempty_string import AnyNonEmptyString
 from tests.test_utils.unordered_list import UnorderedList
 
 stack_arn = "arn:aws:cloudformation:us-west-2:123456789012:stack/teststack/51af3dc0-da77-11e4-872e-1234567db123"
@@ -34,18 +46,22 @@ def new_create_request(
         "LogicalResourceId": "CFNLogicalID",
         "PhysicalResourceId": "PhysicalID",
         "ResourceProperties": resource_properties,
+        "OldResourceProperties": {},
     }
 
 
 @patch.object(CfnScheduleHandler, "_send_response")
 def test_minimalist_cfn_schedule_creation(
-    mocked_cfn_callback: MagicMock, config_table: None
+    mocked_cfn_callback: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+    app_env: AppEnv,
 ) -> None:
     event = new_create_request(
         {
             "NoStackPrefix": "True",
             "ServiceToken": "serviceTokenARN",
-            "Periods": [{"Description": "Stop at 5pm", "EndTime": "16:59"}],
+            "Periods": [{"EndTime": "16:59"}],
         }
     )
     handler = CfnScheduleHandler(event, MockLambdaContext())
@@ -54,36 +70,71 @@ def test_minimalist_cfn_schedule_creation(
     expected_schedule = InstanceSchedule(
         name="CFNLogicalID",
         configured_in_stack=stack_arn,
+        timezone=app_env.default_timezone,
         stop_new_instances=True,
-        use_metrics=False,
-        description="",
         periods=[
             RunningPeriodDictElement(
-                period=RunningPeriod(name=ANY, endtime=time(16, 59, 0)),
-                instancetype=None,
+                period=RunningPeriod(name=AnyNonEmptyString(), endtime=time(16, 59, 0))
             )
         ],
     )
 
-    assert handler.response["Status"] == "SUCCESS", handler.response[
-        "Reason"
-    ]  # todo: appears to return timeout even for exceptions within code? (6/30/23)
+    response = mocked_cfn_callback.call_args.args[0]
+    assert response["Status"] == "SUCCESS", response["Reason"]
+    # todo: appears to return timeout even for exceptions within code? (6/30/23)
     #            -- action: improve error reporting
-    global_config = get_global_configuration(MockLogger())
-    assert len(global_config.schedules) == 1
-    assert "CFNLogicalID" in global_config.schedules
-    assert global_config.schedules["CFNLogicalID"] == expected_schedule
+    schedules = schedule_store.find_all()
+    assert len(schedules) == 1
+    assert "CFNLogicalID" in schedules
+    saved_schedule = schedules["CFNLogicalID"].to_instance_schedule(period_store)
+    assert saved_schedule == expected_schedule
+
+
+@patch.object(CfnScheduleHandler, "_send_response")
+def test_cfn_schedule_with_legacy_maint_win_str_type(
+    mocked_cfn_callback: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+    app_env: AppEnv,
+) -> None:
+    event = new_create_request(
+        {
+            "NoStackPrefix": "True",
+            "ServiceToken": "serviceTokenARN",
+            "Periods": [{"EndTime": "16:59"}],
+            "SsmMaintenanceWindow": "my_window_name",  # backwards compatibility for str type
+        }
+    )
+    handler = CfnScheduleHandler(event, MockLambdaContext())
+    handler.handle_request()
+
+    expected_schedule = InstanceSchedule(
+        name="CFNLogicalID",
+        configured_in_stack=stack_arn,
+        timezone=app_env.default_timezone,
+        ssm_maintenance_window=["my_window_name"],
+        periods=[
+            RunningPeriodDictElement(
+                period=RunningPeriod(name=AnyNonEmptyString(), endtime=time(16, 59, 0))
+            )
+        ],
+    )
+
+    response = mocked_cfn_callback.call_args.args[0]
+    assert response["Status"] == "SUCCESS", response["Reason"]
+    schedules = schedule_store.find_all()
+    assert len(schedules) == 1
+    assert "CFNLogicalID" in schedules
+    saved_schedule = schedules["CFNLogicalID"].to_instance_schedule(period_store)
+    assert saved_schedule == expected_schedule
 
 
 @patch.object(CfnScheduleHandler, "_send_response")
 def test_cfn_schedule_with_all_parameters(
-    mocked_cfn_callback: MagicMock, config_table: None
+    mocked_cfn_callback: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
 ) -> None:
-    # untested properties:
-    # "Overwrite"
-    # "OverrideStatus"
-    # "Metrics"
-
     event = new_create_request(
         {
             "ServiceToken": "ServiceTokenARN",
@@ -95,8 +146,9 @@ def test_cfn_schedule_with_all_parameters(
             "Hibernate": "True",
             "RetainRunning": "True",
             "StopNewInstances": "True",
-            "UseMaintenanceWindow": "True",
-            "SsmMaintenanceWindow": "my_window_name",
+            "SsmMaintenanceWindow": ["my_window_name"],
+            "Metrics": "True",  # removed in 3.0, but shouldn't cause the template to error (yet)
+            "OverrideStatus": "running",
             "Periods": [
                 {
                     "Description": "run from 9-5 on the first 3 days of March",
@@ -120,33 +172,36 @@ def test_cfn_schedule_with_all_parameters(
     expected_schedule = InstanceSchedule(
         name="schedule_name",
         description="template with all values",
-        timezone="America/New_York",
+        timezone=ZoneInfo("America/New_York"),
         configured_in_stack=stack_arn,
         enforced=True,
         hibernate=True,
         retain_running=True,
         stop_new_instances=True,
-        use_maintenance_window=True,
-        ssm_maintenance_window="my_window_name",
-        use_metrics=False,
+        ssm_maintenance_window=["my_window_name"],
+        override_status="running",
         periods=UnorderedList(
             [
                 RunningPeriodDictElement(
                     period=RunningPeriod(
-                        name=ANY,
+                        name=AnyNonEmptyString(),
                         begintime=time(9, 0, 0),
                         endtime=time(17, 0, 0),
-                        monthdays={1, 2, 3},
-                        months={3},
+                        cron_recurrence=CronRecurrenceExpression(
+                            monthdays=parse_monthdays_expr({"1-3"}),
+                            months=parse_months_expr({"3"}),
+                        ),
                     ),
                     instancetype="t2.micro",
                 ),
                 RunningPeriodDictElement(
                     period=RunningPeriod(
-                        name=ANY,
+                        name=AnyNonEmptyString(),
                         begintime=time(14, 0, 0),
                         endtime=time(17, 0, 0),
-                        weekdays={5, 6},
+                        cron_recurrence=CronRecurrenceExpression(
+                            weekdays=parse_weekdays_expr({"sat-sun"}),
+                        ),
                     ),
                     instancetype="t2.micro",
                 ),
@@ -156,10 +211,165 @@ def test_cfn_schedule_with_all_parameters(
 
     handler = CfnScheduleHandler(event, MockLambdaContext())
     handler.handle_request()
-
-    assert handler.response["Status"] == "SUCCESS", handler.response["Reason"]
-    global_config = get_global_configuration(MockLogger())
-    assert len(global_config.schedules) == 1
-    assert "schedule_name" in global_config.schedules
-    saved_schedule = global_config.schedules["schedule_name"]
+    response = mocked_cfn_callback.call_args.args[0]
+    assert response["Status"] == "SUCCESS", response["Reason"]
+    schedules = schedule_store.find_all()
+    assert len(schedules) == 1
+    assert "schedule_name" in schedules
+    saved_schedule = schedules["schedule_name"].to_instance_schedule(period_store)
     assert saved_schedule == expected_schedule
+
+    # expect that all periods are also tagged with configured_in_stack parameter:
+    for period in period_store.find_all().values():
+        assert period.configured_in_stack == stack_arn
+
+
+@patch.object(CfnScheduleHandler, "_send_response")
+def test_cfn_schedule_fail_when_invalid_schedule_property_provided(
+    mocked_cfn_callback: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+) -> None:
+    event = new_create_request(
+        {
+            "ServiceToken": "serviceTokenARN",
+            "NoStackPrefix": "True",
+            "Timezone": "UTC",
+            "Invalid": "Invalid parameter",  # Should fail as it is not a supported property
+        }  # type: ignore[typeddict-unknown-key]
+    )
+    handler = CfnScheduleHandler(event, MockLambdaContext())
+    handler.handle_request()
+
+    error_message = f"Unknown schedule property Invalid, valid properties are {CfnScheduleResourceProperties.__annotations__.keys()}"
+    response = mocked_cfn_callback.call_args.args[0]
+    assert response["Status"] == "FAILED"
+    assert response["Reason"] == error_message
+
+    schedules = schedule_store.find_all()
+    periods = period_store.find_all()
+    assert len(schedules) == 0
+    assert len(periods) == 0
+
+
+@patch.object(CfnScheduleHandler, "_send_response")
+def test_cfn_schedule_fail_when_schedule_property_case_not_match(
+    mocked_cfn_callback: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+) -> None:
+    event = new_create_request(
+        {
+            "ServiceToken": "serviceTokenARN",
+            "NoStackPrefix": "True",
+            "TimeZone": "UTC",  # Should fail as `Timezone` is the expected property
+            "Periods": [{"BeginTime": "00:00"}],
+        }  # type: ignore[typeddict-unknown-key]
+    )
+    handler = CfnScheduleHandler(event, MockLambdaContext())
+    handler.handle_request()
+
+    error_message = f"Unknown schedule property TimeZone, valid properties are {CfnScheduleResourceProperties.__annotations__.keys()}"
+    response = mocked_cfn_callback.call_args.args[0]
+    assert response["Status"] == "FAILED"
+    assert response["Reason"] == error_message
+
+    schedules = schedule_store.find_all()
+    periods = period_store.find_all()
+    assert len(schedules) == 0
+    assert len(periods) == 0
+
+
+@patch.object(CfnScheduleHandler, "_send_response")
+def test_cfn_schedule_fail_when_schedule_period_empty(
+    mocked_cfn_callback: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+) -> None:
+    event = new_create_request(
+        {
+            "ServiceToken": "serviceTokenARN",
+            "NoStackPrefix": "True",
+            "Timezone": "UTC",
+            "Periods": [],  # Should fail as it is empty
+        },
+    )
+    handler = CfnScheduleHandler(event, MockLambdaContext())
+    handler.handle_request()
+
+    logical_id = event["LogicalResourceId"]
+    error_message = f"Error parsing schedule {logical_id}: At least one period must be specified for a schedule"
+    response = mocked_cfn_callback.call_args.args[0]
+    assert response["Status"] == "FAILED"
+    assert response["Reason"] == error_message
+
+    schedules = schedule_store.find_all()
+    periods = period_store.find_all()
+    assert len(schedules) == 0
+    assert len(periods) == 0
+
+
+@patch.object(CfnScheduleHandler, "_send_response")
+def test_cfn_schedule_fail_when_invalid_schedule_period_provided(
+    mocked_cfn_callback: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+) -> None:
+    event = new_create_request(
+        {
+            "ServiceToken": "serviceTokenARN",
+            "NoStackPrefix": "True",
+            "Timezone": "UTC",
+            "Periods": [
+                {
+                    "BeginTime": "00:00",
+                    "EndTime": "01:00",
+                    "Invalid": "Invalid parameter",  # Should fail as it is not a supported property
+                }  # type: ignore[typeddict-unknown-key]
+            ],
+        },
+    )
+    handler = CfnScheduleHandler(event, MockLambdaContext())
+    handler.handle_request()
+
+    error_message = f"Unknown period property Invalid, valid properties are {CfnSchedulePeriodProperties.__annotations__.keys()}"
+    response = mocked_cfn_callback.call_args.args[0]
+    assert response["Status"] == "FAILED"
+    assert response["Reason"] == error_message
+
+    schedules = schedule_store.find_all()
+    periods = period_store.find_all()
+    assert len(schedules) == 0
+    assert len(periods) == 0
+
+
+@patch.object(CfnScheduleHandler, "_send_response")
+def test_cfn_schedule_fail_when_schedule_period_property_case_not_match(
+    mocked_cfn_callback: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+) -> None:
+    event = new_create_request(
+        {
+            "ServiceToken": "serviceTokenARN",
+            "NoStackPrefix": "True",
+            "Timezone": "UTC",
+            "Periods": [
+                {
+                    "Endtime": "01:00",  # Should fail as `EndTime` is the expected property
+                }  # type: ignore[typeddict-unknown-key]
+            ],
+        },
+    )
+    handler = CfnScheduleHandler(event, MockLambdaContext())
+    handler.handle_request()
+
+    error_message = f"Unknown period property Endtime, valid properties are {CfnSchedulePeriodProperties.__annotations__.keys()}"
+    response = mocked_cfn_callback.call_args.args[0]
+    assert response["Status"] == "FAILED"
+    assert response["Reason"] == error_message
+
+    schedules = schedule_store.find_all()
+    periods = period_store.find_all()
+    assert len(schedules) == 0
+    assert len(periods) == 0
