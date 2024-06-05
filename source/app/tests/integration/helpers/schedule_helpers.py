@@ -9,5 +9,5 @@ def at_time(
     return datetime.datetime.combine(date, time, datetime.timezone.utc)
 
 
-def quick_time(hrs: int, minutes: int, seconds: int) -> datetime.datetime:
+def quick_time(hrs: int, minutes: int, seconds: int = 0) -> datetime.datetime:
     return at_time(datetime.time(hrs, minutes, seconds))

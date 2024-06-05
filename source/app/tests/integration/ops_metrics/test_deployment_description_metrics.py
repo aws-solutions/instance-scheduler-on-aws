@@ -1,150 +1,178 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 import json
-from datetime import datetime, time
-from os import environ
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
 from freezegun import freeze_time
 
-from instance_scheduler.configuration.instance_schedule import InstanceSchedule
-from instance_scheduler.configuration.running_period import RunningPeriod
-from instance_scheduler.configuration.running_period_dict_element import (
-    RunningPeriodDictElement,
-)
-from instance_scheduler.configuration.scheduler_config import GlobalConfig
 from instance_scheduler.handler.scheduling_orchestrator import (
     OrchestrationRequest,
     SchedulingOrchestratorHandler,
 )
-from instance_scheduler.util.app_env import AppEnv
+from instance_scheduler.model.ddb_config_item import DdbConfigItem
+from instance_scheduler.model.period_definition import PeriodDefinition
+from instance_scheduler.model.period_identifier import PeriodIdentifier
+from instance_scheduler.model.schedule_definition import ScheduleDefinition
+from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
+from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
+from instance_scheduler.model.store.schedule_definition_store import (
+    ScheduleDefinitionStore,
+)
 from tests.context import MockLambdaContext
-from tests.integration.ops_metrics.conftest import solution_metrics_uuid
+from tests.integration.ops_metrics.conftest import override_should_send_metric
+from tests.logger import MockLogger
+from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
+from tests.test_utils.mock_orchestrator_environment import MockOrchestratorEnvironment
+from tests.test_utils.unordered_list import UnorderedList
 
 mockEvent: OrchestrationRequest = {"scheduled_action": "run_orchestrator"}
-
-periods: list[RunningPeriodDictElement] = [
-    RunningPeriodDictElement(
-        period=RunningPeriod(
-            name="test-period",
-            begintime=time(10, 0, 0),
-            endtime=time(20, 0, 0),
-        )
-    )
-]
-
-global_config = GlobalConfig(
-    scheduled_services=["ec2", "rds"],
-    schedule_clusters=False,
-    tag_name="Schedule",
-    regions=["us-east-1", "us-east-2", "us-west-2"],
-    default_timezone=ZoneInfo("Asia/Hong_Kong"),
-    schedules={
-        "all-flags": InstanceSchedule(
-            name="all-flags",
-            periods=periods,
-            override_status="running",
-            use_metrics=True,
-            stop_new_instances=True,
-            use_maintenance_window=True,
-            enforced=True,
-            hibernate=True,
-            retain_running=True,
-            timezone="Asia/Hong_Kong",
-        ),
-        "no-flags-cfn": InstanceSchedule(
-            name="no-flags-cfn",
-            periods=periods,
-            configured_in_stack="some-stack-arn",
-            timezone="UTC",
-        ),
-        "non-default-tz-cfn": InstanceSchedule(
-            name="non-default-tz-cfn",
-            periods=periods,
-            configured_in_stack="some-stack-arn",
-            timezone="UTC",
-        ),
-        "explicit-tz-matches-default": InstanceSchedule(
-            name="explicit-tz-matches-default",
-            periods=periods,
-            timezone="Asia/Hong_Kong",  # should not be counted by tz metric
-        ),
-    },
-    trace=False,
-    enable_ssm_maintenance_windows=True,
-    use_metrics=True,
-    schedule_lambda_account=True,
-    create_rds_snapshot=False,
-    started_tags="non-null tag",
-    stopped_tags="",
-    scheduler_role_name="Scheduler-Role",
-    namespace="dev",
-    organization_id="",
-    aws_partition="aws",
-    remote_account_ids=["222233334444", "333344445555"],
-)
-
-env = {
-    "START_TAGS": "non-null tag",
-    "STOP_TAGS": "",
-    "SCHEDULER_FREQUENCY": "10",
-    "ENABLE_AWS_ORGANIZATIONS": "False",
-    "ENABLE_EC2_SSM_MAINTENANCE_WINDOWS": "True",
-}
 
 
 @patch("instance_scheduler.handler.scheduling_orchestrator.should_collect_metric")
 @patch.object(SchedulingOrchestratorHandler, "_run_scheduling_lambda")
-@patch.dict(environ, env)
 @freeze_time(datetime(2023, 6, 12, 12, 0, 0, tzinfo=ZoneInfo("UTC")))
 def test_orchestrator_sends_expected_metric(
     run_lambda_func: MagicMock,
     should_collect_metric_func: MagicMock,
     mock_metrics_endpoint: MagicMock,
-    app_env: AppEnv,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+    config_item_store: DdbConfigItemStore,
 ) -> None:
-    should_collect_metric_func.return_value = True
-    with patch.object(SchedulingOrchestratorHandler, "configuration", global_config):
+    # account configuration
+    config_item_store.put(
+        DdbConfigItem(
+            organization_id="", remote_account_ids=["222233334444", "333344445555"]
+        )
+    )
+
+    period_store.put(
+        PeriodDefinition(name="test-period", begintime="05:00", endtime="06:00")
+    )
+    period_store.put(
+        PeriodDefinition(name="test-period-one-sided-begin", begintime="05:00")
+    )
+    period_store.put(
+        PeriodDefinition(name="test-period-one-sided-end", endtime="06:00")
+    )
+
+    # test schedules
+    schedule_store.put(
+        ScheduleDefinition(
+            name="all-flags",
+            periods=[PeriodIdentifier.of("test-period")],
+            override_status="running",
+            stop_new_instances=True,
+            ssm_maintenance_window=["test-window"],
+            enforced=True,
+            hibernate=True,
+            retain_running=True,
+            timezone="Asia/Hong_Kong",
+        )
+    )
+    schedule_store.put(
+        ScheduleDefinition(
+            name="no-flags-cfn",
+            periods=[PeriodIdentifier.of("test-period-one-sided-begin")],
+            configured_in_stack="some-stack-arn",
+            stop_new_instances=False,
+            timezone="UTC",
+        )
+    )
+    schedule_store.put(
+        ScheduleDefinition(
+            name="non-default-tz-cfn",
+            periods=[
+                PeriodIdentifier.of("test-period"),
+                PeriodIdentifier.of("test-period-one-sided-begin"),
+            ],
+            configured_in_stack="some-stack-arn",
+            timezone="UTC",
+        )
+    )
+    schedule_store.put(
+        ScheduleDefinition(
+            name="explicit-tz-matches-default",
+            periods=[
+                PeriodIdentifier.of("test-period-one-sided-begin"),
+                PeriodIdentifier.of("test-period-one-sided-end"),
+            ],  # one sided schedule counted once
+            timezone="Asia/Hong_Kong",  # should not be counted by tz metric
+        )
+    )
+
+    orchestrator_env = MockOrchestratorEnvironment(
+        scheduler_frequency_minutes=10,
+        stop_tags=[],
+        start_tags=["non-null tag"],
+        enable_schedule_hub_account=True,
+        schedule_regions=["us-east-1", "us-west-2"],
+        enable_ec2_service=True,
+        enable_rds_service=True,
+        enable_rds_clusters=True,
+        enable_neptune_service=True,
+        enable_docdb_service=True,
+        enable_asg_service=True,
+        enable_aws_organizations=False,
+        enable_rds_snapshots=False,
+        enable_ec2_ssm_maintenance_windows=True,
+        ops_dashboard_enabled=True,
+        default_timezone=ZoneInfo("Asia/Hong_Kong"),
+    )
+
+    with MockMetricsEnviron(
+        send_anonymous_metrics=True
+    ) as metrics_environ, override_should_send_metric(True):
+        should_collect_metric_func.return_value = (
+            True  # override return as this metric is normally sent daily
+        )
         handler = SchedulingOrchestratorHandler(
-            event=mockEvent, context=MockLambdaContext()
+            event=mockEvent,
+            context=MockLambdaContext(),
+            env=orchestrator_env,
+            logger=MockLogger(),
         )
         handler.handle_request()
 
         expected_metric = {
-            "TimeStamp": "2023-06-12 12:00:00",
-            "UUID": str(solution_metrics_uuid),
-            "Solution": app_env.solution_id,
-            "Version": app_env.solution_version,
-            "Event_Name": "deployment_description",
-            "Context": {
-                "services": ["ec2", "rds"],
-                "regions": ["us-east-1", "us-east-2", "us-west-2"],
+            "timestamp": "2023-06-12 12:00:00",
+            "uuid": str(metrics_environ.metrics_uuid),
+            "solution": metrics_environ.solution_id,
+            "version": metrics_environ.solution_version,
+            "event_name": "deployment_description",
+            "context_version": 1,
+            "context": {
+                "services": UnorderedList(
+                    ["ec2", "rds", "rds-clusters", "neptune", "docdb", "asg"]
+                ),
+                "regions": orchestrator_env.schedule_regions,
                 "num_accounts": 3,  # local account + 2 remote
                 "num_schedules": 4,
                 "num_cfn_schedules": 2,
+                "num_one_sided_schedules": 3,
                 "default_timezone": "Asia/Hong_Kong",
-                "schedule_aurora_clusters": False,
                 "create_rds_snapshots": False,
                 "schedule_interval_minutes": 10,
                 "memory_size_mb": 128,  # memory size from MockLambdaContext
                 "using_organizations": False,
                 "enable_ec2_ssm_maintenance_windows": True,
+                "ops_dashboard_enabled": orchestrator_env.ops_dashboard_enabled,
                 "num_started_tags": 1,
                 "num_stopped_tags": 0,
                 "schedule_flag_counts": {
-                    "stop_new_instances": 1,
+                    "stop_new_instances": 3,
                     "enforced": 1,
                     "retain_running": 1,
                     "hibernate": 1,
                     "override": 1,
                     "use_ssm_maintenance_window": 1,
-                    "use_metrics": 1,
                     "non_default_timezone": 2,
                 },
             },
         }
 
         assert mock_metrics_endpoint.call_count == 1
-        json_payload = mock_metrics_endpoint.call_args[1]["data"]
+        json_payload = mock_metrics_endpoint.call_args[1]["body"]
         assert json.loads(json_payload) == expected_metric

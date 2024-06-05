@@ -2,43 +2,23 @@
 # SPDX-License-Identifier: Apache-2.0
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Generic, TypedDict, TypeVar
+from typing import Generic, TypeVar
 
-from boto3.session import Session
+from instance_scheduler.schedulers.states import ScheduleState
+from instance_scheduler.service.abstract_instance import AbstractInstance
 
-from instance_scheduler import ScheduleState
-from instance_scheduler.configuration.instance_schedule import Instance
-from instance_scheduler.configuration.scheduling_context import SchedulingContext
-from instance_scheduler.util.logger import Logger
-
-
-class ServiceArgs(TypedDict):
-    account_id: str
-    logger: Logger
-    stack_name: str
-    session: Session
-    scheduling_context: SchedulingContext
-
-
-T = TypeVar("T", bound=Instance)
+T = TypeVar("T", bound=AbstractInstance)
 
 
 class Service(Generic[T], ABC):
-    def __init__(self, _: ServiceArgs) -> None:
-        """noop"""
 
     @property
     @abstractmethod
     def service_name(self) -> str:
         pass
 
-    @property
     @abstractmethod
-    def allow_resize(self) -> bool:
-        pass
-
-    @abstractmethod
-    def get_schedulable_instances(self) -> list[T]:
+    def describe_tagged_instances(self) -> Iterator[T]:
         pass
 
     @abstractmethod

@@ -7,9 +7,10 @@ from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 
 @dataclass(frozen=True)
 class AnonymousMetricWrapper:
-    TimeStamp: str
-    UUID: str
-    Solution: str
-    Version: str
-    Event_Name: str
-    Context: OpsMetric
+    timestamp: str
+    uuid: str
+    solution: str
+    version: str
+    event_name: str
+    context_version: int
+    context: OpsMetric

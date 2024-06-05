@@ -2,9 +2,37 @@
 
 exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
 {
-  "AWSTemplateFormatVersion": "2010-09-09",
   "Conditions": {
-    "IsMemberOfOrganization": {
+    "AppRegistryForInstanceSchedulerShouldDeployBA583A67": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::Partition",
+            },
+            "aws-cn",
+          ],
+        },
+      ],
+    },
+    "EC2SchedulerCrossAccountRolekmsAccessCondition6C83D407": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Fn::Select": [
+                0,
+                {
+                  "Ref": "KmsKeyArns",
+                },
+              ],
+            },
+            "",
+          ],
+        },
+      ],
+    },
+    "UsingAWSOrganizationsCondition": {
       "Fn::Equals": [
         {
           "Ref": "UsingAWSOrganizations",
@@ -13,23 +41,14 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       ],
     },
   },
-  "Description": "",
   "Mappings": {
     "AppRegistryForInstanceSchedulerSolution25A90F05": {
       "Data": {
-        "AppRegistryApplicationName": "instance-scheduler-on-aws",
-        "ApplicationType": "AWS-Solutions",
-        "ID": "SO0030",
-        "SolutionName": "instance-scheduler-on-aws",
-        "Version": "v1.5.0",
-      },
-    },
-    "mappings": {
-      "SchedulerEventBusName": {
-        "Name": "scheduler-event-bus",
-      },
-      "SchedulerRole": {
-        "Name": "Scheduler-Role",
+        "AppRegistryApplicationName": "my-appreg-solution-name",
+        "ApplicationType": "my-appreg-app-name",
+        "ID": "my-solution-id",
+        "SolutionName": "my-solution-name",
+        "Version": "v9.9.9",
       },
     },
   },
@@ -38,19 +57,20 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "ParameterGroups": [
         {
           "Label": {
-            "default": "Namespace Configuration",
+            "default": "Account structure",
           },
           "Parameters": [
+            "InstanceSchedulerAccount",
+            "UsingAWSOrganizations",
             "Namespace",
           ],
         },
         {
           "Label": {
-            "default": "Account Structure",
+            "default": "Service-specific",
           },
           "Parameters": [
-            "InstanceSchedulerAccount",
-            "UsingAWSOrganizations",
+            "KmsKeyArns",
           ],
         },
       ],
@@ -58,32 +78,38 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         "InstanceSchedulerAccount": {
           "default": "Hub Account ID",
         },
+        "KmsKeyArns": {
+          "default": "Kms Key Arns for EC2",
+        },
+        "Namespace": {
+          "default": "Namespace",
+        },
         "UsingAWSOrganizations": {
           "default": "Use AWS Organizations",
         },
       },
     },
   },
-  "Outputs": {
-    "CrossAccountRole": {
-      "Description": "Arn for cross account role for Instance scheduler, add this arn to the list of crossaccount roles (CrossAccountRoles) parameter of the Instance Scheduler template.",
-      "Value": {
-        "Fn::GetAtt": [
-          "EC2SchedulerCrossAccountRole",
-          "Arn",
-        ],
-      },
-    },
-  },
   "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
     "InstanceSchedulerAccount": {
-      "AllowedPattern": "(^[0-9]{12}$)",
+      "AllowedPattern": "^\\d{12}$",
       "ConstraintDescription": "Account number is a 12 digit number",
-      "Description": "AccountID of the Instance Scheduler Hub stack that should be allowed to schedule resources in this account.",
+      "Description": "Account ID of the Instance Scheduler Hub stack that should be allowed to schedule resources in this account.",
       "Type": "String",
     },
+    "KmsKeyArns": {
+      "Default": "",
+      "Description": "comma-separated list of kms arns to grant Instance Scheduler kms:CreateGrant permissions to provide the EC2  service with Decrypt permissions for encrypted EBS volumes. This allows the scheduler to start EC2 instances with attached encrypted EBS volumes. provide just (*) to give limited access to all kms keys, leave blank to disable. For details on the exact policy created, refer to security section of the implementation guide (https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/)",
+      "Type": "CommaDelimitedList",
+    },
     "Namespace": {
-      "Description": "Unique identifier used to differentiate between multiple solution deployments. Must be set to the same value as the Hub stack",
+      "Default": "default",
+      "Description": "Unique identifier used to differentiate between multiple solution deployments. Must be set to the same value as the Hub stack. Must be non-empty for Organizations deployments.",
       "Type": "String",
     },
     "UsingAWSOrganizations": {
@@ -98,6 +124,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
   },
   "Resources": {
     "AppRegistry968496A3": {
+      "Condition": "AppRegistryForInstanceSchedulerShouldDeployBA583A67",
       "Properties": {
         "Description": {
           "Fn::Join": [
@@ -171,6 +198,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "Type": "AWS::ServiceCatalogAppRegistry::Application",
     },
     "AppRegistryAssociation": {
+      "Condition": "AppRegistryForInstanceSchedulerShouldDeployBA583A67",
       "Properties": {
         "Application": {
           "Fn::GetAtt": [
@@ -186,6 +214,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "Type": "AWS::ServiceCatalogAppRegistry::ResourceAssociation",
     },
     "AppRegistryAttributeGroupAssociationf823ba38a843A987197E": {
+      "Condition": "AppRegistryForInstanceSchedulerShouldDeployBA583A67",
       "Properties": {
         "Application": {
           "Fn::GetAtt": [
@@ -203,6 +232,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "Type": "AWS::ServiceCatalogAppRegistry::AttributeGroupAssociation",
     },
     "AppRegistryDefaultApplicationAttributes15279635": {
+      "Condition": "AppRegistryForInstanceSchedulerShouldDeployBA583A67",
       "Properties": {
         "Attributes": {
           "applicationType": {
@@ -289,29 +319,89 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       },
       "Type": "AWS::ServiceCatalogAppRegistry::AttributeGroup",
     },
-    "EC2SchedulerCrossAccountRole": {
+    "AsgSchedulingRoleASGSchedulingPermissions6DEABC8F": {
       "Metadata": {
         "cdk_nag": {
           "rules_to_suppress": [
             {
+              "applies_to": [
+                "Resource::*",
+              ],
               "id": "AwsSolutions-IAM5",
-              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+              "reason": "Required permissions to describe AutoScaling Groups",
+            },
+            {
+              "applies_to": [
+                "Resource::arn:<AWS::Partition>:autoscaling:*:<AWS::AccountId>:autoScalingGroup:*:autoScalingGroupName/*",
+              ],
+              "id": "AwsSolutions-IAM5",
+              "reason": "Required permissions to modify scheduled scaling actions on AutoScaling Groups",
             },
           ],
         },
         "cfn_nag": {
           "rules_to_suppress": [
             {
-              "id": "W11",
-              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+              "id": "W12",
+              "reason": "DescribeAutoScalingGroups and autoscaling:DescribeScheduledActions actions require wildcard permissions",
             },
+          ],
+        },
+      },
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "autoscaling:BatchPutScheduledUpdateGroupAction",
+                "autoscaling:BatchDeleteScheduledAction",
+                "autoscaling:CreateOrUpdateTags",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":autoscaling:*:",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":autoScalingGroup:*:autoScalingGroupName/*",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": [
+                "autoscaling:DescribeAutoScalingGroups",
+                "autoscaling:DescribeScheduledActions",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "AsgSchedulingRoleASGSchedulingPermissions6DEABC8F",
+        "Roles": [
+          {
+            "Ref": "AsgSchedulingRoleF04B8CC9",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "AsgSchedulingRoleF04B8CC9": {
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
             {
               "id": "W28",
               "reason": "The role name is defined to allow cross account access from the hub account.",
-            },
-            {
-              "id": "W76",
-              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
             },
           ],
         },
@@ -324,17 +414,416 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
               "Effect": "Allow",
               "Principal": {
                 "AWS": {
-                  "Fn::Sub": [
-                    "arn:\${AWS::Partition}:iam::\${accountId}:root",
-                    {
-                      "accountId": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
                         "Ref": "InstanceSchedulerAccount",
                       },
-                    },
+                      ":role/",
+                      {
+                        "Ref": "Namespace",
+                      },
+                      "-AsgRequestHandler-Role",
+                    ],
                   ],
                 },
               },
             },
+          ],
+          "Version": "2012-10-17",
+        },
+        "RoleName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "Namespace",
+              },
+              "-ASG-Scheduling-Role",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "EC2SchedulerCrossAccountRole": {
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W28",
+              "reason": "The role name is defined to allow cross account access from the hub account.",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "InstanceSchedulerAccount",
+                      },
+                      ":role/",
+                      {
+                        "Ref": "Namespace",
+                      },
+                      "-SchedulingRequestHandler-Role",
+                    ],
+                  ],
+                },
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "RoleName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "Namespace",
+              },
+              "-Scheduler-Role",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "EC2SchedulerCrossAccountRoleKmsPermissions93DB5FB5": {
+      "Condition": "EC2SchedulerCrossAccountRolekmsAccessCondition6C83D407",
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "applies_to": [
+                "Resource::*",
+              ],
+              "id": "AwsSolutions-IAM5",
+              "reason": "Specific kms keys are unknown until runtime, for security, access is instead restricted to only granting decryption permissions to the ec2 service for encrypted EBS volumes",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "kms:CreateGrant",
+              "Condition": {
+                "Bool": {
+                  "kms:GrantIsForAWSResource": true,
+                },
+                "ForAllValues:StringEquals": {
+                  "kms:EncryptionContextKeys": [
+                    "aws:ebs:id",
+                  ],
+                  "kms:GrantOperations": [
+                    "Decrypt",
+                  ],
+                },
+                "Null": {
+                  "kms:EncryptionContextKeys": false,
+                  "kms:GrantOperations": false,
+                },
+                "StringLike": {
+                  "kms:ViaService": "ec2.*.amazonaws.com",
+                },
+              },
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "KmsKeyArns",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "EC2SchedulerCrossAccountRoleKmsPermissions93DB5FB5",
+        "Roles": [
+          {
+            "Ref": "EC2SchedulerCrossAccountRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "EC2SchedulerCrossAccountRoleSchedulingPermissions3E73CF8A": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "applies_to": [
+                "Resource::arn:<AWS::Partition>:rds:*:<AWS::AccountId>:db:*",
+                "Resource::arn:<AWS::Partition>:rds:*:<AWS::AccountId>:cluster:*",
+                "Resource::arn:<AWS::Partition>:ec2:*:<AWS::AccountId>:instance/*",
+                "Resource::arn:<AWS::Partition>:rds:*:<AWS::AccountId>:snapshot:*",
+                "Resource::*",
+              ],
+              "id": "AwsSolutions-IAM5",
+              "reason": "required scheduling permissions",
+            },
+          ],
+        },
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W12",
+              "reason": "required scheduling permissions",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "ec2:DescribeInstances",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "ec2:StartInstances",
+                "ec2:StopInstances",
+                "ec2:CreateTags",
+                "ec2:DeleteTags",
+                "ec2:ModifyInstanceAttribute",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
+              },
+            },
+            {
+              "Action": "ssm:DescribeMaintenanceWindows",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "rds:DescribeDBClusters",
+                "rds:DescribeDBInstances",
+                "tag:GetResources",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "rds:DeleteDBSnapshot",
+                "rds:DescribeDBSnapshots",
+                "rds:StopDBInstance",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:snapshot:*",
+              },
+            },
+            {
+              "Action": [
+                "rds:AddTagsToResource",
+                "rds:RemoveTagsFromResource",
+                "rds:StartDBInstance",
+                "rds:StopDBInstance",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:db:*",
+              },
+            },
+            {
+              "Action": [
+                "rds:AddTagsToResource",
+                "rds:RemoveTagsFromResource",
+                "rds:StartDBCluster",
+                "rds:StopDBCluster",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:cluster:*",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "EC2SchedulerCrossAccountRoleSchedulingPermissions3E73CF8A",
+        "Roles": [
+          {
+            "Ref": "EC2SchedulerCrossAccountRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "RegisterSpokeAccountCustomResourceLambda8BF25EDC": {
+      "Condition": "UsingAWSOrganizationsCondition",
+      "DependsOn": [
+        "RegisterSpokeAccountCustomResourceLambdaRoleDefaultPolicy3599775F",
+        "RegisterSpokeAccountCustomResourceLambdaRoleDD724340",
+      ],
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "AwsSolutions-L1",
+              "reason": "Python 3.11 is the newest available runtime. This finding is a false positive.",
+            },
+          ],
+        },
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W89",
+              "reason": "This Lambda function does not need to access any resource provisioned within a VPC.",
+            },
+            {
+              "id": "W58",
+              "reason": "This Lambda function has permission provided to write to CloudWatch logs using the iam roles.",
+            },
+            {
+              "id": "W92",
+              "reason": "Lambda function is a custom resource. Concurrent calls are very limited.",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "Code": "Omitted to remove snapshot dependency on code hash",
+        "Description": "Custom Resource Provider used for spoke account self registration via aws organization",
+        "Environment": {
+          "Variables": {
+            "HUB_REGISTRATION_LAMBDA_ARN": {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:",
+                  {
+                    "Ref": "AWS::Partition",
+                  },
+                  ":lambda:",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  ":",
+                  {
+                    "Ref": "InstanceSchedulerAccount",
+                  },
+                  ":function:InstanceScheduler-",
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "-SpokeRegistration",
+                ],
+              ],
+            },
+            "USER_AGENT_EXTRA": "AwsSolution/my-solution-id/v9.9.9",
+          },
+        },
+        "Handler": "handle_remote_registration_request",
+        "MemorySize": 128,
+        "Role": {
+          "Fn::GetAtt": [
+            "RegisterSpokeAccountCustomResourceLambdaRoleDD724340",
+            "Arn",
+          ],
+        },
+        "Runtime": "python3.11",
+        "Timeout": 60,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "RegisterSpokeAccountCustomResourceLambdaPolicyAE6C7E85": {
+      "Condition": "UsingAWSOrganizationsCondition",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":lambda:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "InstanceSchedulerAccount",
+                    },
+                    ":function:InstanceScheduler-",
+                    {
+                      "Ref": "Namespace",
+                    },
+                    "-SpokeRegistration",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "SpokeRegistrationLogGroup7EBCC472",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "RegisterSpokeAccountCustomResourceLambdaPolicyAE6C7E85",
+        "Roles": [
+          {
+            "Ref": "RegisterSpokeAccountCustomResourceLambdaRoleDD724340",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "RegisterSpokeAccountCustomResourceLambdaPolicyWaiter": {
+      "Condition": "UsingAWSOrganizationsCondition",
+      "DependsOn": [
+        "RegisterSpokeAccountCustomResourceLambdaPolicyAE6C7E85",
+      ],
+      "Type": "AWS::CloudFormation::WaitConditionHandle",
+    },
+    "RegisterSpokeAccountCustomResourceLambdaRoleDD724340": {
+      "Condition": "UsingAWSOrganizationsCondition",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
             {
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
@@ -345,101 +834,28 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
           ],
           "Version": "2012-10-17",
         },
-        "Path": "/",
-        "Policies": [
-          {
-            "PolicyDocument": {
-              "Statement": [
-                {
-                  "Action": [
-                    "rds:DeleteDBSnapshot",
-                    "rds:DescribeDBSnapshots",
-                    "rds:StopDBInstance",
-                  ],
-                  "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:snapshot:*",
-                  },
-                },
-                {
-                  "Action": [
-                    "rds:AddTagsToResource",
-                    "rds:RemoveTagsFromResource",
-                    "rds:DescribeDBSnapshots",
-                    "rds:StartDBInstance",
-                    "rds:StopDBInstance",
-                  ],
-                  "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:db:*",
-                  },
-                },
-                {
-                  "Action": [
-                    "rds:AddTagsToResource",
-                    "rds:RemoveTagsFromResource",
-                    "rds:StartDBCluster",
-                    "rds:StopDBCluster",
-                  ],
-                  "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Sub": "arn:\${AWS::Partition}:rds:*:\${AWS::AccountId}:cluster:*",
-                  },
-                },
-                {
-                  "Action": [
-                    "ec2:StartInstances",
-                    "ec2:StopInstances",
-                    "ec2:CreateTags",
-                    "ec2:DeleteTags",
-                  ],
-                  "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
-                  },
-                },
-                {
-                  "Action": [
-                    "rds:DescribeDBClusters",
-                    "rds:DescribeDBInstances",
-                    "ec2:DescribeInstances",
-                    "ssm:DescribeMaintenanceWindows",
-                    "ssm:DescribeMaintenanceWindowExecutions",
-                    "tag:GetResources",
-                  ],
-                  "Effect": "Allow",
-                  "Resource": "*",
-                },
-              ],
-              "Version": "2012-10-17",
-            },
-            "PolicyName": "EC2InstanceSchedulerRemote",
-          },
-        ],
-        "RoleName": {
-          "Fn::Sub": [
-            "\${Namespace}-\${Name}",
-            {
-              "Name": {
-                "Fn::FindInMap": [
-                  "mappings",
-                  "SchedulerRole",
-                  "Name",
-                ],
-              },
-            },
-          ],
-        },
       },
       "Type": "AWS::IAM::Role",
     },
-    "Ec2ModifyInstanceAttrPolicy4B693ACF": {
+    "RegisterSpokeAccountCustomResourceLambdaRoleDefaultPolicy3599775F": {
+      "Condition": "UsingAWSOrganizationsCondition",
       "Metadata": {
         "cdk_nag": {
           "rules_to_suppress": [
             {
+              "applies_to": [
+                "Resource::*",
+              ],
               "id": "AwsSolutions-IAM5",
-              "reason": "All policies have been scoped to be as restrictive as possible. This solution needs to access ec2/rds resources across all regions.",
+              "reason": "required for xray",
+            },
+          ],
+        },
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W12",
+              "reason": "Wildcard required for xray",
             },
           ],
         },
@@ -448,151 +864,98 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         "PolicyDocument": {
           "Statement": [
             {
-              "Action": "ec2:ModifyInstanceAttribute",
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
-              },
+              "Resource": "*",
             },
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "Ec2ModifyInstanceAttrPolicy4B693ACF",
+        "PolicyName": "RegisterSpokeAccountCustomResourceLambdaRoleDefaultPolicy3599775F",
         "Roles": [
           {
-            "Ref": "EC2SchedulerCrossAccountRole",
+            "Ref": "RegisterSpokeAccountCustomResourceLambdaRoleDD724340",
           },
         ],
       },
       "Type": "AWS::IAM::Policy",
     },
-    "SSMParameterNamespace2002A907": {
-      "Condition": "IsMemberOfOrganization",
+    "RemoteRegistrationCustomResource": {
+      "Condition": "UsingAWSOrganizationsCondition",
+      "DeletionPolicy": "Delete",
       "DependsOn": [
-        "schedulerssmparameterstoreevent",
+        "RegisterSpokeAccountCustomResourceLambdaPolicyWaiter",
       ],
       "Properties": {
-        "Description": "This parameter is for Instance Scheduler solution to support accounts in AWS Organizations.",
-        "Name": "/instance-scheduler/do-not-delete-manually",
-        "Type": "String",
-        "Value": {
-          "Ref": "Namespace",
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "RegisterSpokeAccountCustomResourceLambda8BF25EDC",
+            "Arn",
+          ],
         },
       },
-      "Type": "AWS::SSM::Parameter",
+      "Type": "Custom::RegisterSpokeAccount",
+      "UpdateReplacePolicy": "Delete",
     },
-    "SchedulerEventDeliveryPolicyD8B17948": {
-      "Condition": "IsMemberOfOrganization",
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
+    "SpokeRegistrationLogGroup7EBCC472": {
+      "Condition": "UsingAWSOrganizationsCondition",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
             {
-              "Action": "events:PutEvents",
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::Sub": [
-                  "arn:\${AWS::Partition}:events:\${AWS::Region}:\${InstanceSchedulerAccount}:event-bus/\${Namespace}-\${EventBusName}",
+              "id": "W84",
+              "reason": "This template has to be supported in gov cloud which doesn't yet have the feature to provide kms key id to cloudwatch log group",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "/aws/lambda/",
+              {
+                "Ref": "RegisterSpokeAccountCustomResourceLambda8BF25EDC",
+              },
+            ],
+          ],
+        },
+        "RetentionInDays": 365,
+      },
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
                   {
-                    "EventBusName": {
-                      "Fn::FindInMap": [
-                        "mappings",
-                        "SchedulerEventBusName",
-                        "Name",
-                      ],
-                    },
+                    "Ref": "BootstrapVersion",
                   },
                 ],
               },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "SchedulerEventDeliveryPolicyD8B17948",
-        "Roles": [
-          {
-            "Ref": "SchedulerEventDeliveryRole5AE883C1",
+            ],
           },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
-    },
-    "SchedulerEventDeliveryRole5AE883C1": {
-      "Condition": "IsMemberOfOrganization",
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "events.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
         },
-        "Description": "Event Role to add the permissions necessary to migrate a sender-receiver relationship to Use AWS Organizations",
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "schedulerssmparameterstoreevent": {
-      "Condition": "IsMemberOfOrganization",
-      "DependsOn": [
-        "SchedulerEventDeliveryRole5AE883C1",
       ],
-      "Properties": {
-        "Description": "Event rule to invoke Instance Scheduler lambda function to store spoke account id in configuration.",
-        "EventPattern": {
-          "account": [
-            "111111111111",
-          ],
-          "detail": {
-            "name": [
-              "/instance-scheduler/do-not-delete-manually",
-            ],
-            "operation": [
-              "Create",
-              "Delete",
-            ],
-            "type": [
-              "String",
-            ],
-          },
-          "detail-type": [
-            "Parameter Store Change",
-          ],
-          "source": [
-            "aws.ssm",
-          ],
-        },
-        "State": "ENABLED",
-        "Targets": [
-          {
-            "Arn": {
-              "Fn::Sub": [
-                "arn:\${AWS::Partition}:events:\${AWS::Region}:\${InstanceSchedulerAccount}:event-bus/\${Namespace}-\${EventBusName}",
-                {
-                  "EventBusName": {
-                    "Fn::FindInMap": [
-                      "mappings",
-                      "SchedulerEventBusName",
-                      "Name",
-                    ],
-                  },
-                },
-              ],
-            },
-            "Id": "Spoke-SSM-Parameter-Event",
-            "RoleArn": {
-              "Fn::GetAtt": [
-                "SchedulerEventDeliveryRole5AE883C1",
-                "Arn",
-              ],
-            },
-          },
-        ],
-      },
-      "Type": "AWS::Events::Rule",
     },
   },
 }

@@ -1,61 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-import datetime
-from typing import Any
-
-import boto3
-from mypy_boto3_ec2.client import EC2Client
-
-from instance_scheduler.configuration.instance_schedule import InstanceSchedule
-from instance_scheduler.configuration.running_period import RunningPeriod
-from instance_scheduler.handler.scheduling_request import SchedulingRequestHandler
 from instance_scheduler.schedulers.instance_states import InstanceStates
-from tests.context import MockLambdaContext
-from tests.integration.helpers.ec2_helpers import get_current_state
-from tests.integration.helpers.schedule_helpers import at_time
-from tests.integration.helpers.scheduling_context_builder import (
-    build_context,
-    build_scheduling_event,
-)
-
-
-def schedule_event_at_time(
-    time: datetime.time, retain_running_flag: bool = True
-) -> Any:
-    """
-    helper method for quickly building a scheduling event with the following:
-    begintime: 10:00
-    endtime: 20:00
-    retain_running: true
-    """
-    context = build_context(
-        current_dt=at_time(time),
-        schedules={
-            "test-schedule": InstanceSchedule(
-                name="test-schedule",
-                retain_running=retain_running_flag,
-                periods=[
-                    {
-                        "period": RunningPeriod(
-                            name="test-period",
-                            begintime=datetime.time(10, 0, 0),
-                            endtime=datetime.time(20, 0, 0),
-                        )
-                    }
-                ],
-            )
-        },
-    )
-
-    event = build_scheduling_event(context)
-
-    return event
+from tests.integration.helpers.ec2_helpers import get_current_state, start_ec2_instances
+from tests.integration.helpers.run_handler import simple_schedule
+from tests.integration.helpers.schedule_helpers import quick_time
 
 
 def setup_retain_running_scenario(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
-    retain_running_flag: bool = True,
 ) -> None:
     """
     The retain_running flag comes into effect when an instance is manually started by
@@ -72,99 +24,93 @@ def setup_retain_running_scenario(
     this should cause the instance to be identified as having been started manually and will tag it with
         the retain_running flag
     """
-    # ----------------------------Event Definition--------------------------#
-    event = schedule_event_at_time(
-        datetime.time(10, 0, 0), retain_running_flag=retain_running_flag
-    )
-    # ----------------------------EC2 Instance-------------------------#
-    ec2_client: EC2Client = boto3.client("ec2")
-    ec2_client.start_instances(InstanceIds=[ec2_instance])
+    with simple_schedule(
+        begintime="10:00", endtime="20:00", retain_running=True
+    ) as context:
+        # stopped under normal conditions (populates state table)
+        context.run_scheduling_request_handler(dt=quick_time(20, 0))
+        assert get_current_state(ec2_instance) == "stopped"
 
-    # ------------------------Last Desired State------------------------#
-    ec2_instance_states.set_instance_state(ec2_instance, "stopped")
-    ec2_instance_states.save()
+        # customer manually starts instance
+        start_ec2_instances(ec2_instance)
 
-    # -------------------run handler------------------------#
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
+        # already running instance is identified when it should normally be started
+        context.run_scheduling_request_handler(dt=quick_time(10, 0))
 
 
 def test_instance_is_stopped_at_end_of_period_when_flag_is_not_set(
-    ec2_instance: str, ec2_instance_states: InstanceStates
+    ec2_instance: str,
+    ec2_instance_states: InstanceStates,
 ) -> None:
-    # ----------------------------Setup--------------------------#
     setup_retain_running_scenario(
-        ec2_instance, ec2_instance_states, retain_running_flag=False
+        ec2_instance,
     )
 
-    # Ec2 instance and instance states should already be setup now
-
-    # ----------------------------Event Definition--------------------------#
-    event = schedule_event_at_time(datetime.time(20, 0, 0), retain_running_flag=False)
-
-    # -------------------run handler------------------------#
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
-
-    # ---------------------validate result---------------------#
-    assert get_current_state(ec2_instance) == "stopped"
+    with simple_schedule(
+        begintime="10:00", endtime="20:00", retain_running=False
+    ) as context:
+        context.run_scheduling_request_handler(quick_time(20, 0))
+        assert get_current_state(ec2_instance) == "stopped"
 
 
 def test_instance_is_not_stopped_at_end_of_period_when_flag_is_set(
-    ec2_instance: str, ec2_instance_states: InstanceStates
+    ec2_instance: str,
+    ec2_instance_states: InstanceStates,
 ) -> None:
-    # ----------------------------Setup--------------------------#
     setup_retain_running_scenario(
-        ec2_instance, ec2_instance_states, retain_running_flag=True
+        ec2_instance,
     )
 
-    # Ec2 instance and instance states should already be setup now
-
-    # ----------------------------Event Definition--------------------------#
-    event = schedule_event_at_time(datetime.time(20, 0, 0))
-
-    # -------------------run handler------------------------#
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
-
-    # ---------------------validate result---------------------#
-    assert get_current_state(ec2_instance) == "running"
+    with simple_schedule(
+        begintime="10:00", endtime="20:00", retain_running=True
+    ) as context:
+        context.run_scheduling_request_handler(quick_time(20, 0))
+        assert get_current_state(ec2_instance) == "running"
 
 
 def test_retain_running_behavior_over_multiple_scheduling_cycles(
-    ec2_instance: str, ec2_instance_states: InstanceStates
+    ec2_instance: str,
+    ec2_instance_states: InstanceStates,
 ) -> None:
-    # ----------------------------Setup--------------------------#
     setup_retain_running_scenario(
-        ec2_instance, ec2_instance_states, retain_running_flag=True
+        ec2_instance,
     )
 
-    for i in range(1, 3):
+    with simple_schedule(
+        begintime="10:00", endtime="20:00", retain_running=True
+    ) as context:
         # ----------------------------Period Start--------------------------#
-        event = schedule_event_at_time(datetime.time(10, 0, 0))
-        handler = SchedulingRequestHandler(event, MockLambdaContext())
-        handler.handle_request()
-
+        context.run_scheduling_request_handler(quick_time(10, 0))
         assert get_current_state(ec2_instance) == "running"
 
-        # ----------------------------Period End----------------------------#
-        event = schedule_event_at_time(datetime.time(20, 0, 0))
-        handler = SchedulingRequestHandler(event, MockLambdaContext())
-        handler.handle_request()
+        # ----------------------------Period end--------------------------#
+        context.run_scheduling_request_handler(quick_time(20, 0))
+        assert get_current_state(ec2_instance) == "running"
 
+        # ----------------------------Period Start--------------------------#
+        context.run_scheduling_request_handler(quick_time(10, 0))
+        assert get_current_state(ec2_instance) == "running"
+
+        # ----------------------------Period end--------------------------#
+        context.run_scheduling_request_handler(quick_time(20, 0))
         assert get_current_state(ec2_instance) == "running"
 
     # disable retain-running flag to confirm running behavior was actually because of the flag
-    # ----------------------------Period Start--------------------------#
-    event = schedule_event_at_time(datetime.time(10, 0, 0), retain_running_flag=False)
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
+    with simple_schedule(
+        begintime="10:00", endtime="20:00", retain_running=False
+    ) as context:
+        # ----------------------------Period Start--------------------------#
+        context.run_scheduling_request_handler(quick_time(10, 0))
+        assert get_current_state(ec2_instance) == "running"
 
-    assert get_current_state(ec2_instance) == "running"
+        # ----------------------------Period end--------------------------#
+        context.run_scheduling_request_handler(quick_time(20, 0))
+        assert get_current_state(ec2_instance) == "stopped"
 
-    # ----------------------------Period End----------------------------#
-    event = schedule_event_at_time(datetime.time(20, 0, 0), retain_running_flag=False)
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
+        # ----------------------------Period Start--------------------------#
+        context.run_scheduling_request_handler(quick_time(10, 0))
+        assert get_current_state(ec2_instance) == "running"
 
-    assert get_current_state(ec2_instance) == "stopped"
+        # ----------------------------Period end--------------------------#
+        context.run_scheduling_request_handler(quick_time(20, 0))
+        assert get_current_state(ec2_instance) == "stopped"

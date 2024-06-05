@@ -1,18 +1,15 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-
-import * as codebuild from "aws-cdk-lib/aws-codebuild";
-import * as pipelines from "aws-cdk-lib/pipelines";
-import { Construct } from "constructs";
 import { Stack, Stage } from "aws-cdk-lib";
-import { InstanceSchedulerStack } from "../../instance-scheduler/lib/instance-scheduler-stack";
-import { NagSuppressions } from "cdk-nag";
-import { E2eTestStack } from "./e2e-test-stack";
+import * as codebuild from "aws-cdk-lib/aws-codebuild";
 import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
-import * as hubStackUtils from "../e2e-tests/utils/hub-stack-utils";
+import * as pipelines from "aws-cdk-lib/pipelines";
+import { NagSuppressions } from "cdk-nag";
+import { Construct } from "constructs";
+import { E2eTestStack } from "./e2e-test-stack";
+import { InstanceSchedulerTestingStack } from "./instance-scheduler-testing-stack";
 
 const DEPLOY_STAGE_NAME = "Deployment-Test";
-const END_TO_END_STAGE_NAME = "End-to-End-Tests";
 const STACK_NAME = "InstanceScheduler";
 const TEST_RESOURCES_STACK_NAME = "InstanceSchedulerE2ETestResources";
 
@@ -42,29 +39,25 @@ export class TestingPipelineStack extends Stack {
   constructor(scope: Construct, construct_id: string, sourceProvider: SourceProvider) {
     super(scope, construct_id);
 
+    const synth = this.synthStep(sourceProvider.getSource(this));
     const pipeline = new pipelines.CodePipeline(this, "Pipeline", {
-      synth: this.synthStep(sourceProvider.getSource(this)),
+      synth,
       codeBuildDefaults: {
         buildEnvironment: {
-          buildImage: codebuild.LinuxBuildImage.STANDARD_6_0,
-          computeType: codebuild.ComputeType.LARGE,
-          privileged: true,
+          buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
+          computeType: codebuild.ComputeType.X_LARGE,
         },
       },
     });
 
     const deployStage = new DeployStage(this, DEPLOY_STAGE_NAME);
     pipeline.addStage(deployStage, {
-      pre: [this.unitTestStep()],
+      post: [this.endToEndTestStep(deployStage), this.fullTestStep()],
     });
 
-    const e2eTestStage = new EndToEndTestStage(this, END_TO_END_STAGE_NAME);
-    pipeline.addStage(e2eTestStage, {
-      post: [this.endToEndTestStep(deployStage.instanceSchedulerStack, e2eTestStage.e2eTestResourcesStack)],
-    });
+    pipeline.buildPipeline();
 
     //pipeline must be built before findings can be suppressed
-    pipeline.buildPipeline();
     NagSuppressions.addStackSuppressions(this, [
       {
         id: "AwsSolutions-IAM5",
@@ -74,6 +67,10 @@ export class TestingPipelineStack extends Stack {
         id: "AwsSolutions-CB4",
         reason: "Update step provided by construct",
       },
+    ]);
+
+    NagSuppressions.addResourceSuppressions(synth.project, [
+      { id: "AwsSolutions-CB3", reason: "Privileged mode is required to build Lambda PythonFunctions with Docker" },
     ]);
 
     NagSuppressions.addResourceSuppressions(pipeline.pipeline.artifactBucket, [
@@ -86,23 +83,38 @@ export class TestingPipelineStack extends Stack {
 
   synthStep(source: pipelines.IFileSetProducer) {
     return new pipelines.CodeBuildStep("Synth", {
+      buildEnvironment: { privileged: true },
       input: source,
-      installCommands: ["npm install --location=global npm@^9", "npm ci"],
-      commands: ["npm run synth"],
+      installCommands: [
+        "pyenv global $PYTHON_311_VERSION",
+        "python -m pip install -U pip setuptools poetry tox",
+        "npm ci",
+      ],
+      commands: ["npm run test", "npm run synth"],
       primaryOutputDirectory: "build/cdk.out",
     });
   }
 
-  unitTestStep() {
-    return new pipelines.CodeBuildStep("unitTests", {
+  fullTestStep() {
+    return new pipelines.CodeBuildStep("FullTest", {
+      buildEnvironment: { privileged: true },
       installCommands: [
-        "npm install --location=global npm@^9",
-        "pyenv install -s 3.8 3.9 3.11",
-        "pyenv global 3.11 3.9 3.8",
-        "python -m pip install -U pip setuptools tox",
+        "n 20",
+        "npm install --location=global npm@^10",
+        "pyenv install -s 3.8 3.9 3.12",
+        "pyenv global $PYTHON_311_VERSION 3.12 3.9 3.8",
+        "python -m pip install -U pip setuptools poetry tox",
         "npm ci",
       ],
-      commands: ["npm run test:ci"],
+      commands: [
+        "cd deployment",
+        "./build-open-source-dist.sh",
+        "cd ..",
+        "npm run test:ci",
+        "cd deployment",
+        "./build-s3-dist.sh solutions instance-scheduler-on-aws v0.0.0",
+      ],
+      primaryOutputDirectory: "build/cdk.out",
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
           cdk_test_reports: {
@@ -122,17 +134,22 @@ export class TestingPipelineStack extends Stack {
           },
         },
       }),
-      rolePolicyStatements: [],
     });
   }
 
-  endToEndTestStep(mainInstanceSchedulerStack: InstanceSchedulerStack, testingResourcesStack: E2eTestStack) {
+  endToEndTestStep(deployStage: DeployStage) {
     return new pipelines.CodeBuildStep("EndToEndTests", {
-      installCommands: ["npm install --location=global npm@^9", "npm ci"],
+      installCommands: [
+        "n 20",
+        "npm install --location=global npm@^10",
+        "npm ci",
+        "pyenv global $PYTHON_311_VERSION",
+        "python -m pip install -U pip setuptools poetry tox ./source/cli",
+      ],
       commands: ["npm run e2e-tests"],
-      envFromCfnOutputs: {
-        ...testingResourcesStack.outputs,
-        ...hubStackUtils.extractOutputsFrom(mainInstanceSchedulerStack),
+      env: {
+        TEST_ASSETS_STACK: deployStage.e2eTestResourcesStack.stackName,
+        HUB_STACK: deployStage.instanceSchedulerStack.stackName,
       },
       partialBuildSpec: codebuild.BuildSpec.fromObject({
         reports: {
@@ -155,32 +172,14 @@ export class TestingPipelineStack extends Stack {
 }
 
 class DeployStage extends Stage {
-  constructor(scope: Construct, construct_id: string) {
-    super(scope, construct_id);
-  }
-
-  instanceSchedulerStack = new InstanceSchedulerStack(this, STACK_NAME, {
+  readonly instanceSchedulerStack = new InstanceSchedulerTestingStack(this, STACK_NAME, {
     appregApplicationName: "AWS-Solutions",
     appregSolutionName: "instance-scheduler-on-aws",
     description: "test deployment from the InstanceScheduler e2e pipeline",
     solutionId: "SO0030",
     solutionName: "instance-scheduler-on-aws",
     solutionVersion: "pipeline",
-    paramOverrides: {
-      schedulerFrequency: "1",
-      scheduledServices: "Both",
-      namespace: "e2etesting",
-      enableSSMMaintenanceWindows: "Yes",
-      trace: "Yes",
-    },
-    disableOpMetrics: true,
   });
-}
 
-class EndToEndTestStage extends Stage {
-  constructor(scope: Construct, construct_id: string) {
-    super(scope, construct_id);
-  }
-
-  e2eTestResourcesStack = new E2eTestStack(this, TEST_RESOURCES_STACK_NAME);
+  readonly e2eTestResourcesStack = new E2eTestStack(this, TEST_RESOURCES_STACK_NAME);
 }

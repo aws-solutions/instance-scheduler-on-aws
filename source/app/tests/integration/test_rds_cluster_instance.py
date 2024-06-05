@@ -3,19 +3,15 @@
 from typing import TYPE_CHECKING
 
 import boto3
+from mypy_boto3_rds.type_defs import DBClusterMemberTypeDef
 
-from instance_scheduler.handler.scheduling_request import SchedulingRequestHandler
 from instance_scheduler.schedulers.instance_states import InstanceStates
-from tests.context import MockLambdaContext
 from tests.integration.helpers.rds_helpers import (
     get_rds_cluster_state,
     get_rds_instance_state,
 )
+from tests.integration.helpers.run_handler import simple_schedule, target
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.integration.helpers.scheduling_context_builder import (
-    build_context,
-    build_scheduling_event,
-)
 
 if TYPE_CHECKING:
     from mypy_boto3_rds.client import RDSClient
@@ -23,41 +19,50 @@ else:
     RDSClient = object
 
 
-def test_rds_cluster_instance_not_scheduled(
-    rds_cluster: str, rds_instance_states: InstanceStates
+def tag_rds_instance(
+    instance: DBClusterMemberTypeDef, schedule_name: str, rds_client: RDSClient
 ) -> None:
-    """Instances part of an aurora cluster should not be scheduled, even if tagged"""
-    context = build_context(
-        current_dt=quick_time(10, 0, 0), schedule_clusters=False, service="rds"
+    instance_description = rds_client.describe_db_instances(
+        DBInstanceIdentifier=instance["DBInstanceIdentifier"]
     )
-    event = build_scheduling_event(context)
+    arn = instance_description["DBInstances"][0]["DBInstanceArn"]
+    rds_client.add_tags_to_resource(
+        ResourceName=arn, Tags=[{"Key": "Schedule", "Value": schedule_name}]
+    )
 
+
+def test_rds_cluster_instances_are_not_scheduled_individually(
+    rds_cluster: str,
+    rds_instance_states: InstanceStates,
+) -> None:
     rds_client: RDSClient = boto3.client("rds")
 
     cluster = rds_client.describe_db_clusters(DBClusterIdentifier=rds_cluster)
     instances = [instance for instance in cluster["DBClusters"][0]["DBClusterMembers"]]
 
-    assert instances
+    assert len(instances) > 0  # test would be invalid if there were no instances
+
+    # customer incorrectly tags instances that are members of a cluster
     for instance in instances:
-        instance_description = rds_client.describe_db_instances(
-            DBInstanceIdentifier=instance["DBInstanceIdentifier"]
+        tag_rds_instance(instance, "some-other-schedule", rds_client)
+
+    with simple_schedule(
+        name="some-other-schedule", begintime="10:00", endtime="20:00"
+    ) as context:
+        # within period (populate state table)
+        context.run_scheduling_request_handler(
+            dt=quick_time(19, 55), target=target(service="rds")
         )
-        arn = instance_description["DBInstances"][0]["DBInstanceArn"]
-        rds_client.add_tags_to_resource(
-            ResourceName=arn, Tags=[{"Key": "Schedule", "Value": "test-schedule"}]
-        )
-        rds_client.stop_db_instance(
-            DBInstanceIdentifier=instance["DBInstanceIdentifier"]
+
+        # period end (would normally stop)
+        context.run_scheduling_request_handler(
+            dt=quick_time(20, 0), target=target(service="rds")
         )
 
-    rds_client.stop_db_cluster(DBClusterIdentifier=rds_cluster)
-
-    rds_instance_states.set_instance_state(rds_cluster, "stopped")
-    rds_instance_states.save()
-
-    handler = SchedulingRequestHandler(event, MockLambdaContext())
-    handler.handle_request()
-
-    assert get_rds_cluster_state(rds_cluster) == "stopped"
-    for instance in instances:
-        assert get_rds_instance_state(instance["DBInstanceIdentifier"]) == "stopped"
+        # neither the instances nor the cluster should have been stopped
+        # (the cluster is tagged with a different schedule)
+        assert get_rds_cluster_state(rds_cluster) == "available"
+        for instance in instances:
+            assert (
+                get_rds_instance_state(instance["DBInstanceIdentifier"]) == "available"
+            )

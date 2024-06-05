@@ -8,7 +8,6 @@ from pytest import fixture
 
 from instance_scheduler.schedulers.instance_states import InstanceStates
 from instance_scheduler.util.app_env import AppEnv
-from tests import ami
 from tests.logger import MockLogger
 
 if TYPE_CHECKING:
@@ -34,7 +33,7 @@ def auto_setup_sns_error_reporting_topic(mock_sns_errors_topic: None) -> None:
 
 
 @fixture
-def ec2_instance(moto_backend: None) -> Iterator[str]:
+def ec2_instance(moto_backend: None, ami: str) -> Iterator[str]:
     ec2_client: EC2Client = boto3.client("ec2")
     instance_id: str = ec2_client.run_instances(ImageId=ami, MinCount=1, MaxCount=1)[
         "Instances"

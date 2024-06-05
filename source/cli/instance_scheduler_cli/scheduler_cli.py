@@ -35,7 +35,6 @@ HELP_PERIOD_NAME = "Name of the period"
 HELP_PERIOD_WEEKDAYS = "Weekdays of the period"
 HELP_QUERY = "JMESPath query to transform or filter the result"
 HELP_REGION = "Region in which the Instance Scheduler stack is deployed"
-HELP_SCHEDULE_CLOUDWATCH_METRICS = "Enable CloudWatch metrics for this schedule"
 HELP_SCHEDULE_DESCRIPTION = "Description for the schedule."
 HELP_SCHEDULE_ENFORCED = "Enforce schedule state for instance."
 HELP_SCHEDULE_HIBERNATE = "Hibernate EC2 instances if possible when stopped."
@@ -75,14 +74,12 @@ PARAM_ENDTIME = "--endtime"
 PARAM_ENFORCED = "--enforced"
 PARAM_HIBERNATE = "--hibernate"
 PARAM_RETAINED_RUNNING = "--retain-running"
-PARAM_METRICS = "--use-metrics"
 PARAM_MONTHDAYS = "--monthdays"
 PARAM_MONTHS = "--months"
 PARAM_OVERRIDE = "--override-status"
 PARAM_PERIODS = "--periods"
 PARAM_STARTDATE = "--startdate"
 PARAM_KEEP_NEW = "--do-not-stop-new-instances"
-PARAM_USE_MAIN = "--use-maintenance-window"
 PARAM_WEEKDAYS = "--weekdays"
 PARAM_TIMEZONE = "--timezone"
 PARAM_SSM_MAINTENCE_WINDOW = "--ssm-maintenance-window"
@@ -156,6 +153,7 @@ def handle_command(args: Any, command: str) -> int:
                     and not hasattr(getattr(args, a), "__call__")
                 )
             },
+            "version": __version__,
         }
 
         payload = str.encode(json.dumps(event))
@@ -235,17 +233,9 @@ def build_parser() -> ArgumentParser:
         )
 
         schedule_parser.add_argument(
-            PARAM_USE_MAIN,
-            default=False,
-            dest="use_maintenance_window",
-            action="store_true",
-            help=HELP_SCHEDULE_USE_MAIN,
-        )
-
-        schedule_parser.add_argument(
             PARAM_SSM_MAINTENCE_WINDOW,
             help=HELP_SCHEDULE_SSM_MAINTENANCE_WINDOW,
-            type=str,
+            nargs="+",
         )
 
         schedule_parser.add_argument(
@@ -270,14 +260,6 @@ def build_parser() -> ArgumentParser:
             dest="hibernate",
             action="store_true",
             help=HELP_SCHEDULE_HIBERNATE,
-        )
-
-        schedule_parser.add_argument(
-            PARAM_METRICS,
-            default=False,
-            dest="use-metrics",
-            action="store_true",
-            help=HELP_SCHEDULE_CLOUDWATCH_METRICS,
         )
 
     def build_describe_schedules_parser() -> None:

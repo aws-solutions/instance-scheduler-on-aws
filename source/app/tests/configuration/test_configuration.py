@@ -1,36 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from unittest.mock import MagicMock, patch
-from zoneinfo import ZoneInfo
-
 from instance_scheduler import configuration
-from instance_scheduler.configuration.scheduler_config import GlobalConfig
-from instance_scheduler.util.app_env import AppEnv
-
-mock_config = GlobalConfig(
-    scheduled_services=["ec2"],
-    schedule_clusters=True,
-    tag_name="tag",
-    regions=["us-east-1"],
-    default_timezone=ZoneInfo("UTC"),
-    schedules={},
-    trace=False,
-    enable_ssm_maintenance_windows=True,
-    use_metrics=True,
-    remote_account_ids=["123456789012"],
-    namespace="ns",
-    aws_partition="aws",
-    scheduler_role_name="rolename",
-    organization_id="",
-    schedule_lambda_account=False,
-    create_rds_snapshot=True,
-    started_tags="",
-    stopped_tags="",
-)
-
-
-def test_env_var_names() -> None:
-    assert configuration.ENV_STACK == "STACK_NAME"
 
 
 def test_month_names() -> None:
@@ -80,7 +50,6 @@ def test_attributes() -> None:
     assert (
         configuration.ENABLE_SSM_MAINTENANCE_WINDOWS == "enable_ssm_maintenance_windows"
     )
-    assert configuration.METRICS == "use_metrics"
     assert configuration.REGIONS == "regions"
     assert configuration.BEGINTIME == "begintime"
     assert configuration.DESCRIPTION == "description"
@@ -99,7 +68,6 @@ def test_attributes() -> None:
     assert configuration.SCHEDULE_CLUSTERS == "schedule_clusters"
     assert configuration.CREATE_RDS_SNAPSHOT == "create_rds_snapshot"
     assert configuration.STOP_NEW_INSTANCES == "stop_new_instances"
-    assert configuration.USE_MAINTENANCE_WINDOW == "use_maintenance_window"
     assert configuration.SSM_MAINTENANCE_WINDOW == "ssm_maintenance_window"
     assert configuration.TIMEZONE == "timezone"
     assert configuration.TAGNAME == "tagname"
@@ -134,43 +102,3 @@ def test_tag_values() -> None:
     assert configuration.TAG_VAL_MONTH == "month"
     assert configuration.TAG_VAL_DAY == "day"
     assert configuration.TAG_VAL_TIMEZONE == "timezone"
-
-
-def test_configuration_global() -> None:
-    assert configuration.__configuration is None
-
-
-@patch("instance_scheduler.configuration.SchedulerConfigBuilder")
-@patch("instance_scheduler.configuration.ConfigDynamodbAdapter")
-def test_get_scheduler_configuration(
-    mock_config_dynamodb_adapter: MagicMock,
-    mock_scheduler_config_builder: MagicMock,
-    app_env: AppEnv,
-) -> None:
-    my_configdata = "my config"
-    mock_config_dynamodb_adapter.return_value.config = my_configdata
-    expected_configuration = mock_config
-    mock_scheduler_config_builder.return_value.build.return_value = (
-        expected_configuration
-    )
-
-    result = configuration.get_global_configuration(None)
-    assert result == expected_configuration
-
-    assert configuration.__configuration == expected_configuration
-    mock_config_dynamodb_adapter.assert_called_once_with(app_env.config_table_name)
-    mock_scheduler_config_builder.assert_called_once_with(logger=None)
-    mock_scheduler_config_builder.return_value.build.assert_called_once_with(
-        my_configdata
-    )
-
-
-def test_get_scheduler_configuration_already_set() -> None:
-    configuration.__configuration = mock_config
-    assert configuration.get_global_configuration(None) == mock_config
-
-
-def test_unload_scheduler_configuration() -> None:
-    configuration.__configuration = mock_config
-    configuration.unload_global_configuration()
-    assert configuration.__configuration is None

@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 from botocore.exceptions import ClientError
 
-from instance_scheduler.configuration.instance_schedule import InstanceSchedule
+from instance_scheduler.schedulers.states import InstanceState, is_valid_instance_state
 from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
 from instance_scheduler.util.logger import Logger
 
@@ -107,7 +107,7 @@ class InstanceStates:
         if InstanceStates.INSTANCE_TABLE_PURGE in item:
             self._instances_to_purge = item[InstanceStates.INSTANCE_TABLE_PURGE]
 
-    def set_instance_state(self, instance_id: str, new_state: str) -> None:
+    def set_instance_state(self, instance_id: str, new_state: InstanceState) -> None:
         """
         Sets the state of an instance
         :param instance_id: id of the instance
@@ -121,14 +121,14 @@ class InstanceStates:
             self._state_info[instance_id] = new_state
             self._dirty = True
 
-    def get_instance_state(self, instance_id):
+    def get_instance_state(self, instance_id: str) -> InstanceState:
         """
         gets the stored state of an instance
         :param instance_id: id of the instance
         :return:
         """
         state = self._state_info.get(instance_id, None)
-        return state if state else InstanceSchedule.STATE_UNKNOWN
+        return state if is_valid_instance_state(state) else InstanceState.UNKNOWN
 
     def delete_instance_state(self, instance_id: str) -> None:
         """

@@ -4,6 +4,7 @@
 import * as dynamodb from "@aws-sdk/client-dynamodb";
 import { hubStackParams } from "./hub-stack-utils";
 import { AttributeValue } from "@aws-sdk/client-dynamodb";
+import { setTimeout } from "timers/promises";
 
 const configTableName = hubStackParams.configTableArn.substring(hubStackParams.configTableArn.lastIndexOf("/") + 1);
 export interface Period {
@@ -17,8 +18,9 @@ export interface Schedule {
   name: string;
   description: string;
   periods?: Period[];
-  use_maintenance_window?: boolean;
-  ssm_maintenance_window?: string;
+  ssm_maintenance_window?: string[];
+  override_status?: string;
+  enforced?: boolean;
 }
 export async function createSchedule(schedule: Schedule) {
   const dynamoClient = new dynamodb.DynamoDBClient({});
@@ -44,11 +46,17 @@ export function currentTimePlus(minutes: number): Date {
   return targetTime;
 }
 
-export function toTimeStr(targetTime: Date): string {
-  return `${targetTime.getUTCHours()}:${targetTime.getUTCMinutes()}`;
+export function zeroPadToTwoDigits(value: number): string {
+  return ("0" + value).slice(-2);
 }
 
-function minutesToMillis(minutes: number) {
+export function toTimeStr(targetTime: Date): string {
+  const hours = zeroPadToTwoDigits(targetTime.getHours());
+  const minutes = zeroPadToTwoDigits(targetTime.getMinutes());
+  return `${hours}:${minutes}`;
+}
+
+export function minutesToMillis(minutes: number) {
   return minutes * 60_000;
 }
 
@@ -68,8 +76,9 @@ function putRequestForSchedule(schedule: Schedule): dynamodb.WriteRequest {
   };
 
   if (schedule.periods) item.periods = { SS: schedule.periods.map((period) => period.name) };
-  if (schedule.use_maintenance_window) item.use_maintenance_window = { BOOL: schedule.use_maintenance_window };
-  if (schedule.ssm_maintenance_window) item.ssm_maintenance_window = { S: schedule.ssm_maintenance_window };
+  if (schedule.ssm_maintenance_window) item.ssm_maintenance_window = { SS: schedule.ssm_maintenance_window };
+  if (schedule.enforced) item.enforced = { BOOL: schedule.enforced };
+  if (schedule.override_status) item.override_status = { S: schedule.override_status };
 
   return {
     PutRequest: {
@@ -90,4 +99,28 @@ function putRequestForPeriod(period: Period): dynamodb.WriteRequest {
       },
     },
   };
+}
+
+export async function waitForExpect(
+  expectation: () => void | Promise<void>,
+  timeout: number,
+  interval: number,
+): Promise<void> {
+  const maxTries = Math.ceil(timeout / interval);
+
+  let errorOnLastAttempt;
+
+  for (let tries = 0; tries <= maxTries; tries++) {
+    try {
+      await expectation();
+      return;
+    } catch (error) {
+      errorOnLastAttempt = error;
+      await setTimeout(interval);
+    }
+  }
+
+  throw new Error(
+    `Timed out waiting for expectation to pass after ${timeout}ms. Error thrown by last attempt: ${errorOnLastAttempt}`,
+  );
 }

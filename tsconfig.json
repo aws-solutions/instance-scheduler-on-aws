@@ -14,7 +14,7 @@
       "dom"
     ],
     "module": "CommonJS",
-    "noEmitOnError": true,
+    "noEmitOnError": false,
     "noFallthroughCasesInSwitch": true,
     "noImplicitAny": true,
     "noImplicitReturns": true,
@@ -29,18 +29,15 @@
     "target": "ES2022",
     "forceConsistentCasingInFileNames": true,
     "noPropertyAccessFromIndexSignature": false,
-    "noUncheckedIndexedAccess": false,
-    "allowJs": false
+    "noUncheckedIndexedAccess": false
   },
   "include": [
     "source/**/*.ts",
-    "source/pipeline/**/*.ts",
     "deployment/cdk-solution-helper/**/*.ts",
     ".projenrc.ts",
     "projenrc/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
     "build/cdk.out"
   ],
   "files": [

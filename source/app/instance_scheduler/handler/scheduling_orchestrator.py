@@ -1,38 +1,75 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 import json
-from collections.abc import Iterator, Mapping
+import traceback
+from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict, TypeGuard
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeGuard, cast
 
-import boto3
-
-from instance_scheduler import configuration
 from instance_scheduler.boto_retry import get_client_with_standard_retry
-from instance_scheduler.configuration.instance_schedule import InstanceSchedule
-from instance_scheduler.configuration.scheduler_config import GlobalConfig
-from instance_scheduler.configuration.scheduling_context import SchedulingContext
-from instance_scheduler.handler.base import Handler
+from instance_scheduler.handler.environments.orchestrator_environment import (
+    OrchestratorEnvironment,
+)
+from instance_scheduler.handler.scheduling_request import SchedulingRequest
+from instance_scheduler.model.ddb_config_item import DdbConfigItem
+from instance_scheduler.model.period_definition import (
+    InvalidPeriodDefinition,
+    PeriodDefinition,
+)
+from instance_scheduler.model.schedule_definition import (
+    InvalidScheduleDefinition,
+    ScheduleDefinition,
+)
+from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
+from instance_scheduler.model.store.dynamo_period_definition_store import (
+    DynamoPeriodDefinitionStore,
+)
+from instance_scheduler.model.store.dynamo_schedule_definition_store import (
+    DynamoScheduleDefinitionStore,
+)
+from instance_scheduler.model.store.in_memory_period_definition_store import (
+    InMemoryPeriodDefinitionStore,
+)
+from instance_scheduler.model.store.in_memory_schedule_definition_store import (
+    InMemoryScheduleDefinitionStore,
+)
+from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
+from instance_scheduler.model.store.schedule_definition_store import (
+    ScheduleDefinitionStore,
+)
 from instance_scheduler.ops_metrics.metric_type.deployment_description_metric import (
     DeploymentDescriptionMetric,
     ScheduleFlagCounts,
 )
 from instance_scheduler.ops_metrics.metrics import collect_metric, should_collect_metric
-from instance_scheduler.util.app_env import AppEnv, get_app_env
+from instance_scheduler.util import safe_json
 from instance_scheduler.util.logger import Logger
+from instance_scheduler.util.scheduling_target import get_account_ids, list_all_targets
+from instance_scheduler.util.validation import ValidationException, validate_string
 
 if TYPE_CHECKING:
     from aws_lambda_powertools.utilities.typing import LambdaContext
 else:
     LambdaContext = object
-    STSClient = object
 
 LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
-LOG_STREAM_PREFIX = "Scheduler"
 
 
 class OrchestrationRequest(TypedDict):
     scheduled_action: Literal["run_orchestrator"]
+
+
+def validate_orchestration_request(
+    untyped_dict: Mapping[str, Any]
+) -> TypeGuard[OrchestrationRequest]:
+    validate_string(untyped_dict, "scheduled_action", required=True)
+
+    if untyped_dict["scheduled_action"] != "run_orchestrator":
+        raise ValidationException(
+            f"unknown scheduled_action. received '{untyped_dict['scheduled_action']}', expected 'run_orchestrator'"
+        )
+
+    return True
 
 
 LAMBDA_PAYLOAD_CAPACITY_BYTES = (
@@ -40,29 +77,56 @@ LAMBDA_PAYLOAD_CAPACITY_BYTES = (
 )
 
 
-class SchedulingOrchestratorHandler(Handler[OrchestrationRequest]):
+def handle_orchestration_request(
+    event: Mapping[str, Any], context: LambdaContext
+) -> Any:
+    env = OrchestratorEnvironment.from_env()
+    dt = datetime.now(timezone.utc)
+    logstream = "SchedulingOrchestratorHandler-{:0>4d}{:0>2d}{:0>2d}".format(
+        dt.year, dt.month, dt.day
+    )
+    logger = Logger(
+        log_group=env.log_group,
+        log_stream=logstream,
+        topic_arn=env.topic_arn,
+        debug=env.enable_debug_logging,
+    )
+
+    with logger:
+        try:
+            validate_orchestration_request(event)
+            event = cast(OrchestrationRequest, event)
+            handler = SchedulingOrchestratorHandler(event, context, env, logger)
+            return handler.handle_request()
+        except Exception as e:
+            # log error to SNS, then let the lambda execution fail
+            logger.error(
+                "Error handling orchestration registration request {}: ({})\n{}",
+                safe_json(event),
+                e,
+                traceback.format_exc(),
+            )
+            raise e
+
+
+class SchedulingOrchestratorHandler:
     """
     Handles event from cloudwatch rule timer
     """
 
-    def __init__(self, event: OrchestrationRequest, context: LambdaContext) -> None:
+    def __init__(
+        self,
+        event: OrchestrationRequest,
+        context: LambdaContext,
+        env: OrchestratorEnvironment,
+        logger: Logger,
+    ) -> None:
+        self._env = env
         self._context = context
         self._event = event
-        self._configuration: Optional[GlobalConfig] = None
+        self._logger = logger
         self._lambda_client = None
         self._hub_account_id: str = context.invoked_function_arn.split(":")[4]
-
-        # Setup logging
-        classname = self.__class__.__name__
-        app_env = get_app_env()
-        dt = datetime.now(timezone.utc)
-        logstream = LOG_STREAM.format(classname, dt.year, dt.month, dt.day)
-        self._logger = Logger(
-            log_group=app_env.log_group,
-            log_stream=logstream,
-            topic_arn=app_env.topic_arn,
-            debug=app_env.enable_debug_logging,
-        )
 
     @property
     def lambda_client(self) -> Any:
@@ -73,59 +137,6 @@ class SchedulingOrchestratorHandler(Handler[OrchestrationRequest]):
         if self._lambda_client is None:
             self._lambda_client = get_client_with_standard_retry("lambda")
         return self._lambda_client
-
-    @property
-    def configuration(self) -> GlobalConfig:
-        """
-        Returns the scheduler configuration
-        :return: scheduler configuration
-        """
-        if self._configuration is None:
-            self._configuration = configuration.get_global_configuration(self._logger)
-        return self._configuration
-
-    def accounts_and_roles(self, config: GlobalConfig) -> Iterator[str]:
-        """
-        Iterates account and cross-account-roles of the accounts to operate on
-        :return:
-        """
-        processed_accounts = []
-
-        if config.schedule_lambda_account:
-            processed_accounts.append(self._hub_account_id)
-            yield self._hub_account_id
-
-        for remote_account in config.remote_account_ids:
-            if remote_account is None:
-                continue
-            # warn and skip if account was already processed
-            if remote_account in processed_accounts:
-                self._logger.warning(
-                    "Remote account {} is already processed", remote_account
-                )
-                continue
-            yield remote_account
-
-    def target_account_id(self, context: SchedulingContext) -> str:
-        """
-        Iterates list of accounts to process
-        :param context:
-        :return:
-        """
-        if context.schedule_lambda_account:
-            return self._hub_account_id
-        else:
-            return context.account_id
-
-    @staticmethod
-    def is_handling_request(
-        event: Mapping[str, Any]
-    ) -> TypeGuard[OrchestrationRequest]:
-        """
-        Handler for cloudwatch event to run the scheduler
-        :return: True
-        """
-        return str(event.get("scheduled_action", "")) == "run_orchestrator"
 
     def handle_request(self) -> list[Any]:
         """
@@ -140,14 +151,39 @@ class SchedulingOrchestratorHandler(Handler[OrchestrationRequest]):
                 datetime.now(),
             )
 
-            result = []
-            for scheduling_context in self.list_scheduling_contexts(self.configuration):
-                result.append(self._run_scheduling_lambda(scheduling_context))
+            ddb_config_item_store = DdbConfigItemStore(self._env.config_table_name)
 
-            if should_collect_metric(DeploymentDescriptionMetric, logger=self._logger):
+            schedules, periods = prefetch_schedules_and_periods(self._env, self._logger)
+            ddb_config_item = ddb_config_item_store.get()
+
+            serialized_schedules = schedules.serialize()
+            serialized_periods = periods.serialize()
+
+            result = []
+            for target in list_all_targets(
+                ddb_config_item, self._env, self._logger, self._context
+            ):
+                current_dt_str = datetime.now(timezone.utc).isoformat()
+                scheduler_request = SchedulingRequest(
+                    action="scheduler:run",
+                    account=target.account,
+                    region=target.region,
+                    service=target.service,
+                    current_dt=current_dt_str,
+                    dispatch_time=datetime.now(timezone.utc).isoformat(),
+                )
+                scheduler_request["schedules"] = serialized_schedules
+                scheduler_request["periods"] = serialized_periods
+                result.append(self._run_scheduling_lambda(scheduler_request))
+
+            if should_collect_metric(DeploymentDescriptionMetric):
                 collect_metric(
                     self.build_deployment_description_metric(
-                        self.configuration, get_app_env(), self._context
+                        ddb_config_item,
+                        schedules,
+                        periods,
+                        self._env,
+                        self._context,
                     ),
                     logger=self._logger,
                 )
@@ -156,88 +192,30 @@ class SchedulingOrchestratorHandler(Handler[OrchestrationRequest]):
         finally:
             self._logger.flush()
 
-    def list_scheduling_contexts(
-        self, config: GlobalConfig
-    ) -> Iterator[SchedulingContext]:
-        services = config.scheduled_services
-        regions = config.regions
-        current_dt = datetime.now(timezone.utc)
-        if not regions:
-            regions = [boto3.Session().region_name]
-            # todo: better way to use local region?
-            # todo: could pull from event the same as how lambda_account is fetched
-
-        for service in services:
-            for region in regions:
-                for account in self.accounts_and_roles(
-                    config
-                ):  # todo: pull from config.remote_accounts directly?
-                    if account is self._hub_account_id:  # local account
-                        schedule_lambda_account = True
-                        account_id = ""
-                    else:  # remote account
-                        schedule_lambda_account = False
-                        account_id = account
-
-                    yield SchedulingContext(
-                        account_id=account_id,  # mutated above
-                        service=service,
-                        region=region,
-                        current_dt=current_dt,
-                        schedules=config.schedules,
-                        default_timezone=config.default_timezone,
-                        schedule_clusters=config.schedule_clusters,
-                        tag_name=config.tag_name,
-                        trace=config.trace,
-                        enable_ssm_maintenance_windows=config.enable_ssm_maintenance_windows,
-                        use_metrics=config.use_metrics,
-                        namespace=config.namespace,
-                        aws_partition=config.aws_partition,
-                        scheduler_role_name=config.scheduler_role_name,
-                        organization_id=config.organization_id,
-                        schedule_lambda_account=schedule_lambda_account,  # mutated above
-                        create_rds_snapshot=config.create_rds_snapshot,
-                        started_tags=config.started_tags,  #
-                        stopped_tags=config.stopped_tags,
-                    )
-
-    def _run_scheduling_lambda(self, context: SchedulingContext) -> dict[str, Any]:
+    def _run_scheduling_lambda(
+        self, scheduler_request: SchedulingRequest
+    ) -> dict[str, Any]:
         # runs a service/account/region subset of the configuration as a new lambda function
         self._logger.info(
             "Starting lambda function for scheduling {} instances for account {} in region {}",
-            context.service,
-            self.target_account_id(context),
-            context.region,
+            scheduler_request["service"],
+            scheduler_request["account"],
+            scheduler_request["region"],
         )
 
-        # need to convert configuration to dictionary to allow it to be passed in event
-        event_payload = context.to_dict()
-
-        payload = str.encode(
-            json.dumps(
-                {
-                    "action": "scheduler:run",
-                    "configuration": event_payload,
-                    "dispatch_time": str(datetime.now()),
-                }
-            )
-        )
-
+        payload = str.encode(json.dumps(scheduler_request))
         if len(payload) > LAMBDA_PAYLOAD_CAPACITY_BYTES:
-            strip_schedules_and_periods(event_payload)
-            payload = str.encode(
-                json.dumps(
-                    {
-                        "action": "scheduler:run",
-                        "configuration": event_payload,
-                        "dispatch_time": str(datetime.now()),
-                    }
-                )
-            )
+            # strip periods and let the request handler reload them
+            del scheduler_request["periods"]
+            payload = str.encode(json.dumps(scheduler_request))
+        if len(payload) > LAMBDA_PAYLOAD_CAPACITY_BYTES:
+            # if payload is still too large, strip schedules as well
+            del scheduler_request["schedules"]
+            payload = str.encode(json.dumps(scheduler_request))
 
         # start the lambda function
         resp = self.lambda_client.invoke(
-            FunctionName=self._context.function_name,
+            FunctionName=self._env.scheduling_request_handler_name,
             InvocationType="Event",
             LogType="None",
             Payload=payload,
@@ -247,13 +225,13 @@ class SchedulingOrchestratorHandler(Handler[OrchestrationRequest]):
                 "Error executing {}, version {} with configuration {}",
                 self._context.function_name,
                 self._context.function_version,
-                event_payload,
+                payload,
             )
 
         result = {
-            "service": context.service,
-            "account": self.target_account_id(context),
-            "region": context.region,
+            "service": scheduler_request["service"],
+            "account": scheduler_request["account"],
+            "region": scheduler_request["region"],
             "lambda_invoke_result": resp["StatusCode"],
             "lambda_request_id": resp["ResponseMetadata"]["RequestId"],
         }
@@ -261,41 +239,53 @@ class SchedulingOrchestratorHandler(Handler[OrchestrationRequest]):
 
     def build_deployment_description_metric(
         self,
-        global_config: GlobalConfig,
-        app_env: AppEnv,
+        ddb_config_item: DdbConfigItem,
+        schedule_store: ScheduleDefinitionStore,
+        period_store: PeriodDefinitionStore,
+        env: OrchestratorEnvironment,
         lambda_context: LambdaContext,
     ) -> DeploymentDescriptionMetric:
         flag_counts = ScheduleFlagCounts()
-        for schedule in global_config.schedules.values():
-            flag_counts.stop_new_instances += schedule.stop_new_instances is True
+        schedules = schedule_store.find_all()
+        periods = period_store.find_all()
+        for schedule in schedules.values():
+            flag_counts.stop_new_instances += schedule.stop_new_instances in [
+                True,
+                None,
+            ]  # default is also true
             flag_counts.enforced += schedule.enforced is True
             flag_counts.retain_running += schedule.retain_running is True
             flag_counts.hibernate += schedule.hibernate is True
             flag_counts.override += schedule.override_status is not None
-            flag_counts.use_ssm_maintenance_window += (
-                schedule.use_maintenance_window is True
+            flag_counts.use_ssm_maintenance_window += bool(
+                schedule.ssm_maintenance_window
             )
-            flag_counts.use_metrics += schedule.use_metrics is True
             flag_counts.non_default_timezone += schedule.timezone != str(
-                global_config.default_timezone
+                env.default_timezone
             )
 
         metric = DeploymentDescriptionMetric(
-            services=self.configuration.scheduled_services,
-            regions=self.configuration.regions,
-            num_accounts=sum(1 for _ in self.accounts_and_roles(self.configuration)),
-            num_schedules=len(global_config.schedules),
-            num_cfn_schedules=_count_cfn_schedules(global_config.schedules),
+            services=get_enabled_services(env),
+            regions=env.schedule_regions,
+            num_accounts=sum(
+                1
+                for _ in get_account_ids(
+                    ddb_config_item, self._env, self._logger, self._context
+                )
+            ),
+            num_schedules=len(schedules),
+            num_cfn_schedules=_count_cfn_schedules(schedules),
+            num_one_sided_schedules=_count_one_sided_schedules(schedules, periods),
             schedule_flag_counts=flag_counts,
-            default_timezone=str(global_config.default_timezone),
-            schedule_aurora_clusters=global_config.schedule_clusters,
-            create_rds_snapshots=global_config.create_rds_snapshot,
-            schedule_interval_minutes=app_env.scheduler_frequency_minutes,
+            default_timezone=str(env.default_timezone),
+            create_rds_snapshots=env.enable_rds_snapshots,
+            schedule_interval_minutes=env.scheduler_frequency_minutes,
             memory_size_mb=lambda_context.memory_limit_in_mb,
-            using_organizations=app_env.enable_aws_organizations,
-            enable_ec2_ssm_maintenance_windows=app_env.enable_ec2_ssm_maintenance_windows,
-            num_started_tags=len(app_env.start_tags),
-            num_stopped_tags=len(app_env.stop_tags),
+            using_organizations=env.enable_aws_organizations,
+            enable_ec2_ssm_maintenance_windows=env.enable_ec2_ssm_maintenance_windows,
+            ops_dashboard_enabled=env.ops_dashboard_enabled,
+            num_started_tags=len(env.start_tags),
+            num_stopped_tags=len(env.stop_tags),
         )
 
         return metric
@@ -306,8 +296,96 @@ def strip_schedules_and_periods(event_dict: dict[str, Any]) -> None:
     event_dict["periods"] = {}
 
 
-def _count_cfn_schedules(schedules: dict[str, InstanceSchedule]) -> int:
+def _count_cfn_schedules(schedules: Mapping[str, ScheduleDefinition]) -> int:
     count = 0
     for schedule in schedules.values():
         count += bool(schedule.configured_in_stack)
     return count
+
+
+def _count_one_sided_schedules(
+    schedules: Mapping[str, ScheduleDefinition], periods: Mapping[str, PeriodDefinition]
+) -> int:
+    def is_one_sided_period(period: PeriodDefinition | None) -> bool:
+        if period is None:
+            return False
+        return bool(
+            (period.begintime and not period.endtime)
+            or (not period.begintime and period.endtime)
+        )  # logical xor
+
+    count = 0
+    for schedule in schedules.values():
+        for schedule_period in schedule.periods:
+            if is_one_sided_period(periods[schedule_period.name]):
+                count += 1
+                break
+    return count
+
+
+def get_enabled_services(env: OrchestratorEnvironment) -> list[str]:
+    enabled_services = []
+    if env.enable_ec2_service:
+        enabled_services.append("ec2")
+    if env.enable_rds_service:
+        enabled_services.append("rds")
+    if env.enable_rds_clusters:
+        enabled_services.append("rds-clusters")
+    if env.enable_neptune_service:
+        enabled_services.append("neptune")
+    if env.enable_docdb_service:
+        enabled_services.append("docdb")
+    if env.enable_asg_service:
+        enabled_services.append("asg")
+    return enabled_services
+
+
+def prefetch_schedules_and_periods(
+    env: OrchestratorEnvironment, logger: Logger
+) -> tuple[InMemoryScheduleDefinitionStore, InMemoryPeriodDefinitionStore]:
+    schedules, schedule_errors = prefetch_schedules(env)
+    periods, period_errors = prefetch_periods(env)
+
+    cached_schedule_store = InMemoryScheduleDefinitionStore(schedules)
+    cached_period_store = InMemoryPeriodDefinitionStore(periods)
+
+    exceptions: list[InvalidScheduleDefinition | InvalidPeriodDefinition] = list()
+    exceptions.extend(schedule_errors)
+    exceptions.extend(period_errors)
+
+    for schedule in list(cached_schedule_store.find_all().values()):
+        # filter and warn about schedules referencing periods that do not exist
+        try:
+            schedule.to_instance_schedule(cached_period_store)
+        except InvalidScheduleDefinition as e:
+            cached_schedule_store.delete(schedule.name)
+            exceptions.append(
+                InvalidScheduleDefinition(
+                    f"Invalid Schedule Definition:\n{json.dumps(schedule.to_item(), indent=2)}\n{e}"
+                )
+            )
+
+    logger.info("prefetched {} schedules and {} periods", len(schedules), len(periods))
+    if exceptions:
+        logger.error(
+            "There are incorrectly configured schedules/periods!\n{}",
+            "\n\n".join(map(str, exceptions)),
+        )
+
+    return cached_schedule_store, cached_period_store
+
+
+def prefetch_schedules(
+    env: OrchestratorEnvironment,
+) -> tuple[Mapping[str, ScheduleDefinition], list[InvalidScheduleDefinition]]:
+    dynamo_store = DynamoScheduleDefinitionStore(env.config_table_name)
+    schedules, exceptions = dynamo_store.find_all_with_errors()
+    return schedules, exceptions
+
+
+def prefetch_periods(
+    env: OrchestratorEnvironment,
+) -> tuple[Mapping[str, PeriodDefinition], list[InvalidPeriodDefinition]]:
+    dynamo_store = DynamoPeriodDefinitionStore(env.config_table_name)
+    periods, exceptions = dynamo_store.find_all_with_errors()
+    return periods, exceptions

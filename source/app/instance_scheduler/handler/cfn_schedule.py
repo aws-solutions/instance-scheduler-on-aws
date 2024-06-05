@@ -2,18 +2,24 @@
 # SPDX-License-Identifier: Apache-2.0
 from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Optional, TypedDict, TypeGuard
+from typing import TYPE_CHECKING, Any, NotRequired, Optional, TypedDict, TypeGuard
 
-from instance_scheduler import configuration
-from instance_scheduler.configuration.config_admin import (
-    ConfigAdmin,
-    ConfigTablePeriodItem,
+from botocore.exceptions import ClientError
+
+from instance_scheduler.model.period_definition import PeriodDefinition
+from instance_scheduler.model.period_identifier import PeriodIdentifier
+from instance_scheduler.model.schedule_definition import ScheduleDefinition
+from instance_scheduler.model.store.dynamo_period_definition_store import (
+    DynamoPeriodDefinitionStore,
 )
-from instance_scheduler.util import safe_json
+from instance_scheduler.model.store.dynamo_schedule_definition_store import (
+    DynamoScheduleDefinitionStore,
+)
 from instance_scheduler.util.app_env import get_app_env
 from instance_scheduler.util.custom_resource import (
     CustomResource,
     CustomResourceRequest,
+    CustomResourceResponse,
 )
 from instance_scheduler.util.logger import Logger
 
@@ -22,102 +28,65 @@ if TYPE_CHECKING:
 else:
     LambdaContext = object
 
-INF_DELETE_SCHEDULE = "Deleted schedule {}"
-INF_DELETED_PERIOD = "Deleted period {}"
-INF_PERIOD_CREATED = "Created period {}"
-INF_PERIOD_NAME = "Creating period {}"
-INF_SCHEDULE_CREATED = "Created schedule {}"
-INF_SCHEDULE_NAME = "Creating schedule {}"
 
-ERR_INVALID_SCHEDULE_PROPERTY = (
-    "{} is not a valid property for a schedule, valid schedule properties are {}"
-)
-ERR_INVALID_PERIOD_PROPERTY = (
-    "{} is not a valid property for a schedule period, valid period properties are {}"
-)
-
-PERIOD_DESCRIPTION = "Schedule {} period {}, do not delete or update manually"
-PERIOD_NAME = "{}-period-{:0>4d}"
-
-PROP_BEGIN_TIME = "BeginTime"
-PROP_DESCRIPTION = "Description"
-PROP_END_TIME = "EndTime"
-PROP_ENFORCED = "Enforced"
-PROP_HIBERNATE = "Hibernate"
-PROP_RETAIN_RUNNING = "RetainRunning"
-PROP_INSTANCE_TYPE = "InstanceType"
-PROP_METRICS = "Metrics"
-PROP_MONTH_DAYS = "MonthDays"
-PROP_MONTHS = "Months"
-PROP_NAME = "Name"
-PROP_OVERRIDE_STATUS = "OverrideStatus"
-PROP_OVERWRITE = "Overwrite"
-PROP_PERIODS = "Periods"
-PROP_STACK_NAME = "SchedulerStack"
-PROP_NO_STACK_PREFIX = "NoStackPrefix"
-PROP_STOP_NEW = "StopNewInstances"
-PROP_TIMEZONE = "Timezone"
-PROP_USE_MAINTENANCE_WINDOW = "UseMaintenanceWindow"
-PROP_SSM_MAINTENANCE_WINDOW = "SsmMaintenanceWindow"
-PROP_WEEKDAYS = "WeekDays"
-
-VALID_SCHEDULE_PROPERTIES = [
-    PROP_DESCRIPTION,
-    PROP_ENFORCED,
-    PROP_RETAIN_RUNNING,
-    PROP_METRICS,
-    PROP_NAME,
-    PROP_OVERWRITE,
-    PROP_PERIODS,
-    PROP_STOP_NEW,
-    PROP_TIMEZONE,
-    PROP_USE_MAINTENANCE_WINDOW,
-    PROP_SSM_MAINTENANCE_WINDOW,
-    PROP_NO_STACK_PREFIX,
-    PROP_HIBERNATE,
-    "ServiceToken",
-    # these values used to be part of the sample template in the IG, but have been removed 7/23,
-    # customers may still have old templates that include them property, so we need to not break compatibility
-    "Timeout",
-    PROP_OVERRIDE_STATUS,
-]
-
-VALID_PERIOD_PROPERTIES = [
-    PROP_BEGIN_TIME,
-    PROP_DESCRIPTION,
-    PROP_END_TIME,
-    PROP_INSTANCE_TYPE,
-    PROP_MONTH_DAYS,
-    PROP_MONTHS,
-    PROP_WEEKDAYS,
-]
-
-LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
+"""
+  SampleSchedule:
+    Type: 'Custom::ServiceInstanceSchedule'
+    Properties:
+      ServiceToken: !Ref ServiceInstanceScheduleServiceTokenARN #do not edit this line
+      NoStackPrefix: 'False'
+      Name: my-renamed-sample-schedule
+      Description: a full sample template for creating cfn schedules showing all possible values
+      Timezone: America/New_York
+      Enforced: 'True'
+      Hibernate: 'True'
+      RetainRunning: 'True'
+      StopNewInstances: 'True'
+      SsmMaintenanceWindow: 'my_window_name'
+      OverrideStatus: 'running'
+      Periods:
+      - Description: run from 9-5 on the first 3 days of March
+        BeginTime: '9:00'
+        EndTime: '17:00'
+        InstanceType: 't2.micro'
+        MonthDays: '1-3'
+        Months: '3'
+      - Description: run from 2pm-5pm on the weekends
+        BeginTime: '14:00'
+        EndTime: '17:00'
+        InstanceType: 't2.micro'
+        WeekDays: 'Sat-Sun'
+"""
 
 
 class CfnSchedulePeriodProperties(TypedDict, total=False):
-    Description: Optional[str]
-    BeginTime: Optional[str]
-    EndTime: Optional[str]
-    InstanceType: Optional[str]
-    MonthDays: Optional[str]
-    Months: Optional[str]
-    WeekDays: Optional[str]
+    Description: NotRequired[str]
+    BeginTime: NotRequired[str]
+    EndTime: NotRequired[str]
+    InstanceType: NotRequired[str]
+    MonthDays: NotRequired[str]
+    Months: NotRequired[str]
+    WeekDays: NotRequired[str]
 
 
 class CfnScheduleResourceProperties(TypedDict, total=False):
     ServiceToken: str
-    NoStackPrefix: Optional[str]
-    Name: Optional[str]
-    Description: Optional[str]
-    Timezone: Optional[str]
-    Enforced: Optional[str]
-    Hibernate: Optional[str]
-    RetainRunning: Optional[str]
-    StopNewInstances: Optional[str]
-    UseMaintenanceWindow: Optional[str]
-    SsmMaintenanceWindow: Optional[str]
-    Periods: list[CfnSchedulePeriodProperties]
+    NoStackPrefix: NotRequired[str]
+    Name: NotRequired[str]
+    Description: NotRequired[str]
+    Timezone: NotRequired[str]
+    Enforced: NotRequired[str]
+    Hibernate: NotRequired[str]
+    RetainRunning: NotRequired[str]
+    StopNewInstances: NotRequired[str]
+    SsmMaintenanceWindow: NotRequired[list[str] | str]
+    Metrics: NotRequired[str]
+    OverrideStatus: NotRequired[str]
+    Periods: NotRequired[list[CfnSchedulePeriodProperties]]
+
+
+class InvalidScheduleConfiguration(Exception):
+    pass
 
 
 class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
@@ -136,20 +105,24 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
         :param context: Lambda context
         """
         CustomResource.__init__(self, event, context)
-        self.number_of_periods = 0
+        self._logger = self._init_logger()
+        app_env = get_app_env()
+        self.schedule_store = DynamoScheduleDefinitionStore(app_env.config_table_name)
+        self.period_store = DynamoPeriodDefinitionStore(app_env.config_table_name)
 
+    def _init_logger(self) -> Logger:
         app_env = get_app_env()
         classname = self.__class__.__name__
         dt = datetime.now(timezone.utc)
-        log_stream = LOG_STREAM.format(classname, dt.year, dt.month, dt.day)
-        self._logger = Logger(
+        log_stream = "{}-{:0>4d}{:0>2d}{:0>2d}".format(
+            classname, dt.year, dt.month, dt.day
+        )
+        return Logger(
             log_group=app_env.log_group,
             log_stream=log_stream,
             topic_arn=app_env.topic_arn,
             debug=app_env.enable_debug_logging,
         )
-
-        self._admin = ConfigAdmin(logger=self._logger, context=context)
 
     @staticmethod
     def is_handling_request(
@@ -165,240 +138,263 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
             and event.get("ResourceType") == "Custom::ServiceInstanceSchedule"
         )
 
-    @classmethod
-    def _set_if_specified(
-        cls,
-        source: Any,
-        source_name: Any,
-        dest: Any,
-        dest_name: Any = None,
-        default: Any = None,
-    ) -> None:
-        val = source.get(source_name, default)
-        if val is not None:
-            dest[dest_name if dest_name is not None else source_name] = val
+    def _create_request(self) -> CustomResourceResponse:
+        """
+        create a new CloudFormation-Managed schedule
 
-    @property
-    def _schedule_resource_name(self) -> Any:
-        name = self.resource_properties.get(PROP_NAME, None)
-        if name is None:
-            name = self.logical_resource_id
-        if (
-            str(self.resource_properties.get(PROP_NO_STACK_PREFIX, "False")).lower()
-            == "true"
-        ):
-            return name
-        return "{}-{}".format(self.stack_name, name)
-
-    def _create_period(self, period: Any) -> tuple[str, Any]:
-        self.number_of_periods += 1
-
-        period_name = PERIOD_NAME.format(
-            self._schedule_resource_name, self.number_of_periods
-        )
-        self._logger.info(INF_PERIOD_NAME, period_name)
-
-        for p in period:
-            if p not in VALID_PERIOD_PROPERTIES:
-                raise ValueError(
-                    ERR_INVALID_PERIOD_PROPERTY.format(
-                        p, ", ".join(VALID_PERIOD_PROPERTIES)
-                    )
-                )
-
-        create_period_args: ConfigTablePeriodItem = {"name": period_name}
-
-        self._set_if_specified(
-            period, PROP_BEGIN_TIME, create_period_args, configuration.BEGINTIME
-        )
-        self._set_if_specified(
-            period, PROP_END_TIME, create_period_args, configuration.ENDTIME
-        )
-        self._set_if_specified(
-            period, PROP_MONTH_DAYS, create_period_args, configuration.MONTHDAYS
-        )
-        self._set_if_specified(
-            period, PROP_MONTHS, create_period_args, configuration.MONTHS
-        )
-        self._set_if_specified(
-            period, PROP_WEEKDAYS, create_period_args, configuration.WEEKDAYS
-        )
-
-        create_period_args["description"] = PERIOD_DESCRIPTION.format(
-            self._schedule_resource_name, self.number_of_periods
-        )
-        description_config = period.get(PROP_DESCRIPTION, None)
-        if description_config is not None:
-            create_period_args["description"] = "{}, {}".format(
-                description_config, create_period_args["description"]
+        This request will fail if creating a new schedule would overwrite an existing one
+        """
+        self._logger.info(f"received create request for:\n{self.resource_properties}")
+        try:
+            schedule_def, period_defs = self._parse_schedule_template_item(
+                self.resource_properties
             )
-
-        instance_type = period.get(PROP_INSTANCE_TYPE, None)
-        period = self._admin.create_period(create_period_args)
-
-        self._logger.info(INF_PERIOD_CREATED, safe_json(period, 3))
-
-        return period_name, instance_type
-
-    def _delete_periods(self) -> None:
-        i = 0
-        while True:
-            i += 1
-            name = PERIOD_NAME.format(self._schedule_resource_name, i)
-            period = self._admin.delete_period(name, exception_if_not_exists=False)
-            if period is None:
-                break
-            else:
-                self._logger.info(INF_DELETED_PERIOD, name)
-
-    def _create_schedule(self) -> None:
-        self._logger.info(INF_SCHEDULE_NAME, self._schedule_resource_name)
-
-        create_schedule_args = {configuration.NAME: self._schedule_resource_name}
-
-        ps = self.resource_properties
-
-        for pr in ps:
-            # fix for typo in older release, fix parameter if old version with typo is used for compatibility
-            if pr == "UseMaintenaceWindow":
-                pr = PROP_USE_MAINTENANCE_WINDOW
-
-            if pr not in VALID_SCHEDULE_PROPERTIES:
-                raise ValueError(
-                    ERR_INVALID_SCHEDULE_PROPERTY.format(
-                        pr, ", ".join(VALID_SCHEDULE_PROPERTIES)
-                    )
+            # ----- Begin Transaction -------
+            with self.schedule_store.new_transaction() as transaction:
+                transaction.add(
+                    self.schedule_store.transact_put(schedule_def, overwrite=False)
                 )
-
-        self._set_if_specified(
-            ps, PROP_METRICS, create_schedule_args, dest_name=configuration.METRICS
-        )
-        self._set_if_specified(
-            ps, PROP_OVERWRITE, create_schedule_args, dest_name=configuration.OVERWRITE
-        )
-        self._set_if_specified(
-            ps,
-            PROP_OVERRIDE_STATUS,
-            create_schedule_args,
-            dest_name=configuration.OVERRIDE_STATUS,
-        )
-        self._set_if_specified(
-            ps,
-            PROP_USE_MAINTENANCE_WINDOW,
-            create_schedule_args,
-            dest_name=configuration.USE_MAINTENANCE_WINDOW,
-        )
-        self._set_if_specified(
-            ps,
-            PROP_ENFORCED,
-            create_schedule_args,
-            dest_name=configuration.ENFORCED,
-            default=False,
-        )
-        self._set_if_specified(
-            ps,
-            PROP_HIBERNATE,
-            create_schedule_args,
-            dest_name=configuration.HIBERNATE,
-            default=False,
-        )
-        self._set_if_specified(
-            ps,
-            PROP_RETAIN_RUNNING,
-            create_schedule_args,
-            dest_name=configuration.RETAINED_RUNNING,
-            default=False,
-        )
-        self._set_if_specified(
-            ps,
-            PROP_STOP_NEW,
-            create_schedule_args,
-            dest_name=configuration.STOP_NEW_INSTANCES,
-            default=True,
-        )
-        self._set_if_specified(
-            ps,
-            PROP_TIMEZONE,
-            create_schedule_args,
-            dest_name=configuration.TIMEZONE,
-            default="UTC",
-        )
-        self._set_if_specified(
-            ps,
-            PROP_DESCRIPTION,
-            create_schedule_args,
-            dest_name=configuration.DESCRIPTION,
-        )
-        self._set_if_specified(
-            ps,
-            PROP_SSM_MAINTENANCE_WINDOW,
-            create_schedule_args,
-            dest_name=configuration.SSM_MAINTENANCE_WINDOW,
-        )
-
-        create_schedule_args[configuration.SCHEDULE_CONFIG_STACK] = self.stack_id
-
-        periods = []
-        try:
-            self.number_of_periods = 0
-            for period in ps.get(PROP_PERIODS, []):  # type:ignore[attr-defined]
-                period_name, instance_type = self._create_period(period)
-                if instance_type is not None:
-                    period_name = "{}{}{}".format(
-                        period_name, configuration.INSTANCE_TYPE_SEP, instance_type
+                for period_def in period_defs:
+                    transaction.add(
+                        self.period_store.transact_put(period_def, overwrite=False)
                     )
-                periods.append(period_name)
-
-            create_schedule_args[configuration.PERIODS] = periods
-            schedule = self._admin.create_schedule(create_schedule_args)  # type: ignore[arg-type]
-            # todo remove the typing ignore here (requires refactoring this method)
-            self.physical_resource_id = self._schedule_resource_name
-
-            self._logger.info(INF_SCHEDULE_CREATED, safe_json(schedule, 3))
-        except Exception as ex:
-            self._delete_periods()
-            raise ex
-
-    def _delete_schedule(self) -> None:
-        schedule = self._admin.delete_schedule(
-            name=self._schedule_resource_name, exception_if_not_exists=False
-        )
-        if schedule is not None:
-            self._delete_periods()
-            self._logger.info(INF_DELETE_SCHEDULE, self._schedule_resource_name)
-
-    def _update_schedule(self) -> None:
-        self._delete_schedule()
-        self._create_schedule()
-
-    def _create_request(self) -> bool:
-        try:
-            self._create_schedule()
-            return True
-        except Exception as ex:
-            self._logger.error(str(ex))
-            return False
+            # ------ End Transaction --------
+            self._logger.info(
+                f"successfully created schedule:"
+                f"\n{schedule_def}"
+                f"\n{[str(period_def) for period_def in period_defs]}"
+            )
+            return self.OkResponse(physical_resource_id=schedule_def.name)
+        except ClientError as ce:
+            # indicates a transaction failure
+            return self.ErrorResponse(reason=f"unable to create schedule: {ce}")
         finally:
             self._logger.flush()
 
-    def _update_request(self) -> bool:
+    def _update_request(self) -> CustomResourceResponse:
+        """
+        CloudFormation update request against a schedule managed by a CFN stack
+
+        There are 2 possible scenarios that we need to handle
+
+        Schedule name not changed by update -- schedule should be updated in place
+
+            To handle this, we perform a write transaction with overwrite=true to update the schedule in dynamodb
+            without needing any additional deletions
+
+
+        Schedule name changes due to update -- old schedule must be deleted AND we must be careful not to conflict
+        with other already existing schedules
+
+            To handle not conflicting with existing schedules, we set overwrite=false such that if changing the
+            schedule name would overwrite an existing schedule we will instead error on the write transaction
+
+            To handle correctly deleting the old schedule, we return the new schedule name as the
+            physical_resource_id of this resource. When this returned physical_resource_id changes (which it will
+            because the schedule name has changed from the last change request), CloudFormation will issue a
+            delete_request against the original resource which will handle the deletion behavior for us.
+        """
+
+        self._logger.info(f"received update request for:\n{self.resource_properties}")
         try:
-            self._update_schedule()
-            return True
-        except Exception as ex:
-            self._logger.error(str(ex))
-            return False
+            schedule_def, period_defs = self._parse_schedule_template_item(
+                self.resource_properties
+            )
+            old_sched_def, _ = self._parse_schedule_template_item(
+                self.old_resource_properties
+            )
+            # ----- Begin Transaction -------
+            with self.schedule_store.new_transaction() as transaction:
+                if schedule_def.name == old_sched_def.name:
+                    # we are updating the same schedule, so we need to overwrite
+                    transaction.add(
+                        self.schedule_store.transact_put(schedule_def, overwrite=True)
+                    )
+                else:
+                    # the schedule name is changing, fail if a schedule already exists with the same name
+                    transaction.add(
+                        self.schedule_store.transact_put(schedule_def, overwrite=False)
+                    )
+
+                for period_def in period_defs:
+                    transaction.add(
+                        self.period_store.transact_put(period_def, overwrite=True)
+                    )
+            # ------ End Transaction --------
+            self._logger.info(
+                f"successfully updated schedule:"
+                f"\n{schedule_def}"
+                f"\n{[str(period_def) for period_def in period_defs]}"
+            )
+            return self.OkResponse(physical_resource_id=schedule_def.name)
+        except ClientError as ce:
+            # indicates a transaction failure
+            return self.ErrorResponse(reason=f"unable to update schedule: {ce}")
         finally:
             self._logger.flush()
 
             # handles Delete request from CloudFormation
 
-    def _delete_request(self) -> bool:
+    def _delete_request(self) -> CustomResourceResponse:
+        """
+        delete a cloudformation managed schedule
+
+        This request will indicate potential problems by failing if the schedule or any of its periods do not exist
+        """
+        self._logger.info(f"received delete request for:\n{self.resource_properties}")
         try:
-            self._delete_schedule()
-            return True
-        except Exception as ex:
-            self._logger.error(str(ex))
-            return False
+            schedule_def, period_defs = self._parse_schedule_template_item(
+                self.resource_properties
+            )
+            # ----- Begin Transaction -------
+            with self.schedule_store.new_transaction() as transaction:
+                transaction.add(
+                    self.schedule_store.transact_delete(
+                        schedule_def.name, error_if_missing=False
+                    )
+                )
+                for period_def in period_defs:
+                    transaction.add(
+                        self.period_store.transact_delete(
+                            period_def.name, error_if_missing=False
+                        )
+                    )
+            # ------ End Transaction --------
+            self._logger.info(
+                f"successfully deleted schedule {schedule_def.name} and periods {[p_def.name for p_def in period_defs]}"
+            )
+            return self.OkResponse(physical_resource_id=schedule_def.name)
+        except ClientError as ce:
+            # indicates a transaction failure
+            return self.ErrorResponse(reason=f"unable to delete schedule: {ce}")
         finally:
             self._logger.flush()
+
+    def _parse_schedule_template_item(
+        self, resource_properties: CfnScheduleResourceProperties
+    ) -> tuple[ScheduleDefinition, list[PeriodDefinition]]:
+        # ---------------- Validation ----------------#
+        _validate_schedule_props_structure(resource_properties)
+        for period_props in resource_properties.get("Periods", []):
+            _validate_period_props_structure(period_props)
+
+        # ------------ PARSE SCHEDULE NAME ------------#
+        schedule_name: str = resource_properties.get("Name", self.logical_resource_id)
+        if resource_properties.get("NoStackPrefix", "False").lower() == "false":
+            schedule_name = f"{self.stack_name}-{schedule_name}"
+
+        # --------------- PARSE PERIODS ---------------#
+        period_defs = []
+        period_identifiers = []
+        period_counter = 0
+        for period_props in resource_properties.get("Periods", []):
+            period_counter += 1
+            try:
+                period_name = "{}-period-{:0>4d}".format(schedule_name, period_counter)
+                period_def = PeriodDefinition(
+                    name=period_name,
+                    description=period_props.get(
+                        "Description",
+                        f"Schedule {schedule_name} period {period_counter}, "
+                        f"do not delete or update manually",
+                    ),
+                    begintime=period_props.get("BeginTime", None),
+                    endtime=period_props.get("EndTime", None),
+                    weekdays=_ensure_set(period_props.get("WeekDays", None)),
+                    months=_ensure_set(period_props.get("Months", None)),
+                    monthdays=_ensure_set(period_props.get("MonthDays", None)),
+                    configured_in_stack=self.stack_id,
+                )
+
+                period_defs.append(period_def)
+                period_identifiers.append(
+                    PeriodIdentifier.of(
+                        period_name, period_props.get("InstanceType", None)
+                    )
+                )
+            except Exception as ex:
+                raise InvalidScheduleConfiguration(
+                    f"Error parsing period {period_counter} for schedule {schedule_name}: {ex}"
+                )
+
+        # --------------- PARSE SCHEDULE ---------------#
+        try:
+            sche_def = ScheduleDefinition(
+                name=schedule_name,
+                periods=period_identifiers,
+                timezone=resource_properties.get("Timezone", None),
+                description=resource_properties.get("Description", None),
+                override_status=resource_properties.get("OverrideStatus", None),
+                stop_new_instances=_parse_bool(
+                    resource_properties.get("StopNewInstances", None)
+                ),
+                ssm_maintenance_window=_ensure_list(
+                    resource_properties.get("SsmMaintenanceWindow")
+                ),
+                enforced=_parse_bool(resource_properties.get("Enforced", None)),
+                hibernate=_parse_bool(resource_properties.get("Hibernate", None)),
+                retain_running=_parse_bool(
+                    resource_properties.get("RetainRunning", None)
+                ),
+                configured_in_stack=self.stack_id,
+            )
+        except Exception as ex:
+            raise InvalidScheduleConfiguration(
+                f"Error parsing schedule {schedule_name}: {ex}"
+            )
+
+        return sche_def, period_defs
+
+
+def _parse_bool(bool_str: Optional[str]) -> Optional[bool]:
+    if bool_str is None:
+        return None
+    if bool_str.lower() == "true":
+        return True
+    elif bool_str.lower() == "false":
+        return False
+    else:
+        raise ValueError(f"unknown bool value {bool_str}, must be 'true' or 'false'")
+
+
+def _ensure_set(s: list[str] | set[str] | str | None) -> set[str] | None:
+    if s is None:
+        return None
+    if isinstance(s, list):
+        return set(s)
+    if isinstance(s, str):
+        return set(s.split(","))
+    return s
+
+
+def _ensure_list(s: list[str] | set[str] | str | None) -> list[str] | None:
+    if s is None:
+        return None
+    if isinstance(s, set):
+        return list(s)
+    if isinstance(s, str):
+        return list(s.split(","))
+    return s
+
+
+def _validate_period_props_structure(props: CfnSchedulePeriodProperties) -> None:
+    for key in props.keys():
+        if key not in CfnSchedulePeriodProperties.__annotations__.keys():
+            raise InvalidScheduleConfiguration(
+                f"Unknown period property {key}, valid properties are "
+                f"{CfnSchedulePeriodProperties.__annotations__.keys()}"
+            )
+
+
+def _validate_schedule_props_structure(props: CfnScheduleResourceProperties) -> None:
+    for key in props.keys():
+        if key in {"ServiceToken", "Timeout"}:
+            # these properties used to be part of the sample template in the IG, but have been removed in July 2023,
+            # They do not do anything, but customers may still have old templates that include them,
+            # so we need to not break compatibility
+            continue
+        if key not in CfnScheduleResourceProperties.__annotations__.keys():
+            raise InvalidScheduleConfiguration(
+                f"Unknown schedule property {key}, valid properties are "
+                f"{CfnScheduleResourceProperties.__annotations__.keys()}"
+            )

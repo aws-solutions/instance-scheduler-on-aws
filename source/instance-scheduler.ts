@@ -2,10 +2,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { App, Aspects, DefaultStackSynthesizer, StackSynthesizer } from "aws-cdk-lib";
-import { AwsSolutionsChecks, NagSuppressions } from "cdk-nag";
+import { AwsSolutionsChecks } from "cdk-nag";
 import { getSolutionContext } from "./instance-scheduler/lib/cdk-context";
 import { InstanceSchedulerStack } from "./instance-scheduler/lib/instance-scheduler-stack";
-import { InstanceSchedulerRemoteStack } from "./instance-scheduler/lib/remote-stack";
+import { SpokeStack } from "./instance-scheduler/lib/remote-stack";
 import { SourceProvider, TestingPipelineStack } from "./pipeline/lib/testing-pipeline-stack";
 import { E2eTestStack } from "./pipeline/lib/e2e-test-stack";
 import { PipelineBootstrapStack } from "./pipeline/lib/pipeline-bootstrap-stack";
@@ -20,7 +20,7 @@ interface AppProps {
 function addAppStacks(app: App, props: AppProps): void {
   const solutionDetails = getSolutionContext(app);
 
-  const hubStack = new InstanceSchedulerStack(app, "instance-scheduler-on-aws", {
+  new InstanceSchedulerStack(app, "instance-scheduler-on-aws", {
     synthesizer: props.synthesizer,
     description: `(${solutionDetails.solutionId}) ${solutionDetails.solutionName} ${props.solutionVersion}`,
     solutionId: solutionDetails.solutionId,
@@ -28,9 +28,10 @@ function addAppStacks(app: App, props: AppProps): void {
     solutionVersion: props.solutionVersion,
     appregApplicationName: solutionDetails.appRegAppName,
     appregSolutionName: solutionDetails.appRegSolutionName,
+    analyticsReporting: false,
   });
 
-  new InstanceSchedulerRemoteStack(app, "instance-scheduler-on-aws-remote", {
+  new SpokeStack(app, "instance-scheduler-on-aws-remote", {
     synthesizer: props.synthesizer,
     description: `(${solutionDetails.solutionId}S) ${solutionDetails.solutionName} remote ${props.solutionVersion}`,
     solutionId: solutionDetails.solutionId,
@@ -38,18 +39,8 @@ function addAppStacks(app: App, props: AppProps): void {
     solutionVersion: props.solutionVersion,
     appregApplicationName: solutionDetails.appRegAppName,
     appregSolutionName: solutionDetails.appRegSolutionName,
+    analyticsReporting: false,
   });
-
-  NagSuppressions.addResourceSuppressionsByPath(
-    hubStack,
-    "/instance-scheduler-on-aws/SchedulerRole/DefaultPolicy/Resource",
-    [
-      {
-        id: "AwsSolutions-IAM5",
-        reason: "The scheduling lambda must access multiple resources across services",
-      },
-    ],
-  );
 }
 
 function getSourceProvider(sourceType: string): SourceProvider {

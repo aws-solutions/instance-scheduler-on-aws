@@ -24,7 +24,6 @@ export function defaultTestVPC(scope: Construct): ec2.Vpc {
 
 function createNewVpcInScope(scope: Construct) {
   const vpc = new ec2.Vpc(scope, "basic-test-vpc", {
-    natGateways: 0,
     ipAddresses: ec2.IpAddresses.cidr("10.0.0.0/16"),
     subnetConfiguration: [
       {

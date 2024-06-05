@@ -8,13 +8,12 @@ if a customer has too many schedules this event can exceed the maximum payload s
 
 In this scenario the schedules will be omitted from the event, and instead need to be refetched from dynamodb
 """
-import datetime
 import json
+from typing import Iterator
 from unittest.mock import MagicMock, patch
 
-from instance_scheduler import configuration
-from instance_scheduler.configuration.instance_schedule import InstanceSchedule
-from instance_scheduler.configuration.running_period import RunningPeriod
+from _pytest.fixtures import fixture
+
 from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from instance_scheduler.handler import scheduling_orchestrator
 from instance_scheduler.handler.scheduling_orchestrator import (
@@ -22,29 +21,35 @@ from instance_scheduler.handler.scheduling_orchestrator import (
     SchedulingOrchestratorHandler,
 )
 from instance_scheduler.handler.scheduling_request import (
-    SchedulerRequest,
+    SchedulingRequest,
     SchedulingRequestHandler,
+    validate_scheduler_request,
+)
+from instance_scheduler.model.period_definition import PeriodDefinition
+from instance_scheduler.model.period_identifier import PeriodIdentifier
+from instance_scheduler.model.schedule_definition import ScheduleDefinition
+from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
+from instance_scheduler.model.store.in_memory_period_definition_store import (
+    InMemoryPeriodDefinitionStore,
+)
+from instance_scheduler.model.store.in_memory_schedule_definition_store import (
+    InMemoryScheduleDefinitionStore,
+)
+from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
+from instance_scheduler.model.store.schedule_definition_store import (
+    ScheduleDefinitionStore,
 )
 from tests.context import MockLambdaContext
-from tests.integration.helpers.global_config import build_global_config
+from tests.handler.test_scheduling_orchestration_handler import (
+    orchestrator_env_overrides,
+    scheduling_request_from_lambda_invoke,
+)
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.integration.helpers.scheduling_context_builder import build_context
-
-global_config = build_global_config(
-    schedules={
-        "global-schedule": InstanceSchedule(
-            name="global-schedule",
-            periods=[
-                {
-                    "period": RunningPeriod(
-                        name="global-period",
-                        begintime=datetime.time(10, 0, 0),
-                        endtime=datetime.time(20, 0, 0),
-                    )
-                }
-            ],
-        )
-    },
+from tests.logger import MockLogger
+from tests.test_utils.app_env_utils import with_mock_app_env
+from tests.test_utils.mock_orchestrator_environment import MockOrchestratorEnvironment
+from tests.test_utils.mock_scheduling_request_environment import (
+    MockSchedulingRequestEnvironment,
 )
 
 mock_event_bridge_event: OrchestrationRequest = {
@@ -52,49 +57,136 @@ mock_event_bridge_event: OrchestrationRequest = {
 }
 
 
-def build_stripped_event(context: SchedulingContext) -> SchedulerRequest:
-    payload = context.to_dict()
-    scheduling_orchestrator.strip_schedules_and_periods(payload)
-    return {
-        "action": "scheduler:run",
-        "configuration": payload,
-        "dispatch_time": "dispatchTime",
-    }
+@fixture
+def mocked_lambda_invoke() -> Iterator[MagicMock]:
+    with patch.object(SchedulingOrchestratorHandler, "lambda_client") as lambda_client:
+        with patch.object(lambda_client, "invoke") as invoke_func:
+            yield invoke_func
 
 
-@patch.object(SchedulingOrchestratorHandler, "configuration", global_config)
+def test_schedules_and_periods_are_encoded_into_payload(
+    mocked_lambda_invoke: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+    config_item_store: DdbConfigItemStore,
+) -> None:
+    schedule_store.put(
+        ScheduleDefinition(
+            name="my_schedule", periods=[PeriodIdentifier.of("my_period")]
+        )
+    )
+    period_store.put(
+        PeriodDefinition(
+            name="my_period",
+            begintime="10:00",
+            endtime="20:00",
+            monthdays={"1"},  # sets can cause json to fail if not handled correctly
+            weekdays={"mon"},
+            months={"jan"},
+        )
+    )
+
+    SchedulingOrchestratorHandler(
+        event=mock_event_bridge_event,
+        context=MockLambdaContext(),
+        env=MockOrchestratorEnvironment(
+            schedule_regions=[],
+            enable_ec2_service=True,
+            enable_schedule_hub_account=True,
+        ),
+        logger=MockLogger(),
+    ).handle_request()
+
+    assert mocked_lambda_invoke.call_count == 1
+    scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
+        mocked_lambda_invoke.call_args
+    )
+
+    assert "schedules" in scheduling_request
+    assert "periods" in scheduling_request
+
+    # validate expected serial data
+    InMemoryScheduleDefinitionStore.validate_serial_data(
+        scheduling_request["schedules"]
+    )
+    InMemoryPeriodDefinitionStore.validate_serial_data(scheduling_request["periods"])
+
+    encoded_schedules = InMemoryScheduleDefinitionStore.deserialize(
+        scheduling_request["schedules"]
+    )
+    encoded_periods = InMemoryPeriodDefinitionStore.deserialize(
+        scheduling_request["periods"]
+    )
+
+    assert schedule_store.find_all() == encoded_schedules.find_all()
+    assert period_store.find_all() == encoded_periods.find_all()
+
+
 @patch.object(SchedulingOrchestratorHandler, "lambda_client")
-def test_strips_schedules_when_payload_is_too_large(lambda_client: MagicMock) -> None:
+@with_mock_app_env(
+    **orchestrator_env_overrides(
+        schedule_regions=[], enable_ec2_service=True, enable_schedule_hub_account=True
+    )
+)
+def test_strips_schedules_when_payload_is_too_large(
+    lambda_client: MagicMock, config_item_store: DdbConfigItemStore
+) -> None:
     scheduling_orchestrator.LAMBDA_PAYLOAD_CAPACITY_BYTES = 0
     with patch.object(lambda_client, "invoke") as invoke_func:
         cloudwatch_handler = SchedulingOrchestratorHandler(
-            event=mock_event_bridge_event, context=MockLambdaContext()
+            event=mock_event_bridge_event,
+            context=MockLambdaContext(),
+            env=MockOrchestratorEnvironment(
+                schedule_regions=[],
+                enable_ec2_service=True,
+                enable_schedule_hub_account=True,
+            ),
+            logger=MockLogger(),
         )
         cloudwatch_handler.handle_request()
 
         assert invoke_func.call_count == 1
         payload = invoke_func.call_args[1]["Payload"]
-        content = json.loads(payload)
-        assert content["configuration"]["schedules"] == {}
-        assert content["configuration"]["periods"] == {}
+
+        scheduling_request: SchedulingRequest = json.loads(payload)
+        validate_scheduler_request(scheduling_request)
+        assert "schedules" not in scheduling_request
+        assert "periods" not in scheduling_request
 
 
-@patch.object(configuration, "get_global_configuration")
 @patch("instance_scheduler.handler.scheduling_request.InstanceScheduler")
 def test_scheduling_request_handler_reloads_schedules_when_not_provided(
-    mock_scheduler: MagicMock, fetch_global_config_func: MagicMock
+    mock_scheduler: MagicMock,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
 ) -> None:
     # setup
-    fetch_global_config_func.return_value = global_config
-    context = build_context(current_dt=quick_time(10, 0, 0))
-    event = build_stripped_event(context)
+    schedule_store.put(
+        ScheduleDefinition(
+            name="fetched_schedule", periods=[PeriodIdentifier.of("my_period")]
+        )
+    )
+
+    period_store.put(PeriodDefinition(name="my_period", begintime="10:00"))
+
+    request = SchedulingRequest(
+        action="scheduler:run",
+        account="123456789012",
+        region="us-east-1",
+        service="ec2",
+        current_dt=quick_time(10, 0, 0).isoformat(),
+        # schedules explicitly omitted,
+        # periods explicitly omitted,
+        dispatch_time=quick_time(10, 0, 0).isoformat(),
+    )
 
     # run handler
-    scheduling_handler = SchedulingRequestHandler(event, MockLambdaContext())
+    scheduling_handler = SchedulingRequestHandler(
+        request, MockLambdaContext(), MockSchedulingRequestEnvironment(), MockLogger()
+    )
     scheduling_handler.handle_request()
 
-    # assert that the schedule that gets passed to instance_scheduler is global-schedule, not stripped-schedule
+    # assert that when the schedules are not provided in the request they are still loaded from dynamo
     assert mock_scheduler.call_count == 1
-    schedules_passed_to_scheduler = mock_scheduler.call_args.args[1].schedules
-    assert "global-schedule" in schedules_passed_to_scheduler
-    assert "stripped-schedule" not in schedules_passed_to_scheduler
+    context_passed_to_scheduler: SchedulingContext = mock_scheduler.call_args.args[1]
+    assert context_passed_to_scheduler.get_schedule("fetched_schedule") is not None

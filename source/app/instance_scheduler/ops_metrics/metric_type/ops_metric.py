@@ -11,3 +11,4 @@ from instance_scheduler.ops_metrics import GatheringFrequency
 class OpsMetric(ABC):
     collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.UNLIMITED
     event_name: ClassVar[str]
+    context_version: ClassVar[int]

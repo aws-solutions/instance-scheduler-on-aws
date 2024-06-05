@@ -1,13 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-
-import { InstanceSchedulerStack } from "../../../instance-scheduler/lib/instance-scheduler-stack";
 import { CfnOutput } from "aws-cdk-lib";
+import { InstanceSchedulerTestingStack } from "../../lib/instance-scheduler-testing-stack";
 
 const envKeys = {
-  CONFIG_TABLE: "ConfigTable",
-  ISSUE_SNS_TOPIC_ARN: "IssueSNSTopic",
-  SCHEDULER_ROLE_ARN: "IssueSNSTopic",
+  CONFIG_TABLE: "ConfigTableArn",
+  ISSUE_SNS_TOPIC_ARN: "TopicArn",
+  SCHEDULER_ROLE_ARN: "SchedulerRoleArn",
 };
 
 export const hubStackParams = {
@@ -19,10 +18,10 @@ export const hubStackParams = {
   schedulerRoleArn: process.env[envKeys.SCHEDULER_ROLE_ARN]!,
 };
 
-export function extractOutputsFrom(hubStack: InstanceSchedulerStack): Record<string, CfnOutput> {
+export function extractOutputsFrom(hubStack: InstanceSchedulerTestingStack): Record<string, CfnOutput> {
   return {
-    [envKeys.CONFIG_TABLE]: hubStack.configurationTableOutput,
-    [envKeys.ISSUE_SNS_TOPIC_ARN]: hubStack.issueSnsTopicArn,
+    [envKeys.CONFIG_TABLE]: hubStack.configTableArn,
+    [envKeys.ISSUE_SNS_TOPIC_ARN]: hubStack.topicArn,
     [envKeys.SCHEDULER_ROLE_ARN]: hubStack.schedulerRoleArn,
   };
 }

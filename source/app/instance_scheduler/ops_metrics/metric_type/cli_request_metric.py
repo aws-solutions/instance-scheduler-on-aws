@@ -12,3 +12,4 @@ class CliRequestMetric(OpsMetric):
     command_used: str
     event_name: ClassVar[str] = "cli_request"
     collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.UNLIMITED
+    context_version: ClassVar[int] = 1
