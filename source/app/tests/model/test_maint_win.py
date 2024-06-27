@@ -12,6 +12,7 @@ from instance_scheduler.model import (
     EC2SSMMaintenanceWindow,
     EC2SSMMaintenanceWindowValidationError,
 )
+from instance_scheduler.model.maint_win import NoNextExecutionTimeError
 
 if TYPE_CHECKING:
     from mypy_boto3_ssm.type_defs import MaintenanceWindowIdentityTypeDef
@@ -103,6 +104,33 @@ def test_to_item_from_item_round_trip() -> None:
     assert maint_win == EC2SSMMaintenanceWindow.from_item(maint_win.to_item())
 
 
+def test_to_item_with_no_next_execution_time_round_trip() -> None:
+    maint_win = EC2SSMMaintenanceWindow(
+        account_id="111111111111",
+        region="us-east-1",
+        window_id="mw-00000000000000000",
+        window_name="my-window",
+        schedule_timezone=ZoneInfo("Europe/Amsterdam"),
+        next_execution_time=None,
+        duration_hours=1,
+    )
+    assert maint_win == EC2SSMMaintenanceWindow.from_item(maint_win.to_item())
+
+
+def test_to_schedule_with_no_next_execution_time_throws_error() -> None:
+    maint_win = EC2SSMMaintenanceWindow(
+        account_id="111111111111",
+        region="us-east-1",
+        window_id="mw-00000000000000000",
+        window_name="my-window",
+        schedule_timezone=ZoneInfo("Europe/Amsterdam"),
+        next_execution_time=None,
+        duration_hours=1,
+    )
+    with raises(NoNextExecutionTimeError):
+        maint_win.to_schedule(scheduler_interval_minutes=5)
+
+
 def test_to_key() -> None:
     account_id = "111111111111"
     region = "us-east-1"
@@ -178,3 +206,16 @@ def test_from_identity_utc_offset_shorthand() -> None:
     )
     assert maint_win.schedule_timezone == ZoneInfo("UTC")
     assert maint_win.next_execution_time == isoparse(next_execution_time)
+
+
+def test_from_identity_no_next_execution_time() -> None:
+    identity: MaintenanceWindowIdentityTypeDef = {
+        "WindowId": "mw-00000000000000000",
+        "Name": "my-window",
+        "ScheduleTimezone": "Asia/Tokyo",
+        "Duration": 1,
+    }
+    maint_win = EC2SSMMaintenanceWindow.from_identity(
+        identity=identity, account_id="111111111111", region="us-east-1"
+    )
+    assert maint_win.next_execution_time is None

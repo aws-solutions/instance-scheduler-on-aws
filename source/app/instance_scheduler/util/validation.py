@@ -1,10 +1,40 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from typing import Any, Callable, Mapping, TypeGuard
+from typing import Any, Callable, Mapping, TypeGuard, cast
 
 
 class ValidationException(Exception):
     pass
+
+
+def require_int(untyped_dict: Mapping[str, Any], key: str) -> int:
+    validate_int(untyped_dict, key, True)
+    return cast(int, untyped_dict[key])
+
+
+def require_str(untyped_dict: Mapping[str, Any], key: str) -> str:
+    validate_string(untyped_dict, key, True)
+    return cast(str, untyped_dict[key])
+
+
+def validate_int(  # NOSONAR -- (duplicate-returns) function is expected to return true or throw an error per the TypeGuard spec
+    untyped_dict: Mapping[str, Any], key: str, required: bool = True
+) -> TypeGuard[Mapping[str, Any]]:
+    """
+    :param untyped_dict: a mapping of strings to unknown values
+    :param key: the key to check
+    :param required: if true, an error will be thrown if the value is missing, if false, no error will be thrown
+    :return: true if the value stored at {key} is a str. a ValidationException will be raised otherwise
+    """
+    value = untyped_dict.get(key, None)
+    if value is None:
+        if required:
+            raise ValidationException(f"required key {key} is missing")
+        else:
+            return True
+    if type(value) is not int:
+        raise ValidationException(f"{key} must be an int, found {type(value)}")
+    return True
 
 
 def validate_string(  # NOSONAR -- (duplicate-returns) function is expected to return true or throw an error per the TypeGuard spec

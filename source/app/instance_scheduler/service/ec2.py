@@ -19,6 +19,7 @@ from instance_scheduler.maint_win.maintenance_window_context import (
     MaintenanceWindowContext,
 )
 from instance_scheduler.model import EC2SSMMaintenanceWindow
+from instance_scheduler.model.maint_win import NoNextExecutionTimeError
 from instance_scheduler.model.store.dynamo_mw_store import DynamoMWStore
 from instance_scheduler.schedulers.states import ScheduleState
 from instance_scheduler.service import Service
@@ -138,7 +139,6 @@ class Ec2Service(Service[EC2Instance]):
         name: Final = tags.get("Name", "")
         instance_id: Final = instance["InstanceId"]
         schedule_name: Final = tags.get(self._scheduler_tag_key, "")
-
         schedule = self._scheduling_context.get_schedule(schedule_name)
         if schedule:
             maint_windows = self._fetch_mw_schedules_for(schedule)
@@ -165,10 +165,17 @@ class Ec2Service(Service[EC2Instance]):
         for requested_mw_name in schedule.ssm_maintenance_window:
             maint_windows.extend(self.mw_context.find_by_name(requested_mw_name))
 
-        return [
-            mw.to_schedule(self._scheduling_context.scheduling_interval_minutes)
-            for mw in maint_windows
-        ]
+        schedules: list[InstanceSchedule] = []
+        for mw in maint_windows:
+            try:
+                schedules.append(
+                    mw.to_schedule(self._scheduling_context.scheduling_interval_minutes)
+                )
+            except NoNextExecutionTimeError:
+                self._logger.warning(
+                    f"Could not create schedule from maintenance window {mw.window_id}. Missing NextExecutionTime."
+                )
+        return schedules
 
     def resize_instance(self, instance: EC2Instance, instance_type: str) -> None:
         """

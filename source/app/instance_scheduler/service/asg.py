@@ -8,9 +8,7 @@ from typing import TYPE_CHECKING, Final, List, Optional
 from zoneinfo import ZoneInfo
 
 from aws_lambda_powertools.logging import Logger
-from boto3 import Session
 
-from instance_scheduler.boto_retry import get_client_with_standard_retry
 from instance_scheduler.configuration.time_utils import parse_time_str
 from instance_scheduler.cron.asg import (
     to_asg_expr_monthdays,
@@ -24,12 +22,17 @@ from instance_scheduler.cron.parser import (
 )
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
+from instance_scheduler.util.session_manager import AssumedRole
+from instance_scheduler.util.validation import (
+    ValidationException,
+    require_int,
+    require_str,
+)
 
 if TYPE_CHECKING:
     from mypy_boto3_autoscaling.client import AutoScalingClient
     from mypy_boto3_autoscaling.type_defs import (
         AutoScalingGroupPaginatorTypeDef,
-        FilterTypeDef,
         ScheduledUpdateGroupActionRequestTypeDef,
         ScheduledUpdateGroupActionTypeDef,
         TagDescriptionTypeDef,
@@ -37,7 +40,6 @@ if TYPE_CHECKING:
 else:
     AutoScalingClient = object
     AutoScalingGroupPaginatorTypeDef = object
-    FilterTypeDef = object
     ScheduledUpdateGroupActionRequestTypeDef = object
     ScheduledUpdateGroupActionTypeDef = object
     TagDescriptionTypeDef = object
@@ -45,7 +47,7 @@ else:
 logger: Final = Logger(log_uncaught_exceptions=True, use_rfc3339=True)
 
 
-class AsgValidationError(Exception):
+class AsgTagValidationError(Exception):
     pass
 
 
@@ -57,13 +59,21 @@ class BatchPutScheduledActionsError(Exception):
     pass
 
 
+class RollbackFailed(Exception):
+    pass
+
+
+class InvalidSteadyState(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class AsgTag:
     schedule: str
     ttl: str
-    min_size: Optional[int] = None
-    max_size: Optional[int] = None
-    desired_size: Optional[int] = None
+    min_size: int
+    max_size: int
+    desired_size: int
 
     @classmethod
     def from_group(
@@ -89,28 +99,8 @@ class AsgTag:
         )
 
         if len(scheduled_tags) == 0:
-            raise AsgValidationError("Scheduled tag missing")
-
-        try:
-            scheduled_tag_value: Final = json.loads(scheduled_tags[0].get("Value", ""))
-        except Exception:
-            raise AsgValidationError("Unable to parse Scheduled tag value")
-
-        if not isinstance(scheduled_tag_value, dict):
-            raise AsgValidationError("Invalid Scheduled tag value")
-
-        # When there's no value in the tag which unlikely happens unless the solution adds new value or a user modifies values manually,
-        # it sets empty values by default. With default values, it would be schedulable as the values are not valid.
-        # Refer to `is_still_valid` method how the solution determines if the tag is still valid.
-        # Size values are optional so when it comes to schedule, any missing value causes not able to schedule with tag values
-        # as missing value is treated as stopped state which can't be scheduled.
-        return AsgTag(
-            schedule=scheduled_tag_value.get("schedule", ""),
-            ttl=scheduled_tag_value.get("ttl", ""),
-            min_size=scheduled_tag_value.get("min_size"),
-            max_size=scheduled_tag_value.get("max_size"),
-            desired_size=scheduled_tag_value.get("desired_size"),
-        )
+            raise AsgTagValidationError("Scheduled tag missing")
+        return AsgTag.from_json(scheduled_tags[0].get("Value", ""))
 
     def is_still_valid(
         self, *, schedule_name: str, is_schedule_override: bool
@@ -123,7 +113,6 @@ class AsgTag:
         2. the tag we applied is for a different schedule
         3. the tag we applied is nearing expiration
 
-        :param scheduled_tag_value: an auto scaling group scheduled tag value
         :param schedule_name: a schedule name
         :param is_schedule_override: a flag to check if it is to override the schedule or not
         :return: if the auto scaling group scheduled tag is valid and a reason behind the decision
@@ -152,7 +141,7 @@ class AsgTag:
             f"All conditions met, current config valid for schedule {schedule_name} until {ttl_dt.isoformat()}",
         )
 
-    def __str__(self) -> str:
+    def to_json(self) -> str:
         return json.dumps(
             {
                 "schedule": self.schedule,
@@ -163,6 +152,27 @@ class AsgTag:
             }
         )
 
+    @classmethod
+    def from_json(cls, json_str: str) -> "AsgTag":
+        try:
+            json_data: Final = json.loads(json_str)
+        except Exception:
+            raise AsgTagValidationError("Unable to parse Scheduled tag value")
+
+        if not isinstance(json_data, dict):
+            raise AsgTagValidationError("Invalid Scheduled tag value: not a dict")
+
+        try:
+            return AsgTag(
+                schedule=require_str(json_data, "schedule"),
+                ttl=require_str(json_data, "ttl"),
+                min_size=require_int(json_data, "min_size"),
+                max_size=require_int(json_data, "max_size"),
+                desired_size=require_int(json_data, "desired_size"),
+            )
+        except ValidationException as e:
+            raise AsgTagValidationError(f"Invalid Scheduled tag value: {e}") from e
+
 
 @dataclass(frozen=True)
 class AsgSize:
@@ -172,6 +182,9 @@ class AsgSize:
 
     def is_stopped_state(self) -> bool:
         return self.min_size == 0 and self.desired_size == 0 and self.max_size == 0
+
+    def __str__(self) -> str:
+        return f"{self.min_size}-{self.desired_size}-{self.max_size}"
 
     @classmethod
     def from_group(cls, group: AutoScalingGroupPaginatorTypeDef) -> "AsgSize":
@@ -191,24 +204,6 @@ class AsgSize:
         :return: the auto scaling group size
         """
 
-        if not isinstance(asg_tag.min_size, int):
-            logger.info(
-                "Unable to determine auto scaling size from the tag as min size is invalid."
-            )
-            return AsgSize.stopped()
-
-        if not isinstance(asg_tag.max_size, int):
-            logger.info(
-                "Unable to determine auto scaling size from the tag as max size is invalid."
-            )
-            return AsgSize.stopped()
-
-        if not isinstance(asg_tag.desired_size, int):
-            logger.info(
-                "Unable to determine auto scaling size from the tag as desired size is invalid."
-            )
-            return AsgSize.stopped()
-
         return AsgSize(
             min_size=asg_tag.min_size,
             desired_size=asg_tag.desired_size,
@@ -220,20 +215,11 @@ class AsgSize:
         return AsgSize(min_size=0, desired_size=0, max_size=0)
 
 
-@dataclass(frozen=True)
-class AsgScheduleMetadata:
-    auto_scaling_group_name: str
-    schedule_name: str
-    new_schedule_actions: list[ScheduledUpdateGroupActionRequestTypeDef]
-    existing_actions_configured_by_solution: list[ScheduledUpdateGroupActionTypeDef]
-    asg_size: AsgSize
-
-
 class AsgService:
     def __init__(
         self,
         *,
-        session: Session,
+        assumed_asg_scheduling_role: AssumedRole,
         schedule_tag_key: str,
         asg_scheduled_tag_key: str,
         rule_prefix: str,
@@ -241,8 +227,8 @@ class AsgService:
         self._schedule_tag_key: Final = schedule_tag_key
         self._asg_scheduled_tag_key: Final = asg_scheduled_tag_key
         self._rule_prefix: Final = rule_prefix
-        self._autoscaling: Final[AutoScalingClient] = get_client_with_standard_retry(
-            "autoscaling", session=session
+        self._autoscaling: Final[AutoScalingClient] = (
+            assumed_asg_scheduling_role.client("autoscaling")
         )
 
     def get_schedulable_groups(
@@ -251,17 +237,20 @@ class AsgService:
         paginator: Final = self._autoscaling.get_paginator(
             "describe_auto_scaling_groups"
         )
-        filters: Final[list[FilterTypeDef]] = []
 
-        if schedule_names is not None:
-            filters.append(
-                {"Name": f"tag:{self._schedule_tag_key}", "Values": schedule_names}
-            )
+        if schedule_names is None:
+            for page in paginator.paginate(
+                Filters=[{"Name": "tag-key", "Values": [self._schedule_tag_key]}]
+            ):
+                yield from page["AutoScalingGroups"]
         else:
-            filters.append({"Name": "tag-key", "Values": [self._schedule_tag_key]})
-
-        for page in paginator.paginate(Filters=filters):
-            yield from page["AutoScalingGroups"]
+            batch_size = 5  # maximum number of schedule names that can be requested in a single describe call
+            for i in range(0, len(schedule_names), batch_size):
+                batch = schedule_names[i : i + batch_size]
+                for page in paginator.paginate(
+                    Filters=[{"Name": f"tag:{self._schedule_tag_key}", "Values": batch}]
+                ):
+                    yield from page["AutoScalingGroups"]
 
     def schedule_auto_scaling_group(
         self,
@@ -284,81 +273,40 @@ class AsgService:
         """
 
         auto_scaling_group_name: Final = group["AutoScalingGroupName"]
-        schedule_name: Final = schedule_definition.name
 
         try:
             asg_tag = AsgTag.from_group(
                 group=group, asg_scheduled_tag_key=self._asg_scheduled_tag_key
             )
-        except Exception as e:
-            logger.info(f"Scheduled tag validation failure: {e}")
-            asg_tag = AsgTag(schedule="", ttl="")
-
-        valid, reason = asg_tag.is_still_valid(
-            schedule_name=schedule_name,
-            is_schedule_override=is_schedule_override,
-        )
-
-        if valid:
-            logger.info(
-                f"Skipping configuring group {auto_scaling_group_name} with schedule {schedule_definition.name}: {reason}"
+            valid, reason = asg_tag.is_still_valid(
+                schedule_name=schedule_definition.name,
+                is_schedule_override=is_schedule_override,
             )
-            return
 
-        logger.info(
-            f"Configuring group {auto_scaling_group_name} with schedule {schedule_definition.name}: {reason}"
-        )
-
-        steady_state = self._get_steady_state(group=group, asg_tag=asg_tag)
-
-        if steady_state.is_stopped_state():
-            logger.error(
-                f'Unable to determine "running" state for group {auto_scaling_group_name}'
-            )
-            return
-
-        # convert this schedule to actions now to fail fast if the schedule is invalid
-        new_schedule_actions: Final[list[ScheduledUpdateGroupActionRequestTypeDef]] = (
-            list(
-                schedule_to_actions(
-                    schedule_definition,
-                    period_definitions,
-                    steady_state,
-                    self._rule_prefix,
+            if valid:
+                logger.info(
+                    f"Skipping group {auto_scaling_group_name} with schedule {schedule_definition.name}: {reason}"
                 )
-            )
-        )
+            else:
+                self._reconfigure_scheduled_actions_to_match_schedule(
+                    asg=group,
+                    schedule=schedule_definition,
+                    period_definitions=period_definitions,
+                    asg_tag=asg_tag,
+                )
 
-        # need to identify any actions we have configured so they can be replaced
-        existing_actions: Final[Iterable[ScheduledUpdateGroupActionTypeDef]] = list(
-            self._describe_scheduled_actions(
-                auto_scaling_group_name=auto_scaling_group_name,
+        except AsgTagValidationError as e:
+            logger.info(f"Invalid Scheduled Tag: {e}")
+            self._reconfigure_scheduled_actions_to_match_schedule(
+                asg=group,
+                schedule=schedule_definition,
+                period_definitions=period_definitions,
             )
-        )
-
-        existing_actions_configured_by_solution: Final[
-            list[ScheduledUpdateGroupActionTypeDef]
-        ] = list(
-            filter(
-                lambda action: action.get("ScheduledActionName", "").startswith(
-                    self._rule_prefix
-                ),
-                existing_actions,
-            )
-        )
-
-        self._configure_schedules(
-            asg_schedule_metadata=AsgScheduleMetadata(
-                auto_scaling_group_name=auto_scaling_group_name,
-                schedule_name=schedule_name,
-                new_schedule_actions=new_schedule_actions,
-                existing_actions_configured_by_solution=existing_actions_configured_by_solution,
-                asg_size=steady_state,
-            )
-        )
+        except Exception as e:
+            logger.error(f"Error scheduling autoscaling group: {e}")
 
     def _get_steady_state(
-        self, group: AutoScalingGroupPaginatorTypeDef, asg_tag: AsgTag
+        self, group: AutoScalingGroupPaginatorTypeDef, asg_tag: Optional[AsgTag] = None
     ) -> AsgSize:
         """
         Get the steady state of an auto scaling group size to be scheduled.
@@ -370,7 +318,9 @@ class AsgService:
         """
 
         current_size: Final = AsgSize.from_group(group=group)
-        tag_size: Final = AsgSize.from_tag(asg_tag=asg_tag)
+        tag_size: Final = (
+            AsgSize.from_tag(asg_tag=asg_tag) if asg_tag else AsgSize.stopped()
+        )
 
         if not current_size.is_stopped_state():
             return current_size
@@ -447,95 +397,133 @@ class AsgService:
                     f'Failed to put some actions: {put_response["FailedScheduledUpdateGroupActions"]}'
                 )
 
-    def _configure_schedules(self, asg_schedule_metadata: AsgScheduleMetadata) -> None:
+    def _reconfigure_scheduled_actions_to_match_schedule(
+        self,
+        asg: AutoScalingGroupPaginatorTypeDef,
+        schedule: ScheduleDefinition,
+        period_definitions: list[PeriodDefinition],
+        asg_tag: Optional[AsgTag] = None,
+    ) -> None:
         """
-        Configure auto scaling schedules.
+        Reconfigure an asg's scheduled scaling rules to match a given schedule
         1. Delete all existing scheduled actions configured by the solution previously.
         2. Put new or updated scheduled actions configured by the solution.
         3. Create or update the auto scaling tag to have a solution configured tag.
 
         When 1 fails, it does not require rollback as there is no resource to revert.
-        When 2 or 3 fails, it attempts rollback as it needs to have the previously scheduled actions correctly.
-
-        :param asg_schedule_metadata: auto scaling group schedule metadata to configure schedules
+        When 2 or 3 fails, rollback to the previously scheduled actions is attempted.
         """
 
+        asg_group_name = asg["AutoScalingGroupName"]
+        steady_state = self._get_steady_state(group=asg, asg_tag=asg_tag)
+
+        if steady_state.is_stopped_state():
+            raise InvalidSteadyState('Unable to determine valid "running" state')
+
+        logger.info(
+            f"Configuring group {asg_group_name} with schedule {schedule.name}. Using {steady_state} as running state"
+        )
+
+        # convert this schedule to actions now to fail fast if the schedule is invalid
+        new_schedule_actions: Final[list[ScheduledUpdateGroupActionRequestTypeDef]] = (
+            list(
+                schedule_to_actions(
+                    schedule,
+                    period_definitions,
+                    steady_state,
+                    self._rule_prefix,
+                )
+            )
+        )
+
+        existing_actions_configured_by_solution: Final[
+            list[ScheduledUpdateGroupActionTypeDef]
+        ] = list(
+            filter(
+                lambda action: action.get("ScheduledActionName", "").startswith(
+                    self._rule_prefix
+                ),
+                self._describe_scheduled_actions(
+                    auto_scaling_group_name=asg_group_name,
+                ),
+            )
+        )
+
         self._batch_delete_scheduled_action(
-            scheduled_actions=asg_schedule_metadata.existing_actions_configured_by_solution,
-            auto_scaling_group_name=asg_schedule_metadata.auto_scaling_group_name,
+            scheduled_actions=existing_actions_configured_by_solution,
+            auto_scaling_group_name=asg_group_name,
         )
 
         try:
             self._batch_put_scheduled_update_group_action(
-                scheduled_update_group_actions=asg_schedule_metadata.new_schedule_actions,
-                auto_scaling_group_name=asg_schedule_metadata.auto_scaling_group_name,
+                scheduled_update_group_actions=new_schedule_actions,
+                auto_scaling_group_name=asg_group_name,
             )
 
             self._autoscaling.create_or_update_tags(
                 Tags=[
                     {
                         "ResourceType": "auto-scaling-group",
-                        "ResourceId": asg_schedule_metadata.auto_scaling_group_name,
+                        "ResourceId": asg_group_name,
                         "Key": self._asg_scheduled_tag_key,
-                        "Value": str(
-                            AsgTag(
-                                schedule=asg_schedule_metadata.schedule_name,
-                                ttl=(
-                                    datetime.now(timezone.utc) + timedelta(days=30)
-                                ).isoformat(),
-                                min_size=asg_schedule_metadata.asg_size.min_size,
-                                max_size=asg_schedule_metadata.asg_size.max_size,
-                                desired_size=asg_schedule_metadata.asg_size.desired_size,
-                            )
-                        ),
+                        "Value": AsgTag(
+                            schedule=schedule.name,
+                            ttl=(
+                                datetime.now(timezone.utc) + timedelta(days=30)
+                            ).isoformat(),
+                            min_size=steady_state.min_size,
+                            max_size=steady_state.max_size,
+                            desired_size=steady_state.desired_size,
+                        ).to_json(),
                         "PropagateAtLaunch": False,
                     }
                 ]
             )
-        except Exception:
-            self._rollback_schedule_and_raise(
-                asg_schedule_metadata=asg_schedule_metadata
+        except Exception as update_exception:
+            logger.error(
+                f"Failed to configure group {asg_group_name} with schedule {schedule.name}, attempting rollback"
             )
 
-            raise
+            try:
+                self._rollback_asg_update(
+                    asg_name=asg_group_name,
+                    original_actions=existing_actions_configured_by_solution,
+                    new_actions_to_rollback=new_schedule_actions,
+                )
+                logger.info(f"rollback of {asg_group_name} complete")
+            except Exception as rollback_exception:
+                logger.error(f"rollback failed: {rollback_exception}")
 
-    def _rollback_schedule_and_raise(
+            raise update_exception
+
+    def _rollback_asg_update(
         self,
-        asg_schedule_metadata: AsgScheduleMetadata,
+        asg_name: str,
+        original_actions: List[ScheduledUpdateGroupActionTypeDef],
+        new_actions_to_rollback: List[ScheduledUpdateGroupActionRequestTypeDef],
     ) -> None:
         """
-        When it requires to rollback, attempt rollback.
-        1. Delete the scheduled actions that the solution configured this iteration.
-        2. Put back the existing scheduled actions that the solution configured previously.
-
-        When any exception happens, it only logs so it can proceed the next actions.
-
-        :param asg_schedule_metadata: auto scaling group schedule metadata for rollback
+        rollback a failed asg update
         """
-
-        logger.exception(
-            f"Failed to configure group {asg_schedule_metadata.auto_scaling_group_name} with schedule {asg_schedule_metadata.schedule_name}, attempting rollback"
-        )
-
         try:
             self._batch_delete_scheduled_action(
-                scheduled_actions=asg_schedule_metadata.new_schedule_actions,
-                auto_scaling_group_name=asg_schedule_metadata.auto_scaling_group_name,
+                scheduled_actions=new_actions_to_rollback,
+                auto_scaling_group_name=asg_name,
             )
-        except Exception:
-            logger.exception("Failed to delete some actions")
+        except Exception as e:
+            raise RollbackFailed("RollbackFailed: Failed to delete some actions") from e
 
         try:
             self._batch_put_scheduled_update_group_action(
                 scheduled_update_group_actions=list(
-                    action_description_to_request(
-                        asg_schedule_metadata.existing_actions_configured_by_solution
-                    )
+                    action_description_to_request(original_actions)
                 ),
-                auto_scaling_group_name=asg_schedule_metadata.auto_scaling_group_name,
+                auto_scaling_group_name=asg_name,
             )
-        except Exception:
-            logger.exception("Failed to configure some actions")
+        except Exception as e:
+            raise RollbackFailed(
+                "RollbackFailed: Failed to restore some actions"
+            ) from e
 
 
 def action_description_to_request(

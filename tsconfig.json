@@ -37,9 +37,7 @@
     ".projenrc.ts",
     "projenrc/**/*.ts"
   ],
-  "exclude": [
-    "build/cdk.out"
-  ],
+  "exclude": [],
   "files": [
     "global.d.ts"
   ]

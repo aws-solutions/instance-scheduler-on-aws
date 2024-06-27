@@ -21,6 +21,7 @@ import { ConditionAspect } from "./cfn";
 interface AsgSchedulerProps {
   readonly USER_AGENT_EXTRA: string;
   readonly asgHandler: AsgHandler;
+  readonly orchestratorMemorySizeMB: number;
   readonly configTable: Table;
   readonly enableAsgs: CfnCondition;
   readonly enableDebugLogging: CfnCondition;
@@ -44,6 +45,7 @@ export class AsgScheduler extends Construct {
     const asgOrchestrator = new AsgOrchestrator(this, {
       USER_AGENT_EXTRA: props.USER_AGENT_EXTRA,
       asgHandler: props.asgHandler.lambdaFunction,
+      memorySizeMB: props.orchestratorMemorySizeMB,
       configTable: props.configTable,
       enableDebugLogging: props.enableDebugLogging,
       enableSchedulingHubAccount: props.enableSchedulingHubAccount,
@@ -59,6 +61,7 @@ export class AsgScheduler extends Construct {
     new ScheduleUpdateHandler(this, {
       USER_AGENT_EXTRA: props.USER_AGENT_EXTRA,
       asgHandler: props.asgHandler.lambdaFunction,
+      memorySizeMB: props.orchestratorMemorySizeMB,
       configTable: props.configTable,
       enableDebugLogging: props.enableDebugLogging,
       enableSchedulingHubAccount: props.enableSchedulingHubAccount,

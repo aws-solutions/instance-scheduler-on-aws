@@ -16,6 +16,7 @@ import { FunctionFactory } from "./function-factory";
 
 export interface AsgOrchestratorProps {
   readonly USER_AGENT_EXTRA: string;
+  readonly memorySizeMB: number;
   readonly asgHandler: LambdaFunction;
   readonly configTable: Table;
   readonly enableDebugLogging: CfnCondition;
@@ -40,7 +41,7 @@ export class AsgOrchestrator {
       description: `Instance Scheduler orchestrator for AutoScaling Groups version ${props.metricsEnv.SOLUTION_VERSION}`,
       index: "instance_scheduler/handler/asg_orchestrator.py",
       handler: "lambda_handler",
-      memorySize: 128,
+      memorySize: props.memorySizeMB,
       role,
       timeout: Duration.minutes(1),
       environment: {

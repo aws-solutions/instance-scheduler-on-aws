@@ -271,11 +271,16 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
           },
           "Parameters": [
             "MemorySize",
+            "AsgMemorySize",
+            "OrchestratorMemorySize",
             "ddbDeletionProtection",
           ],
         },
       ],
       "ParameterLabels": {
+        "AsgMemorySize": {
+          "default": "AsgHandler Memory size (MB)",
+        },
         "AsgRulePrefix": {
           "default": "ASG action name prefix",
         },
@@ -301,13 +306,16 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
           "default": "Log retention period (days)",
         },
         "MemorySize": {
-          "default": "Memory size (MB)",
+          "default": "SchedulingRequestHandler Memory size (MB)",
         },
         "Namespace": {
           "default": "Namespace",
         },
         "OpsMonitoring": {
           "default": "Operational Monitoring",
+        },
+        "OrchestratorMemorySize": {
+          "default": "Orchestrator Memory size (MB)",
         },
         "Principals": {
           "default": "Organization ID/remote account IDs",
@@ -410,6 +418,24 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
     },
   },
   "Parameters": {
+    "AsgMemorySize": {
+      "AllowedValues": [
+        "128",
+        "384",
+        "512",
+        "640",
+        "768",
+        "896",
+        "1024",
+        "1152",
+        "1280",
+        "1408",
+        "1536",
+      ],
+      "Default": 128,
+      "Description": "Memory size of the Lambda function that schedules ASG resources. Increase if you are experiencing high memory usage or timeouts.",
+      "Type": "Number",
+    },
     "AsgRulePrefix": {
       "Default": "is-",
       "Description": "The prefix Instance Scheduler will use when naming Scheduled Scaling actions for AutoScaling Groups. Actions with this prefix will be added and removed by Instance Scheduler as needed.",
@@ -951,6 +977,24 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       "Description": "Deploy operational metrics and an Ops Monitoring Dashboard to Cloudwatch",
       "Type": "String",
     },
+    "OrchestratorMemorySize": {
+      "AllowedValues": [
+        "128",
+        "384",
+        "512",
+        "640",
+        "768",
+        "896",
+        "1024",
+        "1152",
+        "1280",
+        "1408",
+        "1536",
+      ],
+      "Default": 128,
+      "Description": "Memory size of the Lambda functions that coordinate multi-account, multi-region scheduling for the other scheduling lambdas. Increase if you are experiencing high memory usage or timeouts.",
+      "Type": "Number",
+    },
     "Principals": {
       "Default": "",
       "Description": "(Required) If using AWS Organizations, provide the Organization ID. Eg. o-xxxxyyy. Else, provide a comma-separated list of spoke account ids to schedule. Eg.: 1111111111, 2222222222 or {param: ssm-param-name}",
@@ -1172,7 +1216,9 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
           },
         },
         "Handler": "lambda_handler",
-        "MemorySize": 128,
+        "MemorySize": {
+          "Ref": "AsgMemorySize",
+        },
         "Role": {
           "Fn::GetAtt": [
             "ASGRole21C54AF6",
@@ -1798,7 +1844,9 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
           },
         },
         "Handler": "lambda_handler",
-        "MemorySize": 128,
+        "MemorySize": {
+          "Ref": "OrchestratorMemorySize",
+        },
         "Role": {
           "Fn::GetAtt": [
             "ASGSchedulerASGOrchRole5B79F32B",
@@ -2018,7 +2066,9 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
           },
         },
         "Handler": "lambda_handler",
-        "MemorySize": 128,
+        "MemorySize": {
+          "Ref": "OrchestratorMemorySize",
+        },
         "Role": {
           "Fn::GetAtt": [
             "ASGSchedulerScheduleUpdateHandlerRole25C919AA",
@@ -2585,7 +2635,13 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       },
     },
     "InstanceSchedulerEncryptionKey": {
-      "DeletionPolicy": "Delete",
+      "DeletionPolicy": {
+        "Fn::If": [
+          "ddbDeletionProtectionCondition",
+          "Retain",
+          "Delete",
+        ],
+      },
       "Properties": {
         "Description": "Key for SNS",
         "EnableKeyRotation": true,
@@ -2620,7 +2676,13 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         },
       },
       "Type": "AWS::KMS::Key",
-      "UpdateReplacePolicy": "Delete",
+      "UpdateReplacePolicy": {
+        "Fn::If": [
+          "ddbDeletionProtectionCondition",
+          "Retain",
+          "Delete",
+        ],
+      },
     },
     "InstanceSchedulerEncryptionKeyAlias": {
       "Properties": {
@@ -3806,6 +3868,10 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
               {
                 "Ref": "AWS::StackName",
               },
+              "-",
+              {
+                "Ref": "Namespace",
+              },
               "-Operational-Insights-Dashboard",
             ],
           ],
@@ -4295,7 +4361,9 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
           },
         },
         "Handler": "handle_orchestration_request",
-        "MemorySize": 128,
+        "MemorySize": {
+          "Ref": "OrchestratorMemorySize",
+        },
         "Role": {
           "Fn::GetAtt": [
             "SchedulingOrchestratorRoleAD0FF7B1",

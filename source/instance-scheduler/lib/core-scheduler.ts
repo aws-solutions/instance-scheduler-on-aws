@@ -32,6 +32,8 @@ export interface CoreSchedulerProps {
   readonly solutionVersion: string;
   readonly solutionId: string;
   readonly memorySizeMB: number;
+  readonly asgMemorySizeMB: number;
+  readonly orchestratorMemorySizeMB: number;
   readonly principals: string[];
   readonly logRetentionDays: RetentionDays;
   readonly schedulingEnabled: CfnCondition;
@@ -97,6 +99,7 @@ export class CoreScheduler {
       enableKeyRotation: true,
       removalPolicy: RemovalPolicy.DESTROY,
     });
+    overrideRetentionPolicies(key, Fn.conditionIf(props.enableDdbDeletionProtection.logicalId, "Retain", "Delete"));
     overrideLogicalId(key, "InstanceSchedulerEncryptionKey");
 
     const keyAlias = new Alias(scope, "InstanceSchedulerEncryptionKeyAlias", {
@@ -283,6 +286,7 @@ export class CoreScheduler {
     const orchestratorLambda = new SchedulingOrchestrator(scope, {
       description: "scheduling orchestrator for Instance Scheduler on AWS, version " + props.solutionVersion,
       logRetentionDays: props.logRetentionDays,
+      memorySizeMB: props.orchestratorMemorySizeMB,
       schedulingRequestHandlerLambda: schedulingRequestHandler.lambdaFunction,
       enableDebugLogging: props.enableDebugLogging,
       configTable: this.configTable,
@@ -312,6 +316,7 @@ export class CoreScheduler {
     const asgHandler = new AsgHandler(scope, {
       namespace: props.namespace,
       logRetentionDays: props.logRetentionDays,
+      memorySizeMB: props.asgMemorySizeMB,
       configTable: this.configTable,
       snsErrorReportingTopic: this.topic,
       encryptionKey: key,
@@ -329,6 +334,7 @@ export class CoreScheduler {
     const asgScheduler = new AsgScheduler(scope, "ASGScheduler", {
       USER_AGENT_EXTRA,
       asgHandler,
+      orchestratorMemorySizeMB: props.orchestratorMemorySizeMB,
       configTable: this.configTable,
       enableAsgs: props.enableAsgs,
       enableDebugLogging: props.enableDebugLogging,
@@ -372,6 +378,7 @@ export class CoreScheduler {
       asgHandler: asgHandler,
       orchestrator: orchestratorLambda,
       schedulingIntervalMinutes: props.schedulingIntervalMinutes,
+      namespace: props.namespace,
     });
 
     const cfnSchedulerRule = schedulerRule.node.defaultChild as CfnRule;

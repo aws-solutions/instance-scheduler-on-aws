@@ -11,7 +11,7 @@ from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.service.asg import (
     AsgSize,
     AsgTag,
-    AsgValidationError,
+    AsgTagValidationError,
     period_to_actions,
 )
 
@@ -109,55 +109,6 @@ def test_asg_size_from_tag() -> None:
     assert size.desired_size == desired_size
 
 
-def test_asg_size_from_tag_when_min_size_invalid() -> None:
-    # Prepare
-    max_size = 3
-    desired_size = 2
-    tag_value = AsgTag(
-        schedule="", ttl="", max_size=max_size, desired_size=desired_size
-    )
-
-    # Call
-    size = AsgSize.from_tag(tag_value)
-
-    # Verify
-    assert size.min_size == 0
-    assert size.max_size == 0
-    assert size.desired_size == 0
-
-
-def test_asg_size_from_tag_when_max_size_invalid() -> None:
-    # Prepare
-    min_size = 1
-    desired_size = 2
-    tag_value = AsgTag(
-        schedule="", ttl="", min_size=min_size, desired_size=desired_size
-    )
-
-    # Call
-    size = AsgSize.from_tag(tag_value)
-
-    # Verify
-    assert size.min_size == 0
-    assert size.max_size == 0
-    assert size.desired_size == 0
-
-
-def test_asg_size_from_tag_when_desired_size_invalid() -> None:
-    # Prepare
-    min_size = 1
-    max_size = 3
-    tag_value = AsgTag(schedule="", ttl="", min_size=min_size, max_size=max_size)
-
-    # Call
-    size = AsgSize.from_tag(tag_value)
-
-    # Verify
-    assert size.min_size == 0
-    assert size.max_size == 0
-    assert size.desired_size == 0
-
-
 def test_asg_size_stopped() -> None:
     # Call
     size = AsgSize.stopped()
@@ -178,7 +129,7 @@ def test_asg_tag_from_group(
         max_size=3,
         desired_size=2,
     )
-    group["Tags"] = [{"Key": ASG_SCHEDULED_TAG_KEY, "Value": str(tag_value)}]
+    group["Tags"] = [{"Key": ASG_SCHEDULED_TAG_KEY, "Value": tag_value.to_json()}]
 
     # Call
     scheduled_tag_value = AsgTag.from_group(
@@ -197,7 +148,7 @@ def test_asg_tag_from_group_when_no_scheduled_tag(
     default_asg_group_definition: AutoScalingGroupPaginatorTypeDef,
 ) -> None:
     # Call
-    with raises(AsgValidationError) as e:
+    with raises(AsgTagValidationError) as e:
         AsgTag.from_group(
             group=default_asg_group_definition,
             asg_scheduled_tag_key=ASG_SCHEDULED_TAG_KEY,
@@ -215,7 +166,7 @@ def test_asg_tag_from_group_when_unable_to_parse(
     group["Tags"] = [{"Key": ASG_SCHEDULED_TAG_KEY, "Value": "Mock"}]
 
     # Call
-    with raises(AsgValidationError) as e:
+    with raises(AsgTagValidationError) as e:
         AsgTag.from_group(
             group=group,
             asg_scheduled_tag_key=ASG_SCHEDULED_TAG_KEY,
@@ -233,14 +184,14 @@ def test_asg_tag_from_group_when_scheduled_tag_invalid(
     group["Tags"] = [{"Key": ASG_SCHEDULED_TAG_KEY, "Value": "1"}]
 
     # Call
-    with raises(AsgValidationError) as e:
+    with raises(AsgTagValidationError) as e:
         AsgTag.from_group(
             group=group,
             asg_scheduled_tag_key=ASG_SCHEDULED_TAG_KEY,
         )
 
     # Verify
-    assert str(e.value) == "Invalid Scheduled tag value"
+    assert str(e.value) == "Invalid Scheduled tag value: not a dict"
 
 
 def test_asg_tag_not_valid_when_overridden() -> None:
@@ -339,7 +290,7 @@ def test_asg_tag_is_still_valid() -> None:
     )
 
 
-def test_asg_tag_str() -> None:
+def test_asg_tag_to_json() -> None:
     # Prepare
     ttl: Final = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
     asg_tag = AsgTag(
@@ -347,10 +298,10 @@ def test_asg_tag_str() -> None:
     )
 
     # Call
-    str_value = str(asg_tag)
+    json_str = asg_tag.to_json()
 
     # Verify
-    assert str_value == json.dumps(
+    assert json_str == json.dumps(
         {
             "schedule": asg_tag.schedule,
             "ttl": asg_tag.ttl,

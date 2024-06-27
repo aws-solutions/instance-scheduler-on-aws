@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from re import fullmatch
-from typing import TYPE_CHECKING, Any, Final, Union
+from typing import TYPE_CHECKING, Any, Final, Optional, Union
 from zoneinfo import ZoneInfo
 
 from dateutil.parser import isoparse
@@ -18,6 +18,7 @@ from instance_scheduler.configuration.running_period_dict_element import (
 from instance_scheduler.configuration.time_utils import parse_time_str
 from instance_scheduler.cron.cron_recurrence_expression import CronRecurrenceExpression
 from instance_scheduler.cron.expression import CronSingleValueNumeric
+from instance_scheduler.model.ddb_item_utils import skip_if_none
 from instance_scheduler.schedulers.states import ScheduleState
 from instance_scheduler.util.time import is_aware
 from instance_scheduler.util.validation import (
@@ -60,6 +61,10 @@ class EC2SSMMaintenanceWindowValidationError(Exception):
     """An error occurred while validating the consistency of the maintenance window"""
 
 
+class NoNextExecutionTimeError(Exception):
+    """No next execution time could be found for the maintenance window"""
+
+
 @dataclass(frozen=True)
 class EC2SSMMaintenanceWindow:
     """
@@ -83,7 +88,7 @@ class EC2SSMMaintenanceWindow:
     window_id: str
     window_name: str
     schedule_timezone: ZoneInfo
-    next_execution_time: datetime
+    next_execution_time: Optional[datetime]
     duration_hours: int
 
     def __post_init__(self) -> None:
@@ -113,7 +118,9 @@ class EC2SSMMaintenanceWindow:
             raise EC2SSMMaintenanceWindowValidationError(
                 f"Invalid maintenance window name: {self.window_name}"
             )
-        if not is_aware(self.next_execution_time):
+        if self.next_execution_time is not None and not is_aware(
+            self.next_execution_time
+        ):
             raise EC2SSMMaintenanceWindowValidationError(
                 f"Non-timezone-aware datetime: {self.next_execution_time}"
             )
@@ -131,7 +138,16 @@ class EC2SSMMaintenanceWindow:
             "account-region": {"S": self.account_region},
             "name-id": {"S": self.name_id},
             "ScheduleTimezone": {"S": str(self.schedule_timezone)},
-            "NextExecutionTime": {"S": self.next_execution_time.isoformat()},
+            **skip_if_none(
+                "NextExecutionTime",
+                {
+                    "S": (
+                        self.next_execution_time.isoformat()
+                        if self.next_execution_time
+                        else None
+                    )
+                },
+            ),
             "Duration": {"N": str(self.duration_hours)},
         }
 
@@ -143,13 +159,21 @@ class EC2SSMMaintenanceWindow:
         }
 
     def is_running_at(self, dt: datetime, scheduler_interval_minutes: int) -> bool:
-        return (
-            self.to_schedule(scheduler_interval_minutes).get_desired_state(dt)[0]
-            == ScheduleState.RUNNING
-        )
+        try:
+            return (
+                self.to_schedule(scheduler_interval_minutes).get_desired_state(dt)[0]
+                == ScheduleState.RUNNING
+            )
+        except NoNextExecutionTimeError:
+            return False
 
     def to_schedule(self, scheduler_interval_minutes: int) -> InstanceSchedule:
         """convert this maintenance window into a schedule"""
+        if self.next_execution_time is None:
+            raise NoNextExecutionTimeError(
+                f"Maintenance window {self.window_id} does not have a next_execution_time"
+            )
+
         name_id = f"{self.window_name}:{self.window_id}"
         window_begin_dt: Final = self.next_execution_time.replace(
             second=0, microsecond=0
@@ -275,7 +299,11 @@ class EC2SSMMaintenanceWindow:
             window_id=identity["WindowId"],
             window_name=identity["Name"],
             schedule_timezone=ZoneInfo(identity.get("ScheduleTimezone", "UTC")),
-            next_execution_time=isoparse(identity["NextExecutionTime"]),
+            next_execution_time=(
+                isoparse(identity["NextExecutionTime"])
+                if "NextExecutionTime" in identity
+                else None
+            ),
             duration_hours=identity["Duration"],
         )
 
@@ -296,7 +324,7 @@ class EC2SSMMaintenanceWindow:
         validate_string_item(item, "account-region", True)
         validate_string_item(item, "name-id", True)
         validate_string_item(item, "ScheduleTimezone", True)
-        validate_string_item(item, "NextExecutionTime", True)
+        validate_string_item(item, "NextExecutionTime", False)
         validate_number_item(item, "Duration", True)
 
         account_id, region = item["account-region"]["S"].split(":")
@@ -308,6 +336,10 @@ class EC2SSMMaintenanceWindow:
             window_id=window_id,
             window_name=window_name,
             schedule_timezone=ZoneInfo(item["ScheduleTimezone"]["S"]),
-            next_execution_time=isoparse(item["NextExecutionTime"]["S"]),
+            next_execution_time=(
+                isoparse(item["NextExecutionTime"]["S"])
+                if "NextExecutionTime" in item
+                else None
+            ),
             duration_hours=int(item["Duration"]["N"]),
         )

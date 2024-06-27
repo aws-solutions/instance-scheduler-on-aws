@@ -6,12 +6,6 @@ import { AwsSolutionsChecks } from "cdk-nag";
 import { getSolutionContext } from "./instance-scheduler/lib/cdk-context";
 import { InstanceSchedulerStack } from "./instance-scheduler/lib/instance-scheduler-stack";
 import { SpokeStack } from "./instance-scheduler/lib/remote-stack";
-import { SourceProvider, TestingPipelineStack } from "./pipeline/lib/testing-pipeline-stack";
-import { E2eTestStack } from "./pipeline/lib/e2e-test-stack";
-import { PipelineBootstrapStack } from "./pipeline/lib/pipeline-bootstrap-stack";
-import { buildCodeCommitSource } from "./pipeline/lib/code-commit-source";
-import { buildCodeStarSource } from "./pipeline/lib/code-star-source";
-
 interface AppProps {
   solutionVersion: string;
   synthesizer: StackSynthesizer;
@@ -43,29 +37,6 @@ function addAppStacks(app: App, props: AppProps): void {
   });
 }
 
-function getSourceProvider(sourceType: string): SourceProvider {
-  switch (sourceType) {
-    case "codecommit":
-      return { getSource: buildCodeCommitSource };
-    case "codestar":
-      return { getSource: buildCodeStarSource };
-    default:
-      throw Error("Unknown source type");
-  }
-}
-
-function addPipelineStacks(app: App): void {
-  new PipelineBootstrapStack(app, "instance-scheduler-on-aws-testing-pipeline-bootstrap");
-  const sourceType = app.node.tryGetContext("instance-scheduler-on-aws-pipeline-source") ?? "codecommit";
-  new TestingPipelineStack(app, "instance-scheduler-on-aws-testing-pipeline", getSourceProvider(sourceType));
-
-  /*
-  E2eTestStack does not actually need to be built here to work in the pipeline,
-  but building it here ensures it gets covered by CDK-Nag
-   */
-  new E2eTestStack(app, "instance-scheduler-on-aws-end-to-end-testing-resources");
-}
-
 function main(): void {
   const packageVersion =
     process.env.npm_package_version ??
@@ -91,7 +62,6 @@ function main(): void {
   Aspects.of(app).add(new AwsSolutionsChecks({ verbose: true }));
 
   addAppStacks(app, { solutionVersion, synthesizer });
-  addPipelineStacks(app);
 }
 
 main();

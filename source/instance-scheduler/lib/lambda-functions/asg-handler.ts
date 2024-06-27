@@ -28,6 +28,7 @@ export interface AsgHandlerProps {
   readonly scheduledTagKey: string;
   readonly snsErrorReportingTopic: Topic;
   readonly tagKey: string;
+  readonly memorySizeMB: number;
 }
 
 export class AsgHandler {
@@ -48,7 +49,7 @@ export class AsgHandler {
       description: `Instance Scheduler for AutoScaling Groups version ${props.metricsEnv.SOLUTION_VERSION}`,
       index: "instance_scheduler/handler/asg.py",
       handler: "lambda_handler",
-      memorySize: 128,
+      memorySize: props.memorySizeMB,
       role: this.role,
       timeout: Duration.minutes(5),
       environment: {

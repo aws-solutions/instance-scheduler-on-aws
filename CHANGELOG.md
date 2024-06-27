@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.1] -- 2024-06-27
+
+### Changed
+- Scheduler CLI installation process now uses a version-agnostic installation process
+- Lambda memory size for orchestration and asg scheduling lambdas is now configurable
+
+### Fixed
+- Fixed an error that would cause maintenance window scheduling to fail when the SSM api returned expired maintenance windows without a `NextExecutionTime` property
+- Fixed KMS encryption key being deleted when DynamoDB tables were configured to be retained on stack delete
+- Fixed an error that caused ASG schedule updates to fail when more than 5 schedules were updated at once
+- Fixed a possible name conflict with Operational Insights Dashboard when deploying multiple copies of Instance Scheduler to the same account
+
+### Security
+
+- Upgrade braces to mitigate CVE-2024-4068
+- Upgrade urllib3 to mitigate CVE-2024-37891
+
+### Removed
+- Removed e2e testing pipeline from public assets
+
 ## [3.0.0] - 2024-06-05
 
 ### Added

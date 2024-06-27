@@ -310,6 +310,73 @@ def test_find_windows_after_reconcile_matches_contents_of_db(
         )
 
 
+def test_does_not_process_maintenance_windows_without_next_execution_time(
+    mw_store: MWStore, hub_role: AssumedRole
+) -> None:
+    window_with_execution_time = new_mw("mw-00000000000000000")
+    window_without_execution_time = new_mw(
+        "mw-00000000000000001", next_execution_time=None
+    )
+
+    with ssm_returning([window_with_execution_time, window_without_execution_time]):
+        mw_context = new_mw_context(mw_store, hub_role)
+        mw_context.reconcile_ssm_with_dynamodb()
+
+        db_mws = list(
+            mw_store.find_by_account_region(hub_role.account, hub_role.region)
+        )
+
+        # check assert for each action
+        assert window_with_execution_time in db_mws
+        assert window_with_execution_time in mw_context.find_by_name(
+            window_with_execution_time.window_name
+        )
+
+        assert window_without_execution_time not in db_mws
+        assert window_without_execution_time not in mw_context.find_by_name(
+            window_without_execution_time.window_name
+        )
+
+
+def test_does_not_delete_running_windows_with_no_next_execution_time_until_they_stopped(
+    mw_store: MWStore, hub_role: AssumedRole
+) -> None:
+    window = new_mw(
+        "mw-00000000000000001",
+        next_execution_time=quick_time(10, 0, 0),
+        duration_hours=5,
+    )
+    mw_store.put(window)
+
+    window_no_next_execution_time = new_mw(
+        "mw-00000000000000001",
+        next_execution_time=None,
+        duration_hours=5,
+    )
+
+    with ssm_returning([window_no_next_execution_time]):
+        # window running
+        new_mw_context(
+            mw_store, hub_role, current_dt=quick_time(11, 0, 0)
+        ).reconcile_ssm_with_dynamodb()
+
+        assert window in mw_store.find_by_account_region(
+            hub_role.account, hub_role.region
+        )
+
+        # window stopped
+        new_mw_context(
+            mw_store, hub_role, current_dt=quick_time(15, 0, 0)
+        ).reconcile_ssm_with_dynamodb()
+
+        assert window not in mw_store.find_by_account_region(
+            hub_role.account, hub_role.region
+        )
+        assert window_no_next_execution_time not in mw_store.find_by_account_region(
+            hub_role.account, hub_role.region
+        )
+
+
 def new_mw_context(
     mw_store: MWStore,
     hub_role: AssumedRole,

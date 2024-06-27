@@ -17,6 +17,7 @@ import { Key } from "aws-cdk-lib/aws-kms";
 export interface SchedulingOrchestratorProps {
   readonly description: string;
   readonly logRetentionDays: RetentionDays;
+  readonly memorySizeMB: number;
   readonly schedulingRequestHandlerLambda: LambdaFunction;
   readonly enableDebugLogging: CfnCondition;
   readonly configTable: Table;
@@ -55,7 +56,7 @@ export class SchedulingOrchestrator {
       description: props.description,
       index: "instance_scheduler/handler/scheduling_orchestrator.py",
       handler: "handle_orchestration_request",
-      memorySize: 128,
+      memorySize: props.memorySizeMB,
       role: role,
       timeout: Duration.minutes(5),
       environment: {

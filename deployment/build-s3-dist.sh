@@ -77,7 +77,11 @@ main() {
     header "[Scheduler-CLI] Package the Scheduler cli"
     pushd "$cli_source_dir"
     python -m poetry build
-    cp ./dist/* "$global_dist_dir"
+    cp -r ./dist "$build_dir/instance_scheduler_cli"
+    popd
+
+    pushd "$build_dir"
+    zip -r "$global_dist_dir/instance_scheduler_cli.zip" "instance_scheduler_cli"
     popd
 }
 
