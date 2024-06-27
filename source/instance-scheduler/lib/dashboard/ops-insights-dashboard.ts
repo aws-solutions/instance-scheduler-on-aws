@@ -35,11 +35,12 @@ export interface OperationalInsightsDashboardProps {
   readonly asgHandler: AsgHandler;
   readonly orchestrator: SchedulingOrchestrator;
   readonly schedulingIntervalMinutes: number;
+  readonly namespace: string;
 }
 export class OperationalInsightsDashboard {
   constructor(scope: Stack, props: OperationalInsightsDashboardProps) {
     const dashboard = new Dashboard(scope, "OperationalInsightsDashboard", {
-      dashboardName: Aws.STACK_NAME + "-Operational-Insights-Dashboard",
+      dashboardName: `${Aws.STACK_NAME}-${props.namespace}-Operational-Insights-Dashboard`,
       defaultInterval: Duration.days(7),
       periodOverride: PeriodOverride.INHERIT,
     });

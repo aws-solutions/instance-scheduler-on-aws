@@ -252,9 +252,28 @@ export class InstanceSchedulerStack extends Stack {
 
     const memorySizeValues = ["128", "384", "512", "640", "768", "896", "1024", "1152", "1280", "1408", "1536"];
     const memorySize = new ParameterWithLabel(this, "MemorySize", {
-      label: "Memory size (MB)",
+      label: "SchedulingRequestHandler Memory size (MB)",
       description:
         "Memory size of the Lambda function that schedules EC2 and RDS resources. Increase if you are experiencing high memory usage or timeouts.",
+      type: "Number",
+      allowedValues: memorySizeValues,
+      default: 128,
+    });
+
+    const asgHandlerMemorySize = new ParameterWithLabel(this, "AsgMemorySize", {
+      label: "AsgHandler Memory size (MB)",
+      description:
+        "Memory size of the Lambda function that schedules ASG resources. Increase if you are experiencing high memory usage or timeouts.",
+      type: "Number",
+      allowedValues: memorySizeValues,
+      default: 128,
+    });
+
+    const orchestratorMemorySize = new ParameterWithLabel(this, "OrchestratorMemorySize", {
+      label: "Orchestrator Memory size (MB)",
+      description:
+        "Memory size of the Lambda functions that coordinate multi-account, multi-region scheduling for the other " +
+        "scheduling lambdas. Increase if you are experiencing high memory usage or timeouts.",
       type: "Number",
       allowedValues: memorySizeValues,
       default: 128,
@@ -270,7 +289,7 @@ export class InstanceSchedulerStack extends Stack {
 
     addParameterGroup(this, {
       label: "Other",
-      parameters: [memorySize, enableDdbDeletionProtection],
+      parameters: [memorySize, asgHandlerMemorySize, orchestratorMemorySize, enableDdbDeletionProtection],
     });
 
     const sendAnonymizedUsageMetricsMapping = new CfnMapping(this, "Send");
@@ -290,6 +309,8 @@ export class InstanceSchedulerStack extends Stack {
       solutionVersion: props.solutionVersion,
       solutionId: props.solutionId,
       memorySizeMB: memorySize.valueAsNumber,
+      asgMemorySizeMB: asgHandlerMemorySize.valueAsNumber,
+      orchestratorMemorySizeMB: orchestratorMemorySize.valueAsNumber,
       logRetentionDays: logRetentionDays.valueAsNumber,
       principals: principals.valueAsList,
       schedulingEnabled: enableScheduling.getCondition(),

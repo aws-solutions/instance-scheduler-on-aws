@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from datetime import datetime
+from typing import Optional
 from zoneinfo import ZoneInfo
 
 from _pytest.fixtures import SubRequest, fixture
@@ -32,7 +33,7 @@ def new_mw(
     region: str = region,
     window_name: str = "test-window",
     schedule_timezone: ZoneInfo = ZoneInfo("UTC"),
-    next_execution_time: datetime = quick_time(12, 0, 0),
+    next_execution_time: Optional[datetime] = quick_time(12, 0, 0),
     duration_hours: int = 1,
 ) -> EC2SSMMaintenanceWindow:
     return EC2SSMMaintenanceWindow(

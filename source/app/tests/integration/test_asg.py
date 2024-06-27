@@ -785,15 +785,13 @@ def test_update_schedule_when_schedule_tag_value_is_updated(
     tag_group(
         group_name=ASG_GROUP_NAME,
         tag_key=ASG_SCHEDULED_TAG_KEY,
-        tag_value=str(
-            AsgTag(
-                schedule=schedule_a.name,
-                ttl=(TEST_DATETIME + timedelta(days=30)).isoformat(),
-                min_size=initial_tag_size.min_size,
-                max_size=initial_tag_size.max_size,
-                desired_size=initial_tag_size.desired_size,
-            )
-        ),
+        tag_value=AsgTag(
+            schedule=schedule_a.name,
+            ttl=(TEST_DATETIME + timedelta(days=30)).isoformat(),
+            min_size=initial_tag_size.min_size,
+            max_size=initial_tag_size.max_size,
+            desired_size=initial_tag_size.desired_size,
+        ).to_json(),
     )
     add_actions(
         group_name=ASG_GROUP_NAME, asg_size=initial_tag_size, schedule=schedule_a
@@ -851,15 +849,13 @@ def test_update_schedule_when_tag_is_updated_and_asg_stopped(
     tag_group(
         group_name=ASG_GROUP_NAME,
         tag_key=ASG_SCHEDULED_TAG_KEY,
-        tag_value=str(
-            AsgTag(
-                schedule=schedule_a.name,
-                ttl=(TEST_DATETIME + timedelta(days=30)).isoformat(),
-                min_size=initial_tag_size.min_size,
-                max_size=initial_tag_size.max_size,
-                desired_size=initial_tag_size.desired_size,
-            )
-        ),
+        tag_value=AsgTag(
+            schedule=schedule_a.name,
+            ttl=(TEST_DATETIME + timedelta(days=30)).isoformat(),
+            min_size=initial_tag_size.min_size,
+            max_size=initial_tag_size.max_size,
+            desired_size=initial_tag_size.desired_size,
+        ).to_json(),
     )
     add_actions(
         group_name=ASG_GROUP_NAME, asg_size=initial_tag_size, schedule=schedule_a

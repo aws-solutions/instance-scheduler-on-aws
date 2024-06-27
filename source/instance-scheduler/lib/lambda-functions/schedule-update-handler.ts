@@ -18,6 +18,7 @@ import { FunctionFactory } from "./function-factory";
 export interface ScheduleUpdateHandlerProps {
   readonly USER_AGENT_EXTRA: string;
   readonly asgHandler: LambdaFunction;
+  readonly memorySizeMB: number;
   readonly configTable: Table;
   readonly enableDebugLogging: CfnCondition;
   readonly enableSchedulingHubAccount: CfnCondition;
@@ -41,7 +42,7 @@ export class ScheduleUpdateHandler {
       description: `Instance Scheduler handler for updates to schedules version ${props.metricsEnv.SOLUTION_VERSION}`,
       index: "instance_scheduler/handler/schedule_update.py",
       handler: "lambda_handler",
-      memorySize: 128,
+      memorySize: props.memorySizeMB,
       role,
       timeout: Duration.minutes(1),
       environment: {

@@ -124,9 +124,9 @@ def schedule_auto_scaling_groups(
 
     session: Final = assume_role(
         account=account_id, region=region, role_name=scheduling_role_name
-    ).session
+    )
     asg_service: Final = AsgService(
-        session=session,
+        assumed_asg_scheduling_role=session,
         schedule_tag_key=schedule_tag_key,
         asg_scheduled_tag_key=asg_scheduled_tag_key,
         rule_prefix=rule_prefix,

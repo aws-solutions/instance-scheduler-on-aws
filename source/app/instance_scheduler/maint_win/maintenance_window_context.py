@@ -74,7 +74,9 @@ class MaintenanceWindowContext:
 
         raw_ssm_data = SSMMWClient(self._spoke_scheduler_role).get_mws_from_ssm()
         filtered_ssm_data = _collect_by_nameid(
-            self.filter_by_windows_defined_in_schedules(raw_ssm_data)
+            self.filter_by_windows_defined_in_schedules(
+                self.filter_by_windows_with_next_execution_time(raw_ssm_data)
+            )
         )
 
         ddb_data = _collect_by_nameid(
@@ -145,7 +147,7 @@ class MaintenanceWindowContext:
         return self._prefetched_windows is not None
 
     def filter_by_windows_defined_in_schedules(
-        self, raw_windows: Iterable[EC2SSMMaintenanceWindow]
+        self, windows: Iterable[EC2SSMMaintenanceWindow]
     ) -> Iterable[EC2SSMMaintenanceWindow]:
 
         # collect all windows referenced by schedules
@@ -154,8 +156,15 @@ class MaintenanceWindowContext:
             if schedule.ssm_maintenance_window:
                 referenced_windows.update(schedule.ssm_maintenance_window)
 
-        for window in raw_windows:
+        for window in windows:
             if window.window_name in referenced_windows:
+                yield window
+
+    def filter_by_windows_with_next_execution_time(
+        self, windows: Iterable[EC2SSMMaintenanceWindow]
+    ) -> Iterable[EC2SSMMaintenanceWindow]:
+        for window in windows:
+            if window.next_execution_time:
                 yield window
 
 

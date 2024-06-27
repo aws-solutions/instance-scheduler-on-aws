@@ -51,9 +51,13 @@ describe("core scheduler", function () {
       expect(key.Properties.EnableKeyRotation).toEqual(true);
     });
 
-    it("is not retained", function () {
-      expect(key.DeletionPolicy).toEqual("Delete");
-      expect(key.UpdateReplacePolicy).toEqual("Delete");
+    it("is retained if ddb tables are retained", function () {
+      expect(key.DeletionPolicy).toEqual({
+        "Fn::If": [conditions.enableDdbDeletionProtection, "Retain", "Delete"],
+      });
+      expect(key.UpdateReplacePolicy).toEqual({
+        "Fn::If": [conditions.enableDdbDeletionProtection, "Retain", "Delete"],
+      });
     });
 
     describe("policy", function () {

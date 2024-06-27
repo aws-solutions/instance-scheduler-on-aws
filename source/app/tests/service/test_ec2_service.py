@@ -259,6 +259,83 @@ def test_get_schedulable_instances_omits_asg_instances(moto_backend: None) -> No
     assert list(service.describe_tagged_instances()) == []
 
 
+@patch.object(SSMMWClient, "get_mws_from_ssm")
+def test_describe_tagged_instances_omits_mw_with_no_next_execution_time(
+    mock_mw_backend: MagicMock,
+    moto_backend: None,
+    mw_store: MWStore,
+) -> None:
+    env = MockSchedulingRequestEnvironment(enable_ec2_ssm_maintenance_windows=True)
+    service = build_ec2_service(env=env)
+
+    assert list(service.describe_tagged_instances()) == []
+
+    # create instance
+    ec2: Final[EC2Client] = boto3.client("ec2")
+    instance_type: Final[InstanceTypeType] = "m6g.12xlarge"
+    instances = create_instances_of_status(
+        ec2, instance_type=instance_type, qty_running=1
+    )
+    instance_id = instances.all_ids[0]
+    schedule_name = f"{instance_id}-schedule"
+    tags: list[TagTypeDef] = [
+        {"Key": "Name", "Value": f"{instance_id}-name"},
+        {"Key": env.schedule_tag_key, "Value": schedule_name},
+    ]
+    ec2.create_tags(Resources=[instance_id], Tags=tags)
+
+    # mw that has next_execution_time and will be processed
+    maintenance_window = EC2SSMMaintenanceWindow(
+        window_name=f"{instance_id}-mw",
+        window_id="mw-00000000000000000",
+        account_id="123456789012",
+        region="us-east-1",
+        schedule_timezone=ZoneInfo("UTC"),
+        next_execution_time=quick_time(10, 20, 0),
+        duration_hours=1,
+    )
+
+    # mw that does not have next_execution_time and will be filtered out
+    maintenance_window_no_next_execution_time = EC2SSMMaintenanceWindow(
+        window_name=f"{instance_id}-mw-no-next-execution-time",
+        window_id="mw-00000000000000001",
+        account_id="123456789012",
+        region="us-east-1",
+        schedule_timezone=ZoneInfo("UTC"),
+        next_execution_time=None,
+        duration_hours=1,
+    )
+
+    # create schedule using both maintenance windows, maintenance_window_no_next_execution_time should be ignored
+    schedules: dict[str, InstanceSchedule] = dict()
+    schedules[schedule_name] = InstanceSchedule(
+        schedule_name,
+        timezone=ZoneInfo("UTC"),
+        ssm_maintenance_window=[
+            maintenance_window.window_name,
+            maintenance_window_no_next_execution_time.window_name,
+        ],
+    )
+
+    # mw returned by SSMMWClient
+    mock_mw_backend.return_value = [
+        maintenance_window,
+        maintenance_window_no_next_execution_time,
+    ]
+
+    service = build_ec2_service(
+        env,
+        build_scheduling_context(current_dt=quick_time(10, 0, 0), schedules=schedules),
+    )
+    result = list(service.describe_tagged_instances())
+    assert len(result) == 1
+
+    # only contains maintenance window with next_execution_time
+    assert result[0].maintenance_windows == [
+        maintenance_window.to_schedule(env.scheduler_frequency_minutes)
+    ]
+
+
 def instance_data_from(
     *,
     instance_id: str,
