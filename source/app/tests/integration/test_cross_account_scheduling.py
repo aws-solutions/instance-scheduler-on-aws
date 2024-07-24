@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 from mypy_boto3_ec2 import EC2Client
 
+from instance_scheduler.handler.environments.main_lambda_environment import (
+    MainLambdaEnv,
+)
 from instance_scheduler.schedulers.instance_states import InstanceStates
-from instance_scheduler.util.app_env import AppEnv
 from tests.integration.helpers.boto_client_helpers import client_in_account_region
 from tests.integration.helpers.ec2_helpers import (
     create_ec2_instances,
@@ -33,7 +35,7 @@ class LocalizedTestInstance:
 
 def test_cross_account_cross_region_ec2_scheduling_starts_and_stops_instance(
     ec2_instance_states: InstanceStates,
-    app_env: AppEnv,
+    test_suite_env: MainLambdaEnv,
 ) -> None:
     spoke_account = "222233334444"
     spoke_region = "us-west-2"
@@ -71,7 +73,7 @@ def test_cross_account_cross_region_ec2_scheduling_starts_and_stops_instance(
 
 def test_cross_account_scheduling_does_not_schedule_other_instances(
     ec2_instance_states: InstanceStates,
-    app_env: AppEnv,
+    test_suite_env: MainLambdaEnv,
 ) -> None:
     spoke_account = "222233334444"
     spoke_region = "us-west-2"

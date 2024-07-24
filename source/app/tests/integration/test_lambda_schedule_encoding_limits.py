@@ -41,12 +41,10 @@ from instance_scheduler.model.store.schedule_definition_store import (
 )
 from tests.context import MockLambdaContext
 from tests.handler.test_scheduling_orchestration_handler import (
-    orchestrator_env_overrides,
     scheduling_request_from_lambda_invoke,
 )
 from tests.integration.helpers.schedule_helpers import quick_time
 from tests.logger import MockLogger
-from tests.test_utils.app_env_utils import with_mock_app_env
 from tests.test_utils.mock_orchestrator_environment import MockOrchestratorEnvironment
 from tests.test_utils.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
@@ -123,11 +121,6 @@ def test_schedules_and_periods_are_encoded_into_payload(
 
 
 @patch.object(SchedulingOrchestratorHandler, "lambda_client")
-@with_mock_app_env(
-    **orchestrator_env_overrides(
-        schedule_regions=[], enable_ec2_service=True, enable_schedule_hub_account=True
-    )
-)
 def test_strips_schedules_when_payload_is_too_large(
     lambda_client: MagicMock, config_item_store: DdbConfigItemStore
 ) -> None:

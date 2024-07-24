@@ -32,17 +32,17 @@ from instance_scheduler.util.validation import (
 if TYPE_CHECKING:
     from mypy_boto3_autoscaling.client import AutoScalingClient
     from mypy_boto3_autoscaling.type_defs import (
-        AutoScalingGroupPaginatorTypeDef,
+        AutoScalingGroupTypeDef,
         ScheduledUpdateGroupActionRequestTypeDef,
         ScheduledUpdateGroupActionTypeDef,
         TagDescriptionTypeDef,
     )
 else:
     AutoScalingClient = object
-    AutoScalingGroupPaginatorTypeDef = object
     ScheduledUpdateGroupActionRequestTypeDef = object
     ScheduledUpdateGroupActionTypeDef = object
     TagDescriptionTypeDef = object
+    AutoScalingGroupTypeDef = object
 
 logger: Final = Logger(log_uncaught_exceptions=True, use_rfc3339=True)
 
@@ -79,7 +79,7 @@ class AsgTag:
     def from_group(
         cls,
         *,
-        group: AutoScalingGroupPaginatorTypeDef,
+        group: AutoScalingGroupTypeDef,
         asg_scheduled_tag_key: str,
     ) -> "AsgTag":
         """
@@ -187,7 +187,7 @@ class AsgSize:
         return f"{self.min_size}-{self.desired_size}-{self.max_size}"
 
     @classmethod
-    def from_group(cls, group: AutoScalingGroupPaginatorTypeDef) -> "AsgSize":
+    def from_group(cls, group: AutoScalingGroupTypeDef) -> "AsgSize":
         return AsgSize(
             min_size=group["MinSize"],
             desired_size=group["DesiredCapacity"],
@@ -233,7 +233,7 @@ class AsgService:
 
     def get_schedulable_groups(
         self, schedule_names: list[str] | None = None
-    ) -> Iterator[AutoScalingGroupPaginatorTypeDef]:
+    ) -> Iterator[AutoScalingGroupTypeDef]:
         paginator: Final = self._autoscaling.get_paginator(
             "describe_auto_scaling_groups"
         )
@@ -254,7 +254,7 @@ class AsgService:
 
     def schedule_auto_scaling_group(
         self,
-        group: AutoScalingGroupPaginatorTypeDef,
+        group: AutoScalingGroupTypeDef,
         schedule_definition: ScheduleDefinition,
         period_definitions: list[PeriodDefinition],
         is_schedule_override: bool = False,
@@ -306,7 +306,7 @@ class AsgService:
             logger.error(f"Error scheduling autoscaling group: {e}")
 
     def _get_steady_state(
-        self, group: AutoScalingGroupPaginatorTypeDef, asg_tag: Optional[AsgTag] = None
+        self, group: AutoScalingGroupTypeDef, asg_tag: Optional[AsgTag] = None
     ) -> AsgSize:
         """
         Get the steady state of an auto scaling group size to be scheduled.
@@ -399,7 +399,7 @@ class AsgService:
 
     def _reconfigure_scheduled_actions_to_match_schedule(
         self,
-        asg: AutoScalingGroupPaginatorTypeDef,
+        asg: AutoScalingGroupTypeDef,
         schedule: ScheduleDefinition,
         period_definitions: list[PeriodDefinition],
         asg_tag: Optional[AsgTag] = None,

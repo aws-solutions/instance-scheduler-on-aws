@@ -11,6 +11,7 @@ from instance_scheduler import __version__
 from instance_scheduler.handler.cli.cli_request_handler import CliRequestHandler
 from tests.context import MockLambdaContext
 from tests.logger import MockLogger
+from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
 from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
 
 
@@ -26,6 +27,7 @@ def test_cli_handler_sends_expected_metric(mock_metrics_endpoint: MagicMock) -> 
                 "version": __version__,
             },
             MockLambdaContext(),
+            MockMainLambdaEnv(),
         )
         handler._logger = MockLogger()
         handler.handle_request()

@@ -26,7 +26,7 @@ from instance_scheduler.configuration.scheduling_context import (
     SchedulingContext,
     TagTemplate,
 )
-from instance_scheduler.handler.base import Handler
+from instance_scheduler.handler.base import MainHandler
 from instance_scheduler.handler.environments.scheduling_request_environment import (
     SchedulingRequestEnvironment,
 )
@@ -154,7 +154,7 @@ def init_logger(
     )
 
 
-class SchedulingRequestHandler(Handler[SchedulingRequest]):
+class SchedulingRequestHandler(MainHandler[SchedulingRequest]):
     def __init__(
         self,
         event: SchedulingRequest,

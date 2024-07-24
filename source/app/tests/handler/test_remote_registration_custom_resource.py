@@ -18,7 +18,7 @@ from instance_scheduler.handler.remote_registration_custom_resource import (
     RemoteRegistrationProperties,
     handle_remote_registration_request,
 )
-from instance_scheduler.util.app_env import AppEnvError
+from instance_scheduler.util.app_env_utils import AppEnvError
 from instance_scheduler.util.custom_resource import CustomResourceRequest
 from tests.context import MockLambdaContext
 

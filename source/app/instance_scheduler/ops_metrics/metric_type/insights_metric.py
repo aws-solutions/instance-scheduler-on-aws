@@ -48,7 +48,7 @@ class MetricDataItem:
 class InsightsMetric(OpsMetric):
     metric_data: list[MetricDataItem]
     event_name: ClassVar[str] = "insights_metric"
-    collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.DAILY
+    collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.UNLIMITED
     context_version: ClassVar[int] = 1
 
     @classmethod

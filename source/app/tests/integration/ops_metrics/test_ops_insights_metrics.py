@@ -11,6 +11,8 @@ from _pytest.fixtures import fixture
 from freezegun import freeze_time
 from mypy_boto3_ec2.literals import InstanceTypeType
 
+from instance_scheduler.ops_metrics import GatheringFrequency
+from instance_scheduler.ops_metrics.metric_type.insights_metric import InsightsMetric
 from instance_scheduler.ops_monitoring.cw_ops_insights import (
     CloudWatchOperationalInsights,
 )
@@ -61,6 +63,10 @@ def get_sent_ops_insight_metric_json(metrics_endpoint: MagicMock) -> Any:
     if not desired_metric:
         raise MetricNotFound("metric not found")
     return desired_metric
+
+
+def test_op_metric_is_sent_unlimited() -> None:
+    assert InsightsMetric.collection_frequency == GatheringFrequency.UNLIMITED
 
 
 @freeze_time(datetime(2023, 6, 12, 12, 0, 0, tzinfo=ZoneInfo("UTC")))

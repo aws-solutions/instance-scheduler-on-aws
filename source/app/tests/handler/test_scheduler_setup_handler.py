@@ -12,6 +12,9 @@ from instance_scheduler.handler.config_resource import (
     ServiceSetupResourceProperties,
     is_org_id,
 )
+from instance_scheduler.handler.environments.main_lambda_environment import (
+    MainLambdaEnv,
+)
 from instance_scheduler.handler.setup_demo_data import DEMO_PERIODS, DEMO_SCHEDULES
 from instance_scheduler.model.ddb_config_item import DdbConfigItem
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
@@ -20,10 +23,9 @@ from instance_scheduler.model.store.period_definition_store import PeriodDefinit
 from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleDefinitionStore,
 )
-from instance_scheduler.util.app_env import AppEnv
 from instance_scheduler.util.custom_resource import CustomResourceRequest
 from tests.context import MockLambdaContext
-from tests.test_utils.app_env_utils import mock_app_env
+from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
 from tests.test_utils.unordered_list import UnorderedList
 
 stack_arn = "arn:aws:cloudformation:us-west-2:123456789012:stack/teststack/51af3dc0-da77-11e4-872e-1234567db123"
@@ -87,10 +89,7 @@ def test_create_request_no_orgs_or_accounts(
             "remote_account_ids": [],
         }
     )
-    handler = SchedulerSetupHandler(
-        event,
-        MockLambdaContext(),
-    )
+    handler = SchedulerSetupHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     handler.handle_request()
 
     saved_item = config_item_store.get()
@@ -106,10 +105,7 @@ def test_create_request_with_account_ids(config_item_store: DdbConfigItemStore) 
             "remote_account_ids": accounts,
         }
     )
-    handler = SchedulerSetupHandler(
-        event,
-        MockLambdaContext(),
-    )
+    handler = SchedulerSetupHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     handler.handle_request()
 
     saved_item = config_item_store.get()
@@ -120,17 +116,17 @@ def test_create_request_with_account_ids(config_item_store: DdbConfigItemStore) 
 
 def test_create_request_with_orgs(config_item_store: DdbConfigItemStore) -> None:
     """Happy path, orgs_disabled"""
-    with mock_app_env(enable_aws_organizations=True):
-        SchedulerSetupHandler(
-            new_create_request(
-                {
-                    "timeout": 120,
-                    "log_retention_days": 7,
-                    "remote_account_ids": ["o-a1b1c3d4e5"],
-                }
-            ),
-            MockLambdaContext(),
-        ).handle_request()
+    SchedulerSetupHandler(
+        new_create_request(
+            {
+                "timeout": 120,
+                "log_retention_days": 7,
+                "remote_account_ids": ["o-a1b1c3d4e5"],
+            }
+        ),
+        MockLambdaContext(),
+        MockMainLambdaEnv(enable_aws_organizations=True),
+    ).handle_request()
 
     saved_item = config_item_store.get()
     assert saved_item == DdbConfigItem(
@@ -147,22 +143,22 @@ def test_update_request_preserves_registered_accounts_when_org_doesnt_change(
             remote_account_ids=["111122223333", "222233334444"],
         )
     )
-    with mock_app_env(enable_aws_organizations=True):
-        SchedulerSetupHandler(
-            new_update_request(
-                {
-                    "timeout": 120,
-                    "log_retention_days": 7,
-                    "remote_account_ids": ["o-a1b1c3d4e5"],
-                },
-                {
-                    "timeout": 120,
-                    "log_retention_days": 30,
-                    "remote_account_ids": ["o-a1b1c3d4e5"],
-                },
-            ),
-            MockLambdaContext(),
-        ).handle_request()
+    SchedulerSetupHandler(
+        new_update_request(
+            {
+                "timeout": 120,
+                "log_retention_days": 7,
+                "remote_account_ids": ["o-a1b1c3d4e5"],
+            },
+            {
+                "timeout": 120,
+                "log_retention_days": 30,
+                "remote_account_ids": ["o-a1b1c3d4e5"],
+            },
+        ),
+        MockLambdaContext(),
+        MockMainLambdaEnv(enable_aws_organizations=True),
+    ).handle_request()
 
     saved_item = config_item_store.get()
     assert saved_item == DdbConfigItem(
@@ -180,22 +176,22 @@ def test_update_request_clears_registered_accounts_when_org_changes(
             remote_account_ids=["111122223333", "222233334444"],
         )
     )
-    with mock_app_env(enable_aws_organizations=True):
-        SchedulerSetupHandler(
-            new_update_request(
-                {
-                    "timeout": 120,
-                    "log_retention_days": 7,
-                    "remote_account_ids": ["o-a1b1c3d4e5"],
-                },
-                {
-                    "timeout": 120,
-                    "log_retention_days": 7,
-                    "remote_account_ids": ["o-abcdefghijkl"],
-                },
-            ),
-            MockLambdaContext(),
-        ).handle_request()
+    SchedulerSetupHandler(
+        new_update_request(
+            {
+                "timeout": 120,
+                "log_retention_days": 7,
+                "remote_account_ids": ["o-a1b1c3d4e5"],
+            },
+            {
+                "timeout": 120,
+                "log_retention_days": 7,
+                "remote_account_ids": ["o-abcdefghijkl"],
+            },
+        ),
+        MockLambdaContext(),
+        MockMainLambdaEnv(enable_aws_organizations=True),
+    ).handle_request()
 
     saved_item = config_item_store.get()
     assert saved_item == DdbConfigItem(
@@ -213,22 +209,22 @@ def test_update_request_overwrites_remote_accounts_when_orgs_disabled(
             remote_account_ids=["111122223333", "222233334444"],
         )
     )
-    with mock_app_env(enable_aws_organizations=False):
-        SchedulerSetupHandler(
-            new_update_request(
-                {
-                    "timeout": 120,
-                    "log_retention_days": 7,
-                    "remote_account_ids": ["333344445555", "444455556666"],
-                },
-                {
-                    "timeout": 120,
-                    "log_retention_days": 7,
-                    "remote_account_ids": ["o-abcdefghijkl"],
-                },
-            ),
-            MockLambdaContext(),
-        ).handle_request()
+    SchedulerSetupHandler(
+        new_update_request(
+            {
+                "timeout": 120,
+                "log_retention_days": 7,
+                "remote_account_ids": ["333344445555", "444455556666"],
+            },
+            {
+                "timeout": 120,
+                "log_retention_days": 7,
+                "remote_account_ids": ["o-abcdefghijkl"],
+            },
+        ),
+        MockLambdaContext(),
+        MockMainLambdaEnv(enable_aws_organizations=False),
+    ).handle_request()
 
     saved_item = config_item_store.get()
     assert saved_item == DdbConfigItem(
@@ -238,15 +234,16 @@ def test_update_request_overwrites_remote_accounts_when_orgs_disabled(
 
 
 def test_sets_lambda_logs_retention_period_on_create(
-    app_env: AppEnv, config_item_store: DdbConfigItemStore
+    test_suite_env: MainLambdaEnv, config_item_store: DdbConfigItemStore
 ) -> None:
     """With no period, expect set to default"""
-    log_group = app_env.log_group
+    log_group = test_suite_env.log_group
     handler = SchedulerSetupHandler(
         new_create_request(
             {"timeout": 120, "remote_account_ids": [], "log_retention_days": 30}
         ),
         MockLambdaContext(log_group),
+        MockMainLambdaEnv(),
     )
     handler.handle_request()
     response = boto3.client("logs").describe_log_groups(logGroupNamePrefix=log_group)
@@ -266,10 +263,7 @@ def test_creates_example_schedules_on_create(
             "remote_account_ids": [],
         }
     )
-    handler = SchedulerSetupHandler(
-        event,
-        MockLambdaContext(),
-    )
+    handler = SchedulerSetupHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     handler.handle_request()
 
     saved_schedules = list(schedule_store.find_all().values())

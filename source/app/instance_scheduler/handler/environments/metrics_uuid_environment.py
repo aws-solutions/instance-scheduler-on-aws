@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from os import environ
 
-from instance_scheduler.util.app_env import AppEnvError
+from instance_scheduler.util.app_env_utils import AppEnvError
 
 
 @dataclass

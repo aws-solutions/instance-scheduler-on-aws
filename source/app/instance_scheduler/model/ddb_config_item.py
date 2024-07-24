@@ -28,9 +28,7 @@ class DdbConfigItem:
         return {
             "type": {"S": "config"},
             "name": {"S": "scheduler"},
-            "organization_id": {
-                "S": self.organization_id
-            },  # todo: check if this was an omittable field
+            "organization_id": {"S": self.organization_id},
             **skip_if_empty("remote_account_ids", {"SS": self.remote_account_ids}),
         }
 

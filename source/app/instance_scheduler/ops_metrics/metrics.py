@@ -15,7 +15,7 @@ from instance_scheduler.ops_metrics.anonymous_metric_wrapper import (
 )
 from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 from instance_scheduler.util import safe_json
-from instance_scheduler.util.app_env import AppEnvError, env_to_bool
+from instance_scheduler.util.app_env_utils import AppEnvError, env_to_bool
 from instance_scheduler.util.logger import Logger
 
 

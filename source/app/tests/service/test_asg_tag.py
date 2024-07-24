@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 import json
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, Final
+from typing import Final
 from zoneinfo import ZoneInfo
 
+from mypy_boto3_autoscaling.type_defs import AutoScalingGroupTypeDef
 from pytest import fixture, raises
 
 from instance_scheduler.model.period_definition import PeriodDefinition
@@ -15,17 +16,12 @@ from instance_scheduler.service.asg import (
     period_to_actions,
 )
 
-if TYPE_CHECKING:
-    from mypy_boto3_autoscaling.type_defs import AutoScalingGroupPaginatorTypeDef
-else:
-    AutoScalingGroupPaginatorTypeDef = object
-
 ASG_SCHEDULED_TAG_KEY: Final = "scheduled"
 SCHEDULE_NAME: Final = "Schedule"
 
 
 @fixture
-def default_asg_group_definition() -> AutoScalingGroupPaginatorTypeDef:
+def default_asg_group_definition() -> AutoScalingGroupTypeDef:
     return {
         "AutoScalingGroupName": "MockAutoScaling",
         "MinSize": 1,
@@ -76,7 +72,7 @@ def test_period_to_actions() -> None:
 
 
 def test_asg_size_from_group(
-    default_asg_group_definition: AutoScalingGroupPaginatorTypeDef,
+    default_asg_group_definition: AutoScalingGroupTypeDef,
 ) -> None:
     # Call
     size = AsgSize.from_group(default_asg_group_definition)
@@ -118,7 +114,7 @@ def test_asg_size_stopped() -> None:
 
 
 def test_asg_tag_from_group(
-    default_asg_group_definition: AutoScalingGroupPaginatorTypeDef,
+    default_asg_group_definition: AutoScalingGroupTypeDef,
 ) -> None:
     # Prepare
     group = default_asg_group_definition
@@ -145,7 +141,7 @@ def test_asg_tag_from_group(
 
 
 def test_asg_tag_from_group_when_no_scheduled_tag(
-    default_asg_group_definition: AutoScalingGroupPaginatorTypeDef,
+    default_asg_group_definition: AutoScalingGroupTypeDef,
 ) -> None:
     # Call
     with raises(AsgTagValidationError) as e:
@@ -159,7 +155,7 @@ def test_asg_tag_from_group_when_no_scheduled_tag(
 
 
 def test_asg_tag_from_group_when_unable_to_parse(
-    default_asg_group_definition: AutoScalingGroupPaginatorTypeDef,
+    default_asg_group_definition: AutoScalingGroupTypeDef,
 ) -> None:
     # Prepare
     group = default_asg_group_definition
@@ -177,7 +173,7 @@ def test_asg_tag_from_group_when_unable_to_parse(
 
 
 def test_asg_tag_from_group_when_scheduled_tag_invalid(
-    default_asg_group_definition: AutoScalingGroupPaginatorTypeDef,
+    default_asg_group_definition: AutoScalingGroupTypeDef,
 ) -> None:
     # Prepare
     group = default_asg_group_definition

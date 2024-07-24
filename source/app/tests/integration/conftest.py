@@ -7,8 +7,8 @@ import boto3
 from pytest import fixture
 
 from instance_scheduler.schedulers.instance_states import InstanceStates
-from instance_scheduler.util.app_env import AppEnv
 from tests.logger import MockLogger
+from tests.test_utils.testsuite_env import TestSuiteEnv
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb import DynamoDBClient
@@ -85,8 +85,8 @@ def rds_cluster(moto_backend: None) -> Iterator[str]:
 
 
 @fixture
-def state_table(moto_backend: None, app_env: AppEnv) -> str:
-    state_table_name = app_env.state_table_name
+def state_table(moto_backend: None, test_suite_env: TestSuiteEnv) -> str:
+    state_table_name = test_suite_env.state_table_name
     dynamo_client: DynamoDBClient = boto3.client("dynamodb")
     dynamo_client.create_table(
         TableName=state_table_name,

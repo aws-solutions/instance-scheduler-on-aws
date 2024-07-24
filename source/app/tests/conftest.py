@@ -24,11 +24,10 @@ from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleDefinitionStore,
 )
 from instance_scheduler.ops_metrics.metrics import MetricsEnvironment
-from instance_scheduler.util.app_env import AppEnv
 from instance_scheduler.util.session_manager import AssumedRole
 from tests import DEFAULT_REGION
-from tests.test_utils.app_env_utils import mock_app_env
 from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
+from tests.test_utils.testsuite_env import TestSuiteEnv
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient
@@ -57,13 +56,13 @@ def aws_credentials() -> Iterator[None]:
 
 
 @fixture(autouse=True)
-def app_env(aws_credentials: None) -> Iterator[AppEnv]:
-    with mock_app_env() as env:
+def test_suite_env(aws_credentials: None) -> Iterator[TestSuiteEnv]:
+    with TestSuiteEnv() as env:
         yield env
 
 
 @fixture(autouse=True)
-def metrics_environment(app_env: None) -> Iterator[MetricsEnvironment]:
+def metrics_environment() -> Iterator[MetricsEnvironment]:
     with MockMetricsEnviron() as metrics_env:
         yield metrics_env
 
@@ -134,25 +133,25 @@ def period_store(config_table: str) -> PeriodDefinitionStore:
 
 
 @fixture
-def config_table(app_env: AppEnv, moto_backend: None) -> Iterator[str]:
+def config_table(test_suite_env: TestSuiteEnv, moto_backend: None) -> Iterator[str]:
     boto3.client("dynamodb").create_table(
         AttributeDefinitions=[
             {"AttributeName": "name", "AttributeType": "S"},
             {"AttributeName": "type", "AttributeType": "S"},
         ],
-        TableName=app_env.config_table_name,
+        TableName=test_suite_env.config_table_name,
         KeySchema=[
             {"AttributeName": "type", "KeyType": "HASH"},
             {"AttributeName": "name", "KeyType": "RANGE"},
         ],
         BillingMode="PAY_PER_REQUEST",
     )
-    yield app_env.config_table_name
+    yield test_suite_env.config_table_name
 
 
 @fixture
-def maint_win_table(app_env: AppEnv, moto_backend: None) -> Iterator[str]:
-    table_name: Final = app_env.maintenance_window_table_name
+def maint_win_table(test_suite_env: TestSuiteEnv, moto_backend: None) -> Iterator[str]:
+    table_name: Final = test_suite_env.maintenance_window_table_name
     ddb: Final[DynamoDBClient] = boto3.client("dynamodb")
     ddb.create_table(
         AttributeDefinitions=[
@@ -180,12 +179,12 @@ def mw_store(maint_win_table: str) -> MWStore:
 
 
 @fixture
-def mock_log_group(moto_backend: None, app_env: AppEnv) -> None:
+def mock_log_group(moto_backend: None, test_suite_env: TestSuiteEnv) -> None:
     logs: CloudWatchLogsClient = boto3.client("logs")
-    logs.create_log_group(logGroupName=app_env.log_group)
+    logs.create_log_group(logGroupName=test_suite_env.log_group)
 
 
 @fixture
-def mock_sns_errors_topic(moto_backend: None, app_env: AppEnv) -> None:
+def mock_sns_errors_topic(moto_backend: None, test_suite_env: TestSuiteEnv) -> None:
     sns: SNSClient = boto3.client("sns")
-    sns.create_topic(Name=app_env.topic_arn.split(":")[-1])
+    sns.create_topic(Name=test_suite_env.topic_arn.split(":")[-1])

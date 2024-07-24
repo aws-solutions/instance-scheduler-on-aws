@@ -92,4 +92,5 @@ def assume_role(*, account: str, region: str, role_name: str) -> AssumedRole:
             role_name=role_name,
         )
     except ClientError as ex:
+        """rethrow"""
         raise ex

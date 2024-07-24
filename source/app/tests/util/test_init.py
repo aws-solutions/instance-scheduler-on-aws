@@ -3,8 +3,10 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+from instance_scheduler.handler.environments.main_lambda_environment import (
+    MainLambdaEnv,
+)
 from instance_scheduler.util import get_boto_config, safe_json
-from instance_scheduler.util.app_env import AppEnv
 
 
 def test_safe_json() -> None:
@@ -12,9 +14,9 @@ def test_safe_json() -> None:
 
 
 @patch("instance_scheduler.util._Config")
-def test_get_config(mock_config: MagicMock, app_env: AppEnv) -> None:
+def test_get_config(mock_config: MagicMock, test_suite_env: MainLambdaEnv) -> None:
     get_boto_config()
     mock_config.assert_called_once_with(
-        user_agent_extra=app_env.user_agent_extra,
+        user_agent_extra=test_suite_env.user_agent_extra,
         retries={"max_attempts": 5, "mode": "standard"},
     )
