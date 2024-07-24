@@ -99,7 +99,6 @@ class PeriodDefinition:
 
     def __post_init__(self) -> None:
         self.validate()
-        # todo: may need to coerce optional sequences to empty sets here
 
     def validate(self) -> None:
         # will throw validation exceptions

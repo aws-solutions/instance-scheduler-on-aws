@@ -17,7 +17,7 @@ from instance_scheduler.model.schedule_definition import (
     ScheduleDefinition,
 )
 from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
-from instance_scheduler.util.app_env import AppEnv
+from tests.test_utils.testsuite_env import TestSuiteEnv
 
 
 def test_default_schedule_flags_match_expected(
@@ -34,7 +34,7 @@ def test_default_schedule_flags_match_expected(
 
 
 def test_schedule_definition_defaults_match_instance_schedule_defaults(
-    period_store: PeriodDefinitionStore, app_env: AppEnv
+    period_store: PeriodDefinitionStore, test_suite_env: TestSuiteEnv
 ) -> None:
     """
     InstanceSchedule and ScheduleDefinition each define their defaults separately, but these need to match
@@ -48,7 +48,7 @@ def test_schedule_definition_defaults_match_instance_schedule_defaults(
     manual_built_schedule = InstanceSchedule(
         name="test-schedule",
         override_status="running",
-        timezone=app_env.default_timezone,
+        timezone=test_suite_env.default_timezone,
     )
 
     assert schedule_from_def == manual_built_schedule
@@ -56,7 +56,7 @@ def test_schedule_definition_defaults_match_instance_schedule_defaults(
 
 @pytest.mark.parametrize("tz_str", ["", None])
 def test_timezone_uses_default_timezone_when_not_provided(
-    tz_str: str, app_env: AppEnv, period_store: PeriodDefinitionStore
+    tz_str: str, test_suite_env: TestSuiteEnv, period_store: PeriodDefinitionStore
 ) -> None:
     schedule_def = ScheduleDefinition(
         name="test-schedule", timezone=tz_str, override_status="running"
@@ -64,11 +64,13 @@ def test_timezone_uses_default_timezone_when_not_provided(
 
     schedule = schedule_def.to_instance_schedule(period_store)
 
-    assert schedule.timezone == app_env.default_timezone
+    assert schedule.timezone == test_suite_env.default_timezone
 
 
 def test_to_schedule_when_period_exists(
-    config_table: str, app_env: AppEnv, period_store: PeriodDefinitionStore
+    config_table: str,
+    test_suite_env: TestSuiteEnv,
+    period_store: PeriodDefinitionStore,
 ) -> None:
     period_store.put(PeriodDefinition(name="period", begintime="05:00"))
     schedule_def = ScheduleDefinition(
@@ -79,7 +81,7 @@ def test_to_schedule_when_period_exists(
 
     assert schedule == InstanceSchedule(
         name="test-schedule",
-        timezone=app_env.default_timezone,
+        timezone=test_suite_env.default_timezone,
         periods=[
             RunningPeriodDictElement(
                 period=RunningPeriod(name="period", begintime=time(5, 0, 0))

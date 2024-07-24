@@ -111,7 +111,6 @@ class ScheduleDefinition:
         self.validate()
 
     def validate(self) -> None:
-        # todo: more validation -- use maint window with no maint window name?
         if not self.name:
             raise InvalidScheduleDefinition("Schedule name is required")
 
@@ -276,9 +275,7 @@ class ScheduleDefinition:
         if self.timezone:
             return ZoneInfo(self.timezone)
         elif "DEFAULT_TIMEZONE" in environ:
-            return ZoneInfo(
-                environ["DEFAULT_TIMEZONE"]
-            )  # todo: handle this in a correctly typed fashion
+            return ZoneInfo(environ["DEFAULT_TIMEZONE"])
         else:
             return ZoneInfo("UTC")
 

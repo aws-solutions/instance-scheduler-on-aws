@@ -8,6 +8,9 @@ from typing import TYPE_CHECKING, Any, TypedDict, TypeGuard
 
 from instance_scheduler.boto_retry import get_client_with_standard_retry
 from instance_scheduler.handler import setup_demo_data as demo_data
+from instance_scheduler.handler.environments.main_lambda_environment import (
+    MainLambdaEnv,
+)
 from instance_scheduler.model.ddb_config_item import DdbConfigItem
 from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
 from instance_scheduler.model.store.dynamo_period_definition_store import (
@@ -16,7 +19,6 @@ from instance_scheduler.model.store.dynamo_period_definition_store import (
 from instance_scheduler.model.store.dynamo_schedule_definition_store import (
     DynamoScheduleDefinitionStore,
 )
-from instance_scheduler.util.app_env import get_app_env
 from instance_scheduler.util.custom_resource import (
     CustomResource,
     CustomResourceRequest,
@@ -60,11 +62,10 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
     Implements handler for setup helper in cloudformation
     """
 
-    def __init__(self, event: Any, context: LambdaContext) -> None:
-        app_env = get_app_env()
-
+    def __init__(self, event: Any, context: LambdaContext, env: MainLambdaEnv) -> None:
+        self._env = env
         CustomResource.__init__(self, event, context)
-        self.config_item_store = DdbConfigItemStore(app_env.config_table_name)
+        self.config_item_store = DdbConfigItemStore(env.config_table_name)
 
         # Setup logging
         classname = self.__class__.__name__
@@ -73,10 +74,10 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
             classname, dt.year, dt.month, dt.day
         )
         self._logger = Logger(
-            log_group=app_env.log_group,
+            log_group=env.log_group,
             log_stream=log_stream,
-            topic_arn=app_env.topic_arn,
-            debug=app_env.enable_debug_logging,
+            topic_arn=env.topic_arn,
+            debug=env.enable_debug_logging,
         )
 
     @staticmethod
@@ -110,7 +111,7 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
         - resource_properties["log_retention_days"] if present
         - default value of 30 otherwise
         """
-        # todo: this relies on the monolith lambda and will need to be rewritten when we break apart the lambdas
+        # note: this only updates the log retention of the Main lambda
         if not self.context:
             return
 
@@ -131,10 +132,8 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
 
     def _create_sample_schemas(self) -> None:
         try:
-            period_store = DynamoPeriodDefinitionStore(get_app_env().config_table_name)
-            schedule_store = DynamoScheduleDefinitionStore(
-                get_app_env().config_table_name
-            )
+            period_store = DynamoPeriodDefinitionStore(self._env.config_table_name)
+            schedule_store = DynamoScheduleDefinitionStore(self._env.config_table_name)
 
             for demo_period in demo_data.DEMO_PERIODS:
                 period_store.put(demo_period)
@@ -151,7 +150,7 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
     def _create_request(self) -> CustomResourceResponse:
         self._create_sample_schemas()
         self.set_lambda_logs_retention_period()
-        if get_app_env().enable_aws_organizations:
+        if self._env.enable_aws_organizations:
             org_id = parse_as_org_id(self.resource_properties)
             self.config_item_store.put(
                 DdbConfigItem(organization_id=org_id, remote_account_ids=[])
@@ -172,7 +171,7 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
         -when org_id does not change -- keep accounts
         -when org_id does change -- purge accounts
         """
-        if get_app_env().enable_aws_organizations:
+        if self._env.enable_aws_organizations:
             # using organizations
             try:
                 prev_org_id = parse_as_org_id(self.old_resource_properties)

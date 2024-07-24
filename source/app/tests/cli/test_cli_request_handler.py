@@ -13,6 +13,9 @@ from instance_scheduler.handler.cli.cli_request_handler import (
     CliRequestHandler,
     get_supported_cli_versions,
 )
+from instance_scheduler.handler.environments.main_lambda_environment import (
+    MainLambdaEnv,
+)
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.period_identifier import PeriodIdentifier
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
@@ -20,10 +23,10 @@ from instance_scheduler.model.store.period_definition_store import PeriodDefinit
 from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleDefinitionStore,
 )
-from instance_scheduler.util.app_env import AppEnv
 from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
 from tests.context import MockLambdaContext
 from tests.logger import MockLogger
+from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
 from tests.test_utils.unordered_list import UnorderedList
 
 
@@ -74,7 +77,9 @@ def test_create_schedule_throws_error_when_period_not_found(config_table: None) 
     assert result == {"Error": "error: not found: period office-hours does not exist"}
 
 
-def test_create_schedule_with_2_periods(config_table: None, app_env: AppEnv) -> None:
+def test_create_schedule_with_2_periods(
+    config_table: None, test_suite_env: MainLambdaEnv
+) -> None:
     create_period_with_cli(name="period1")
     create_period_with_cli(name="period2")
 
@@ -94,7 +99,7 @@ def test_create_schedule_with_2_periods(config_table: None, app_env: AppEnv) -> 
         }
     }
 
-    created_schedule = get_schedule_from_dynamo("cli-schedule", app_env)
+    created_schedule = get_schedule_from_dynamo("cli-schedule", test_suite_env)
     assert created_schedule == {
         "type": "schedule",
         "name": "cli-schedule",
@@ -107,7 +112,7 @@ def test_create_schedule_with_2_periods(config_table: None, app_env: AppEnv) -> 
 
 
 def test_create_schedule_with_2_maintenance_windows(
-    config_table: None, app_env: AppEnv
+    config_table: None, test_suite_env: MainLambdaEnv
 ) -> None:
     create_period_with_cli(name="period")
 
@@ -130,7 +135,7 @@ def test_create_schedule_with_2_maintenance_windows(
         }
     }
 
-    created_schedule = get_schedule_from_dynamo("cli-schedule", app_env)
+    created_schedule = get_schedule_from_dynamo("cli-schedule", test_suite_env)
     assert created_schedule == {
         "type": "schedule",
         "name": "cli-schedule",
@@ -153,15 +158,17 @@ def test_create_schedule_throws_error_when_schedule_already_exists(
     assert result == {"Error": "error: schedule cli-schedule already exists"}
 
 
-def test_delete_existing_schedule(config_table: None, app_env: AppEnv) -> None:
+def test_delete_existing_schedule(
+    config_table: None, test_suite_env: MainLambdaEnv
+) -> None:
     create_period_with_cli(name="period1")
     create_period_with_cli(name="period2")
     create_schedule_with_cli(periods=["period1", "period2"], name="cli-schedule")
 
-    assert get_schedule_from_dynamo("cli-schedule", app_env) is not None
+    assert get_schedule_from_dynamo("cli-schedule", test_suite_env) is not None
     result = delete_schedule_with_cli("cli-schedule")
     assert result == {"Schedule": "cli-schedule"}
-    assert get_schedule_from_dynamo("cli-schedule", app_env) is None
+    assert get_schedule_from_dynamo("cli-schedule", test_suite_env) is None
 
 
 def test_delete_schedule_will_not_delete_cfn_managed_schedule(
@@ -188,7 +195,7 @@ def test_delete_nonexisting_schedule_returns_error(config_table: None) -> None:
     assert result == {"Error": "not found: schedule cli-schedule does not exist"}
 
 
-def test_create_basic_period(config_table: None, app_env: AppEnv) -> None:
+def test_create_basic_period(config_table: None, test_suite_env: MainLambdaEnv) -> None:
     result = create_period_with_cli(
         name="cli-period", begintime="10:00", endtime="20:00"
     )
@@ -202,7 +209,7 @@ def test_create_basic_period(config_table: None, app_env: AppEnv) -> None:
         }
     }
 
-    created_period = get_period_from_dynamo(name="cli-period", app_env=app_env)
+    created_period = get_period_from_dynamo(name="cli-period", app_env=test_suite_env)
     assert created_period == {
         "type": "period",
         "name": "cli-period",
@@ -211,7 +218,9 @@ def test_create_basic_period(config_table: None, app_env: AppEnv) -> None:
     }
 
 
-def test_create_complex_period(config_table: None, app_env: AppEnv) -> None:
+def test_create_complex_period(
+    config_table: None, test_suite_env: MainLambdaEnv
+) -> None:
     result = create_period_with_cli(
         name="cli-period",
         begintime="10:00",
@@ -233,7 +242,7 @@ def test_create_complex_period(config_table: None, app_env: AppEnv) -> None:
         }
     }
 
-    created_period = get_period_from_dynamo(name="cli-period", app_env=app_env)
+    created_period = get_period_from_dynamo(name="cli-period", app_env=test_suite_env)
     assert created_period == {
         "type": "period",
         "name": "cli-period",
@@ -254,13 +263,15 @@ def test_create_period_throws_error_when_period_already_exists(
     assert result == {"Error": "error: period cli-period already exists"}
 
 
-def test_delete_existing_period(config_table: None, app_env: AppEnv) -> None:
+def test_delete_existing_period(
+    config_table: None, test_suite_env: MainLambdaEnv
+) -> None:
     create_period_with_cli(name="cli-period")
 
-    assert get_period_from_dynamo("cli-period", app_env) is not None
+    assert get_period_from_dynamo("cli-period", test_suite_env) is not None
     result = delete_period_with_cli("cli-period")
     assert result == {"Period": "cli-period"}
-    assert get_period_from_dynamo("cli-period", app_env) is None
+    assert get_period_from_dynamo("cli-period", test_suite_env) is None
 
 
 def test_delete_nonexisting_period_returns_error(config_table: None) -> None:
@@ -501,7 +512,7 @@ def test_describe_schedule_usage(config_table: None) -> None:
     }
 
 
-def test_update_period(config_table: None, app_env: AppEnv) -> None:
+def test_update_period(config_table: None, test_suite_env: MainLambdaEnv) -> None:
     create_period_with_cli("cli-period", begintime="02:00", endtime="4:00")
     result = update_period_with_cli("cli-period", begintime="12:00", endtime="15:00")
 
@@ -514,7 +525,7 @@ def test_update_period(config_table: None, app_env: AppEnv) -> None:
         }
     }
 
-    updated_period = get_period_from_dynamo("cli-period", app_env)
+    updated_period = get_period_from_dynamo("cli-period", test_suite_env)
     assert updated_period == {
         "type": "period",
         "name": "cli-period",
@@ -549,7 +560,7 @@ def test_update_period_returns_error_when_period_does_not_exist(
     assert result == {"Error": "not found: period cli-period does not exist"}
 
 
-def test_update_schedule(config_table: None, app_env: AppEnv) -> None:
+def test_update_schedule(config_table: None, test_suite_env: MainLambdaEnv) -> None:
     create_period_with_cli("period1")
     create_period_with_cli("period2")
     create_schedule_with_cli(
@@ -575,7 +586,7 @@ def test_update_schedule(config_table: None, app_env: AppEnv) -> None:
         }
     }
 
-    updated_schedule = get_schedule_from_dynamo("cli-schedule", app_env)
+    updated_schedule = get_schedule_from_dynamo("cli-schedule", test_suite_env)
     assert updated_schedule == {
         "type": "schedule",
         "name": "cli-schedule",
@@ -588,7 +599,7 @@ def test_update_schedule(config_table: None, app_env: AppEnv) -> None:
 
 
 def test_update_schedule_with_2_maintenance_windows(
-    config_table: None, app_env: AppEnv
+    config_table: None, test_suite_env: MainLambdaEnv
 ) -> None:
     create_period_with_cli("period")
     create_schedule_with_cli(
@@ -616,7 +627,7 @@ def test_update_schedule_with_2_maintenance_windows(
         }
     }
 
-    updated_schedule = get_schedule_from_dynamo("cli-schedule", app_env)
+    updated_schedule = get_schedule_from_dynamo("cli-schedule", test_suite_env)
     assert updated_schedule == {
         "type": "schedule",
         "name": "cli-schedule",
@@ -703,7 +714,7 @@ def create_period_with_cli(
         "version": version,
     }
 
-    handler = CliRequestHandler(event, MockLambdaContext())
+    handler = CliRequestHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     result = handler.handle_request()
     assert is_valid_json(result)
     return result
@@ -722,7 +733,7 @@ def update_period_with_cli(
         "version": version,
     }
 
-    handler = CliRequestHandler(event, MockLambdaContext())
+    handler = CliRequestHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     result = handler.handle_request()
     assert is_valid_json(result)
     return result
@@ -738,7 +749,7 @@ def delete_period_with_cli(
         "parameters": {"name": name},
         "version": version,
     }
-    handler = CliRequestHandler(event, MockLambdaContext())
+    handler = CliRequestHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     result = handler.handle_request()
     assert is_valid_json(result)
     return result
@@ -771,7 +782,7 @@ def create_schedule_with_cli(
     if ssm_maintenance_window:
         event["parameters"]["ssm_maintenance_window"] = ssm_maintenance_window
 
-    handler = CliRequestHandler(event, MockLambdaContext())
+    handler = CliRequestHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     result = handler.handle_request()
     assert is_valid_json(result)
     return result
@@ -804,7 +815,7 @@ def update_schedule_with_cli(
     if ssm_maintenance_window:
         event["parameters"]["ssm_maintenance_window"] = ssm_maintenance_window
 
-    handler = CliRequestHandler(event, MockLambdaContext())
+    handler = CliRequestHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     result = handler.handle_request()
     assert is_valid_json(result)
     return result
@@ -820,7 +831,7 @@ def delete_schedule_with_cli(
         "parameters": {"name": name},
         "version": version,
     }
-    handler = CliRequestHandler(event, MockLambdaContext())
+    handler = CliRequestHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     result = handler.handle_request()
     assert is_valid_json(result)
     return result
@@ -840,7 +851,7 @@ def describe_periods_with_cli(
     if name:
         event["parameters"]["name"] = name
 
-    handler = CliRequestHandler(event, MockLambdaContext())
+    handler = CliRequestHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     result = handler.handle_request()
     assert is_valid_json(result)
     return result
@@ -860,7 +871,7 @@ def describe_schedules_with_cli(
     if name:
         event["parameters"]["name"] = name
 
-    handler = CliRequestHandler(event, MockLambdaContext())
+    handler = CliRequestHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     result = handler.handle_request()
     assert is_valid_json(result)
     return result
@@ -883,19 +894,19 @@ def describe_schedule_usage_with_cli(
         "version": version,
     }
 
-    handler = CliRequestHandler(event, MockLambdaContext())
+    handler = CliRequestHandler(event, MockLambdaContext(), MockMainLambdaEnv())
     result = handler.handle_request()
     assert is_valid_json(result)
     return result
 
 
-def get_period_from_dynamo(name: str, app_env: AppEnv) -> Any:
+def get_period_from_dynamo(name: str, app_env: MainLambdaEnv) -> Any:
     table = DynamoDBUtils.get_dynamodb_table_resource_ref(app_env.config_table_name)
     result = table.get_item(Key={"type": "period", "name": name}, ConsistentRead=True)
     return result.get("Item")
 
 
-def get_schedule_from_dynamo(name: str, app_env: AppEnv) -> Any:
+def get_schedule_from_dynamo(name: str, app_env: MainLambdaEnv) -> Any:
     table = DynamoDBUtils.get_dynamodb_table_resource_ref(app_env.config_table_name)
     result = table.get_item(Key={"type": "schedule", "name": name}, ConsistentRead=True)
     return result.get("Item")

@@ -2746,9 +2746,6 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         "Description": "EC2 and RDS instance scheduler, version v9.9.9",
         "Environment": {
           "Variables": {
-            "APP_NAMESPACE": {
-              "Ref": "Namespace",
-            },
             "CONFIG_TABLE": {
               "Ref": "ConfigTable",
             },
@@ -2762,70 +2759,11 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
                 "False",
               ],
             },
-            "ENABLE_DOCDB_SERVICE": {
-              "Fn::If": [
-                "ScheduleDocDbCondition",
-                "True",
-                "False",
-              ],
-            },
-            "ENABLE_EC2_SERVICE": {
-              "Fn::If": [
-                "ScheduleEC2Condition",
-                "True",
-                "False",
-              ],
-            },
-            "ENABLE_EC2_SSM_MAINTENANCE_WINDOWS": {
-              "Fn::If": [
-                "EnableSSMMaintenanceWindowsCondition",
-                "True",
-                "False",
-              ],
-            },
-            "ENABLE_NEPTUNE_SERVICE": {
-              "Fn::If": [
-                "ScheduleNeptuneCondition",
-                "True",
-                "False",
-              ],
-            },
-            "ENABLE_RDS_CLUSTERS": {
-              "Fn::If": [
-                "EnableRdsClusterSchedulingCondition",
-                "True",
-                "False",
-              ],
-            },
-            "ENABLE_RDS_SERVICE": {
-              "Fn::If": [
-                "ScheduleRdsCondition",
-                "True",
-                "False",
-              ],
-            },
-            "ENABLE_RDS_SNAPSHOTS": {
-              "Fn::If": [
-                "CreateRdsSnapshotCondition",
-                "True",
-                "False",
-              ],
-            },
-            "ENABLE_SCHEDULE_HUB_ACCOUNT": {
-              "Fn::If": [
-                "ScheduleLambdaAccountCondition",
-                "True",
-                "False",
-              ],
-            },
             "ISSUES_TOPIC_ARN": {
               "Ref": "InstanceSchedulerSnsTopic",
             },
             "LOG_GROUP": {
               "Ref": "SchedulerLogGroup",
-            },
-            "MAINTENANCE_WINDOW_TABLE": {
-              "Ref": "MaintenanceWindowTable",
             },
             "METRICS_URL": "https://metrics.awssolutionsbuilder.com/generic",
             "METRICS_UUID": {
@@ -2834,20 +2772,8 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
                 "Uuid",
               ],
             },
-            "SCHEDULER_FREQUENCY": {
+            "SCHEDULING_INTERVAL_MINUTES": {
               "Ref": "SchedulerFrequency",
-            },
-            "SCHEDULER_ROLE_NAME": "Scheduler-Role",
-            "SCHEDULE_REGIONS": {
-              "Fn::Join": [
-                ",",
-                {
-                  "Ref": "Regions",
-                },
-              ],
-            },
-            "SCHEDULE_TAG_KEY": {
-              "Ref": "TagName",
             },
             "SEND_METRICS": {
               "Fn::If": [
@@ -2858,22 +2784,6 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
             },
             "SOLUTION_ID": "my-solution-id",
             "SOLUTION_VERSION": "v9.9.9",
-            "STACK_ID": {
-              "Ref": "AWS::StackId",
-            },
-            "STACK_NAME": {
-              "Ref": "AWS::StackName",
-            },
-            "START_EC2_BATCH_SIZE": "5",
-            "START_TAGS": {
-              "Ref": "StartedTags",
-            },
-            "STATE_TABLE": {
-              "Ref": "StateTable",
-            },
-            "STOP_TAGS": {
-              "Ref": "StoppedTags",
-            },
             "TRACE": {
               "Fn::If": [
                 "TraceCondition",
@@ -2882,7 +2792,6 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
               ],
             },
             "USER_AGENT_EXTRA": "AwsSolution/my-solution-id/v9.9.9",
-            "UUID_KEY": "/Solutions/my-solution-name/UUID/",
           },
         },
         "FunctionName": {

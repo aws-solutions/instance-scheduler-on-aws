@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING, Any, NotRequired, Optional, TypedDict, TypeGua
 
 from botocore.exceptions import ClientError
 
+from instance_scheduler.handler.environments.main_lambda_environment import (
+    MainLambdaEnv,
+)
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.period_identifier import PeriodIdentifier
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
@@ -15,7 +18,6 @@ from instance_scheduler.model.store.dynamo_period_definition_store import (
 from instance_scheduler.model.store.dynamo_schedule_definition_store import (
     DynamoScheduleDefinitionStore,
 )
-from instance_scheduler.util.app_env import get_app_env
 from instance_scheduler.util.custom_resource import (
     CustomResource,
     CustomResourceRequest,
@@ -80,7 +82,6 @@ class CfnScheduleResourceProperties(TypedDict, total=False):
     RetainRunning: NotRequired[str]
     StopNewInstances: NotRequired[str]
     SsmMaintenanceWindow: NotRequired[list[str] | str]
-    Metrics: NotRequired[str]
     OverrideStatus: NotRequired[str]
     Periods: NotRequired[list[CfnSchedulePeriodProperties]]
 
@@ -98,6 +99,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
         self,
         event: CustomResourceRequest[CfnScheduleResourceProperties],
         context: LambdaContext,
+        env: MainLambdaEnv,
     ) -> None:
         """
         Initializes instance
@@ -105,23 +107,21 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
         :param context: Lambda context
         """
         CustomResource.__init__(self, event, context)
-        self._logger = self._init_logger()
-        app_env = get_app_env()
-        self.schedule_store = DynamoScheduleDefinitionStore(app_env.config_table_name)
-        self.period_store = DynamoPeriodDefinitionStore(app_env.config_table_name)
+        self._logger = self._init_logger(env)
+        self.schedule_store = DynamoScheduleDefinitionStore(env.config_table_name)
+        self.period_store = DynamoPeriodDefinitionStore(env.config_table_name)
 
-    def _init_logger(self) -> Logger:
-        app_env = get_app_env()
+    def _init_logger(self, env: MainLambdaEnv) -> Logger:
         classname = self.__class__.__name__
         dt = datetime.now(timezone.utc)
         log_stream = "{}-{:0>4d}{:0>2d}{:0>2d}".format(
             classname, dt.year, dt.month, dt.day
         )
         return Logger(
-            log_group=app_env.log_group,
+            log_group=env.log_group,
             log_stream=log_stream,
-            topic_arn=app_env.topic_arn,
-            debug=app_env.enable_debug_logging,
+            topic_arn=env.topic_arn,
+            debug=env.enable_debug_logging,
         )
 
     @staticmethod
@@ -200,6 +200,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
             schedule_def, period_defs = self._parse_schedule_template_item(
                 self.resource_properties
             )
+
             old_sched_def, _ = self._parse_schedule_template_item(
                 self.old_resource_properties
             )
@@ -274,7 +275,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
         self, resource_properties: CfnScheduleResourceProperties
     ) -> tuple[ScheduleDefinition, list[PeriodDefinition]]:
         # ---------------- Validation ----------------#
-        _validate_schedule_props_structure(resource_properties)
+        self._validate_schedule_props_structure(resource_properties)
         for period_props in resource_properties.get("Periods", []):
             _validate_period_props_structure(period_props)
 
@@ -345,6 +346,29 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
 
         return sche_def, period_defs
 
+    def _validate_schedule_props_structure(
+        self, props: CfnScheduleResourceProperties
+    ) -> None:
+        for key in props.keys():
+            if key in {"ServiceToken", "Timeout"}:
+                # these properties used to be part of the sample template in the IG, but have been removed in July 2023,
+                # They do not do anything, but customers may still have old templates that include them,
+                # so we need to not break compatibility
+                continue
+
+            if key in {"UseMaintenanceWindow", "Metrics"}:
+                # deprecated keys that no longer do anything but that not should throw errors
+                self._logger.warning(
+                    f'Schedule contains deprecated field "${key}", this field will be ignored.'
+                )
+                continue
+
+            if key not in CfnScheduleResourceProperties.__annotations__.keys():
+                raise InvalidScheduleConfiguration(
+                    f"Unknown schedule property {key}, valid properties are "
+                    f"{CfnScheduleResourceProperties.__annotations__.keys()}"
+                )
+
 
 def _parse_bool(bool_str: Optional[str]) -> Optional[bool]:
     if bool_str is None:
@@ -383,18 +407,4 @@ def _validate_period_props_structure(props: CfnSchedulePeriodProperties) -> None
             raise InvalidScheduleConfiguration(
                 f"Unknown period property {key}, valid properties are "
                 f"{CfnSchedulePeriodProperties.__annotations__.keys()}"
-            )
-
-
-def _validate_schedule_props_structure(props: CfnScheduleResourceProperties) -> None:
-    for key in props.keys():
-        if key in {"ServiceToken", "Timeout"}:
-            # these properties used to be part of the sample template in the IG, but have been removed in July 2023,
-            # They do not do anything, but customers may still have old templates that include them,
-            # so we need to not break compatibility
-            continue
-        if key not in CfnScheduleResourceProperties.__annotations__.keys():
-            raise InvalidScheduleConfiguration(
-                f"Unknown schedule property {key}, valid properties are "
-                f"{CfnScheduleResourceProperties.__annotations__.keys()}"
             )

@@ -1,22 +1,26 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Aws, CustomResource, Duration, Stack } from "aws-cdk-lib";
+import { Aws, CfnCondition, CustomResource, Duration, Stack } from "aws-cdk-lib";
 import { Table } from "aws-cdk-lib/aws-dynamodb";
 import { Effect, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { NagSuppressions } from "cdk-nag";
-import { overrideLogicalId } from "../cfn";
+import { cfnConditionToTrueFalse, overrideLogicalId } from "../cfn";
 import { FunctionFactory } from "./function-factory";
 import { addCfnNagSuppressions } from "../cfn-nag";
+import { AnonymizedMetricsEnvironment } from "../anonymized-metrics-environment";
 
 export interface MainLambdaProps {
-  readonly description: string;
-  readonly appenv: { [p: string]: string };
+  readonly DEFAULT_TIMEZONE: string;
+  readonly USER_AGENT_EXTRA: string;
+  readonly metricsEnv: AnonymizedMetricsEnvironment;
   readonly configTable: Table;
   readonly snsErrorReportingTopic: Topic;
-  readonly scheduleLogGroup: LogGroup;
+  readonly schedulerLogGroup: LogGroup;
+  readonly enableDebugLogging: CfnCondition;
+  readonly enableAwsOrganizations: CfnCondition;
   readonly principals: string[];
   readonly logRetentionDays: RetentionDays;
   readonly factory: FunctionFactory;
@@ -36,13 +40,22 @@ export class MainLambda {
     const functionName = Aws.STACK_NAME + "-InstanceSchedulerMain";
     this.lambdaFunction = props.factory.createFunction(scope, "scheduler-lambda", {
       functionName: functionName,
-      description: props.description,
+      description: "EC2 and RDS instance scheduler, version " + props.metricsEnv.SOLUTION_VERSION,
       index: "instance_scheduler/main.py",
       handler: "lambda_handler",
       role: role,
       memorySize: 128,
       timeout: Duration.seconds(300),
-      environment: props.appenv,
+      environment: {
+        LOG_GROUP: props.schedulerLogGroup.logGroupName,
+        ISSUES_TOPIC_ARN: props.snsErrorReportingTopic.topicArn,
+        TRACE: cfnConditionToTrueFalse(props.enableDebugLogging),
+        USER_AGENT_EXTRA: props.USER_AGENT_EXTRA,
+        DEFAULT_TIMEZONE: props.DEFAULT_TIMEZONE,
+        ENABLE_AWS_ORGANIZATIONS: cfnConditionToTrueFalse(props.enableAwsOrganizations),
+        CONFIG_TABLE: props.configTable.tableName,
+        ...props.metricsEnv,
+      },
     });
 
     //backwards compatibility (<1.5.x) override
@@ -58,14 +71,14 @@ export class MainLambda {
       },
     });
     overrideLogicalId(customService, "SchedulerConfigHelper");
-    customService.node.addDependency(props.scheduleLogGroup);
+    customService.node.addDependency(props.schedulerLogGroup);
 
     if (!this.lambdaFunction.role) {
       throw new Error("lambdaFunction role is missing");
     }
 
     props.configTable.grantReadWriteData(this.lambdaFunction.role);
-    props.scheduleLogGroup.grantWrite(this.lambdaFunction.role);
+    props.schedulerLogGroup.grantWrite(this.lambdaFunction.role);
     props.snsErrorReportingTopic.grantPublish(this.lambdaFunction.role);
 
     // basic logging permissions and permission to modify retention policy

@@ -19,7 +19,7 @@ from typing import (
 
 from urllib3 import HTTPResponse, PoolManager
 
-from instance_scheduler.handler.base import Handler
+from instance_scheduler.handler.base import MainHandler
 
 if TYPE_CHECKING:
     from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -56,7 +56,7 @@ class CustomResourceResponse(TypedDict):
 
 class CustomResource(
     Generic[ResourcePropertiesType],
-    Handler[CustomResourceRequest[ResourcePropertiesType]],
+    MainHandler[CustomResourceRequest[ResourcePropertiesType]],
     ABC,
 ):
     EVENT_TYPE_CREATE = "Create"

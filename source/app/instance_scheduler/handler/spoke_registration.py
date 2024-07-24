@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeGuard, cast, get_
 
 from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
 from instance_scheduler.util import safe_json
-from instance_scheduler.util.app_env import AppEnvError, env_to_bool
+from instance_scheduler.util.app_env_utils import AppEnvError, env_to_bool
 from instance_scheduler.util.logger import Logger
 from instance_scheduler.util.validation import ValidationException, validate_string
 

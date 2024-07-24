@@ -12,7 +12,6 @@ from tests.integration.helpers.ec2_helpers import (
 )
 from tests.integration.helpers.run_handler import simple_schedule
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.test_utils.app_env_utils import with_mock_app_env
 from tests.test_utils.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
@@ -56,11 +55,6 @@ def test_ec2_start_tag_is_applied_on_start(
 
 
 @freeze_time("2023-06-12 15:00:00")
-@with_mock_app_env(
-    stop_tags=[
-        "action=stopped by {scheduler} on {year}/{month}/{day} at {hour}:{minute} {timezone}"
-    ]
-)
 def test_ec2_stop_tag_is_applied_on_stop(
     ec2_instance: str,
     ec2_instance_states: InstanceStates,

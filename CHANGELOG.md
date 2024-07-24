@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.2] -- 2024-07-24
+
+### Fixed
+- Fixed an error that caused CloudFormation-managed schedules using the (now deprecated) UseMaintenanceWindow flag be an un-updatable
+
+### Security
+- Upgrade Certifi to mitigate CVE-2024-39689
+
+
+
 ## [3.0.1] -- 2024-06-27
 
 ### Changed

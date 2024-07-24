@@ -10,8 +10,11 @@ from zoneinfo import ZoneInfo
 from packaging.version import Version
 
 from instance_scheduler import __version__
-from instance_scheduler.handler.base import Handler
+from instance_scheduler.handler.base import MainHandler
 from instance_scheduler.handler.cli.schedule_usage import get_schedule_usage
+from instance_scheduler.handler.environments.main_lambda_environment import (
+    MainLambdaEnv,
+)
 from instance_scheduler.model.ddb_item_utils import optionally
 from instance_scheduler.model.period_definition import (
     PeriodDefinition,
@@ -41,7 +44,6 @@ from instance_scheduler.ops_metrics.metric_type.cli_request_metric import (
 )
 from instance_scheduler.ops_metrics.metrics import collect_metric
 from instance_scheduler.util import safe_json
-from instance_scheduler.util.app_env import get_app_env
 from instance_scheduler.util.logger import Logger
 from instance_scheduler.util.validation import ValidationException, validate_string
 
@@ -72,12 +74,14 @@ class UnsupportedVersionException(Exception):
     pass
 
 
-class CliRequestHandler(Handler[AdminCliRequest]):
+class CliRequestHandler(MainHandler[AdminCliRequest]):
     """
     Class to handles requests from admin CLI
     """
 
-    def __init__(self, event: AdminCliRequest, context: LambdaContext) -> None:
+    def __init__(
+        self, event: AdminCliRequest, context: LambdaContext, env: MainLambdaEnv
+    ) -> None:
         """
         Initializes handle instance
         :param event: event to handle
@@ -85,23 +89,18 @@ class CliRequestHandler(Handler[AdminCliRequest]):
         """
         self._event = event
         self._context = context
-        self._schedule_store = DynamoScheduleDefinitionStore(
-            get_app_env().config_table_name
-        )
-        self._period_store = DynamoPeriodDefinitionStore(
-            get_app_env().config_table_name
-        )
+        self._schedule_store = DynamoScheduleDefinitionStore(env.config_table_name)
+        self._period_store = DynamoPeriodDefinitionStore(env.config_table_name)
 
         # Setup logging
         classname = self.__class__.__name__
-        app_env = get_app_env()
         dt = datetime.now(timezone.utc)
         log_stream = LOG_STREAM.format(classname, dt.year, dt.month, dt.day)
         self._logger = Logger(
-            log_group=app_env.log_group,
+            log_group=env.log_group,
             log_stream=log_stream,
-            topic_arn=app_env.topic_arn,
-            debug=app_env.enable_debug_logging,
+            topic_arn=env.topic_arn,
+            debug=env.enable_debug_logging,
         )
 
     @property
