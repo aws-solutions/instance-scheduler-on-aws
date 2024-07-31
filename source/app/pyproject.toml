@@ -2,7 +2,7 @@
 
 [tool.poetry]
 name = "instance_scheduler"
-version = "3.0.2"
+version = "3.0.3"
 description = "Instance Scheduler on AWS"
 license = "Apache-2.0"
 authors = [ "Amazon Web Services" ]
