@@ -20,8 +20,11 @@
     "jest-extended/all"
   ],
   "testMatch": [
-    "**/lib/instance-scheduler/tests/**/?(*.)+(spec|test).js?(x)",
-    "**/*.test.ts"
+    "<rootDir>/@(lib/instance-scheduler/tests)/**/*(*.)@(spec|test).js?(x)",
+    "<rootDir>/@(lib/instance-scheduler/tests)/**/__tests__/**/*.js?(x)",
+    "**/*.test.ts",
+    "<rootDir>/@(projenrc)/**/*(*.)@(spec|test).ts?(x)",
+    "<rootDir>/@(projenrc)/**/__tests__/**/*.ts?(x)"
   ],
   "clearMocks": true,
   "collectCoverage": true,
