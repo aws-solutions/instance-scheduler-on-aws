@@ -28,6 +28,7 @@ import { SpokeRegistrationLambda } from "./lambda-functions/spoke-registration";
 import { SchedulingIntervalToCron } from "./scheduling-interval-mappings";
 
 export interface CoreSchedulerProps {
+  readonly targetPartition: "Commercial" | "China";
   readonly solutionName: string;
   readonly solutionVersion: string;
   readonly solutionId: string;
@@ -74,13 +75,16 @@ export class CoreScheduler {
   public readonly asgOrch: LambdaFunction;
 
   constructor(scope: Stack, props: CoreSchedulerProps) {
-    new AppRegistryForInstanceScheduler(scope, "AppRegistryForInstanceScheduler", {
-      solutionId: props.solutionId,
-      solutionName: props.solutionName,
-      solutionVersion: props.solutionVersion,
-      appregSolutionName: props.appregSolutionName,
-      appregAppName: props.appregApplicationName,
-    });
+    /*The following resources are not supported in the China partition and must be omitted in the china stack*/
+    if (props.targetPartition != "China") {
+      new AppRegistryForInstanceScheduler(scope, "AppRegistryForInstanceScheduler", {
+        solutionId: props.solutionId,
+        solutionName: props.solutionName,
+        solutionVersion: props.solutionVersion,
+        appregSolutionName: props.appregSolutionName,
+        appregAppName: props.appregApplicationName,
+      });
+    }
 
     const USER_AGENT_EXTRA = `AwsSolution/${props.solutionId}/${props.solutionVersion}`;
 

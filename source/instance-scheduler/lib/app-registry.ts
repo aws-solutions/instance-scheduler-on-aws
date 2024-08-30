@@ -4,8 +4,6 @@ import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { Aws, Stack, Tags } from "aws-cdk-lib";
 import * as appreg from "@aws-cdk/aws-servicecatalogappregistry-alpha";
-import { CfnResourceAssociation } from "aws-cdk-lib/aws-servicecatalogappregistry";
-import { ConditionAspect } from "./cfn";
 
 export interface AppRegistryForInstanceSchedulerProps extends cdk.StackProps {
   readonly solutionId: string;
@@ -18,10 +16,6 @@ export interface AppRegistryForInstanceSchedulerProps extends cdk.StackProps {
 export class AppRegistryForInstanceScheduler extends Construct {
   constructor(scope: Stack, id: string, props: AppRegistryForInstanceSchedulerProps) {
     super(scope, id);
-
-    const shouldDeploy = new cdk.CfnCondition(this, "ShouldDeploy", {
-      expression: cdk.Fn.conditionNot(cdk.Fn.conditionEquals(Aws.PARTITION, "aws-cn")),
-    });
 
     const map = new cdk.CfnMapping(this, "Solution");
     map.setValue("Data", "ID", props.solutionId);
@@ -43,10 +37,7 @@ export class AppRegistryForInstanceScheduler extends Construct {
       )}`,
     });
 
-    cdk.Aspects.of(application).add(new ConditionAspect(shouldDeploy));
-
     application.associateApplicationWithStack(scope);
-    cdk.Aspects.of(scope).add(new ConditionAspect(shouldDeploy, CfnResourceAssociation));
 
     Tags.of(application).add("Solutions:SolutionID", map.findInMap("Data", "ID"));
     Tags.of(application).add("Solutions:SolutionName", map.findInMap("Data", "SolutionName"));

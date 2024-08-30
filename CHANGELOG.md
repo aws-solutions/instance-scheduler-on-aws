@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.4] -- 2024-08-30
+### Fixed
+- Fixed China region compatibility issues by adding new -cn variants of solution stack templates
+- Fixed bug in RDS Scheduling Logic that would cause the scheduler to crash when more than 100
+  tagged RDS instances were present in a single scheduling target
+
+### Added
+- added SECURITY.md file with instructions on how security issues can be reported to AWS
+
 ## [3.0.3] -- 2024-07-31
 
 ### Security

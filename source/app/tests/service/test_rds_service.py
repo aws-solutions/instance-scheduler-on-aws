@@ -14,6 +14,10 @@ from instance_scheduler.handler.environments.scheduling_request_environment impo
 from instance_scheduler.service import RdsService
 from instance_scheduler.service.rds import RdsTagDescription
 from instance_scheduler.util.session_manager import AssumedRole
+from tests.integration.helpers.rds_helpers import (
+    create_rds_clusters,
+    create_rds_instances,
+)
 from tests.integration.helpers.schedule_helpers import quick_time
 from tests.integration.helpers.scheduling_context_builder import (
     build_scheduling_context,
@@ -176,4 +180,59 @@ def test_skips_describe_clusters_when_no_tagged_clusters_found(
     with pytest.raises(AssertionError):
         mock_boto_client.get_paginator.assert_has_calls(
             [call("describe_db_clusters")],
+        )
+
+
+def test_describe_instances_respects_50_arn_filter_limit(moto_backend: None) -> None:
+    # see ADR-0007
+    rds_instances = create_rds_instances(150)
+    rds_service = build_rds_service()
+
+    with patch.object(rds_service, "_rds_client") as mock_rds_client:
+        paginator = MagicMock()
+        mock_rds_client.get_paginator.return_value = paginator
+
+        list(rds_service.get_in_scope_rds_instances())
+
+        paginator.paginate.assert_called()
+        requested_rds_arns = []
+
+        # assert that no reqeust exceeded 50 names in the filter
+        for paginate_call in paginator.paginate.call_args_list:
+            assert len(paginate_call.kwargs["Filters"][0]["Values"]) <= 50
+            requested_rds_arns.extend(paginate_call.kwargs["Filters"][0]["Values"])
+
+        # assert that all clusters were actually requested
+        assert len(requested_rds_arns) == 150
+        assert all(
+            f"arn:aws:rds:us-east-1:123456789012:db:{instance_id}" in requested_rds_arns
+            for instance_id in rds_instances
+        )
+
+
+def test_describe_clusters_respects_50_arn_filter_limit(moto_backend: None) -> None:
+    # see ADR-0007
+    rds_clusters = create_rds_clusters(150)
+    rds_service = build_rds_service()
+
+    with patch.object(rds_service, "_rds_client") as mock_rds_client:
+        paginator = MagicMock()
+        mock_rds_client.get_paginator.return_value = paginator
+
+        list(rds_service.get_in_scope_rds_clusters())
+
+        paginator.paginate.assert_called()
+        requested_rds_arns = []
+
+        # assert that no reqeust exceeded 50 names in the filter
+        for paginate_call in paginator.paginate.call_args_list:
+            assert len(paginate_call.kwargs["Filters"][0]["Values"]) <= 50
+            requested_rds_arns.extend(paginate_call.kwargs["Filters"][0]["Values"])
+
+        # assert that all clusters were actually requested
+        assert len(requested_rds_arns) == 150
+        assert all(
+            f"arn:aws:rds:us-east-1:123456789012:cluster:{instance_id}"
+            in requested_rds_arns
+            for instance_id in rds_clusters
         )

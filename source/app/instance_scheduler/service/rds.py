@@ -27,6 +27,7 @@ from instance_scheduler.schedulers.states import ScheduleState
 from instance_scheduler.service import Service
 from instance_scheduler.service.rds_instance import RdsInstance
 from instance_scheduler.util.logger import Logger
+from instance_scheduler.util.pagination import paginate
 from instance_scheduler.util.session_manager import AssumedRole
 
 if TYPE_CHECKING:
@@ -74,8 +75,17 @@ class RdsService(Service[RdsInstance]):
         scheduling_context: SchedulingContext,
         env: SchedulingRequestEnvironment,
     ) -> None:
-        self._session: Final = assumed_scheduling_role.session
-        self._region: Final = assumed_scheduling_role.region
+        self._rds_client: Final = get_client_with_standard_retry(
+            "rds",
+            session=assumed_scheduling_role.session,
+            region=assumed_scheduling_role.region,
+        )
+        self._rgta_client: Final = get_client_with_standard_retry(
+            "resourcegroupstaggingapi",
+            session=assumed_scheduling_role.session,
+            region=assumed_scheduling_role.region,
+        )
+
         self._logger: Final = logger
         self._scheduling_context: Final = scheduling_context
         self._stack_name: Final = env.stack_name
@@ -100,13 +110,9 @@ class RdsService(Service[RdsInstance]):
 
     @cached_property
     def rds_resource_tags(self) -> RdsTagDescription:
-        tag_client: ResourceGroupsTaggingAPIClient = get_client_with_standard_retry(
-            "resourcegroupstaggingapi", session=self._session, region=self._region
-        )
-
         instance_tags: RdsTagDescription = {"db": {}, "cluster": {}}
 
-        paginator: Final = tag_client.get_paginator("get_resources")
+        paginator: Final = self._rgta_client.get_paginator("get_resources")
         if "rds:db" in self._enabled_services:  # NOSONAR
             for page in paginator.paginate(
                 TagFilters=[{"Key": self._env.schedule_tag_key}],
@@ -285,37 +291,35 @@ class RdsService(Service[RdsInstance]):
         if not tagged_instances:
             return
 
-        client: RDSClient = get_client_with_standard_retry(
-            "rds", session=self._session, region=self._region
-        )
         instance_arns = list(tagged_instances.keys())
 
-        paginator = client.get_paginator("describe_db_instances")
-        for page in paginator.paginate(
-            Filters=[
-                {
-                    "Name": "db-instance-id",
-                    "Values": instance_arns,
-                },
-            ],
-            PaginationConfig={"PageSize": 50},
-        ):
-            for instance in page.get("DBInstances", []):
-                if self.instance_is_in_scope(instance):
-                    resource_data = self._select_resource_data(
-                        rds_resource=instance,
-                        is_cluster=False,
-                    )
-                    schedule_name = resource_data.schedule_name
-                    if schedule_name:
-                        self._logger.debug(
-                            f"Selected rds instance {resource_data.id} in state ({resource_data.current_state}) for schedule {schedule_name}",
+        paginator = self._rds_client.get_paginator("describe_db_instances")
+        for arn_page in paginate(instance_arns, 50):
+            for page in paginator.paginate(
+                Filters=[
+                    {
+                        "Name": "db-instance-id",
+                        "Values": arn_page,
+                    },
+                ],
+                PaginationConfig={"PageSize": 50},
+            ):
+                for instance in page.get("DBInstances", []):
+                    if self.instance_is_in_scope(instance):
+                        resource_data = self._select_resource_data(
+                            rds_resource=instance,
+                            is_cluster=False,
                         )
-                        yield resource_data
-                    else:
-                        self._logger.debug(
-                            f"Skipping rds instance {resource_data.id} without schedule"
-                        )
+                        schedule_name = resource_data.schedule_name
+                        if schedule_name:
+                            self._logger.debug(
+                                f"Selected rds instance {resource_data.id} in state ({resource_data.current_state}) for schedule {schedule_name}",
+                            )
+                            yield resource_data
+                        else:
+                            self._logger.debug(
+                                f"Skipping rds instance {resource_data.id} without schedule"
+                            )
 
     def get_in_scope_rds_clusters(self) -> Iterator[RdsInstance]:
         tagged_clusters: dict[ResourceArn, dict[str, str]] = self.rds_resource_tags[
@@ -324,38 +328,36 @@ class RdsService(Service[RdsInstance]):
         if not tagged_clusters:
             return
 
-        client: RDSClient = get_client_with_standard_retry(
-            "rds", session=self._session, region=self._region
-        )
-
         # get all arns from instance_resources
         cluster_arns = list(tagged_clusters.keys())
-        paginator = client.get_paginator("describe_db_clusters")
-        for page in paginator.paginate(
-            Filters=[
-                {
-                    "Name": "db-cluster-id",
-                    "Values": cluster_arns,
-                },
-            ],
-            PaginationConfig={"PageSize": 50},
-        ):
-            for cluster in page.get("DBClusters", []):
-                if self.cluster_is_in_scope(cluster):
-                    resource_data = self._select_resource_data(
-                        rds_resource=cluster,
-                        is_cluster=True,
-                    )
-                    schedule_name = resource_data.schedule_name
-                    if schedule_name:
-                        self._logger.debug(
-                            f"Selected rds cluster {resource_data.id} in state ({resource_data.current_state}) for schedule {schedule_name}"
+        paginator = self._rds_client.get_paginator("describe_db_clusters")
+
+        for arn_page in paginate(cluster_arns, 50):
+            for page in paginator.paginate(
+                Filters=[
+                    {
+                        "Name": "db-cluster-id",
+                        "Values": arn_page,
+                    },
+                ],
+                PaginationConfig={"PageSize": 50},
+            ):
+                for cluster in page.get("DBClusters", []):
+                    if self.cluster_is_in_scope(cluster):
+                        resource_data = self._select_resource_data(
+                            rds_resource=cluster,
+                            is_cluster=True,
                         )
-                        yield resource_data
-                    else:
-                        self._logger.debug(
-                            f"Skipping rds cluster {resource_data.id} without a tagged schedule"
-                        )
+                        schedule_name = resource_data.schedule_name
+                        if schedule_name:
+                            self._logger.debug(
+                                f"Selected rds cluster {resource_data.id} in state ({resource_data.current_state}) for schedule {schedule_name}"
+                            )
+                            yield resource_data
+                        else:
+                            self._logger.debug(
+                                f"Skipping rds cluster {resource_data.id} without a tagged schedule"
+                            )
 
     def describe_tagged_instances(self) -> Iterator[RdsInstance]:
         rds_instances = self.get_in_scope_rds_instances()
@@ -434,10 +436,10 @@ class RdsService(Service[RdsInstance]):
             result.append({"Key": tag["Key"], "Value": value})
         return result
 
-    def _stop_instance(self, client: RDSClient, inst: RdsInstance) -> None:
+    def _stop_instance(self, inst: RdsInstance) -> None:
         def does_snapshot_exist(name: str) -> bool:
             try:
-                resp = client.describe_db_snapshots(
+                resp = self._rds_client.describe_db_snapshots(
                     DBSnapshotIdentifier=name, SnapshotType="manual"
                 )
                 snapshot = resp.get("DBSnapshots", None)
@@ -458,16 +460,16 @@ class RdsService(Service[RdsInstance]):
 
             try:
                 if does_snapshot_exist(snapshot_name):
-                    client.delete_db_snapshot(DBSnapshotIdentifier=snapshot_name)
+                    self._rds_client.delete_db_snapshot(
+                        DBSnapshotIdentifier=snapshot_name
+                    )
                     self._logger.info("Deleted previous snapshot {}", snapshot_name)
             except Exception:
                 self._logger.error("Error deleting snapshot {}", snapshot_name)
 
-        client.stop_db_instance(**args)  # exception caught upstream
+        self._rds_client.stop_db_instance(**args)  # exception caught upstream
 
-    def _tag_stopped_resource(
-        self, client: RDSClient, rds_resource: RdsInstance
-    ) -> None:
+    def _tag_stopped_resource(self, rds_resource: RdsInstance) -> None:
         stop_tags = self._validate_rds_tag_values(self._scheduling_context.stopped_tags)
         if stop_tags is None:
             stop_tags = []
@@ -486,7 +488,7 @@ class RdsService(Service[RdsInstance]):
                     ",".join(['"{}"'.format(k) for k in start_tags_keys]),
                     rds_resource.arn,
                 )
-                client.remove_tags_from_resource(
+                self._rds_client.remove_tags_from_resource(
                     ResourceName=rds_resource.arn, TagKeys=start_tags_keys
                 )
             if len(stop_tags) > 0:
@@ -495,7 +497,7 @@ class RdsService(Service[RdsInstance]):
                     str(stop_tags),
                     rds_resource.arn,
                 )
-                client.add_tags_to_resource(
+                self._rds_client.add_tags_to_resource(
                     ResourceName=rds_resource.arn, Tags=stop_tags
                 )
         except Exception as ex:
@@ -505,9 +507,7 @@ class RdsService(Service[RdsInstance]):
                 str(ex),
             )
 
-    def _tag_started_instances(
-        self, client: RDSClient, rds_resource: RdsInstance
-    ) -> None:
+    def _tag_started_instances(self, rds_resource: RdsInstance) -> None:
         start_tags = self._validate_rds_tag_values(
             self._scheduling_context.started_tags
         )
@@ -527,7 +527,7 @@ class RdsService(Service[RdsInstance]):
                     ",".join(['"{}"'.format(k) for k in stop_tags_keys]),
                     rds_resource.arn,
                 )
-                client.remove_tags_from_resource(
+                self._rds_client.remove_tags_from_resource(
                     ResourceName=rds_resource.arn, TagKeys=stop_tags_keys
                 )
             if start_tags is not None and len(start_tags) > 0:
@@ -536,7 +536,7 @@ class RdsService(Service[RdsInstance]):
                     str(start_tags),
                     rds_resource.arn,
                 )
-                client.add_tags_to_resource(
+                self._rds_client.add_tags_to_resource(
                     ResourceName=rds_resource.arn, Tags=start_tags
                 )
         except Exception as ex:
@@ -549,19 +549,16 @@ class RdsService(Service[RdsInstance]):
     def stop_instances(
         self, instances_to_stop: list[RdsInstance]
     ) -> Iterator[tuple[str, ScheduleState]]:
-        client: RDSClient = get_client_with_standard_retry(
-            "rds", session=self._session, region=self._region
-        )
         for instance in instances_to_stop:
             try:
                 if instance.is_cluster:
-                    client.stop_db_cluster(DBClusterIdentifier=instance.id)
+                    self._rds_client.stop_db_cluster(DBClusterIdentifier=instance.id)
                     self._logger.info('Stopped rds cluster "{}"', instance.id)
                 else:
-                    self._stop_instance(client, instance)
+                    self._stop_instance(instance)
                     self._logger.info('Stopped rds instance "{}"', instance.id)
 
-                self._tag_stopped_resource(client, instance)
+                self._tag_stopped_resource(instance)
 
                 yield instance.id, ScheduleState.STOPPED
             except Exception as ex:
@@ -575,18 +572,15 @@ class RdsService(Service[RdsInstance]):
     def start_instances(
         self, instances_to_start: list[RdsInstance]
     ) -> Iterator[tuple[str, ScheduleState]]:
-        client: RDSClient = get_client_with_standard_retry(
-            "rds", session=self._session, region=self._region
-        )
 
         for instance in instances_to_start:
             try:
                 if instance.is_cluster:
-                    client.start_db_cluster(DBClusterIdentifier=instance.id)
+                    self._rds_client.start_db_cluster(DBClusterIdentifier=instance.id)
                 else:
-                    client.start_db_instance(DBInstanceIdentifier=instance.id)
+                    self._rds_client.start_db_instance(DBInstanceIdentifier=instance.id)
 
-                self._tag_started_instances(client, instance)
+                self._tag_started_instances(instance)
 
                 yield instance.id, ScheduleState.RUNNING
             except Exception as ex:
