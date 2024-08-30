@@ -83,6 +83,7 @@ export function newCoreScheduler(): Template {
   const stack = new Stack();
 
   new CoreScheduler(stack, {
+    targetPartition: "Commercial",
     solutionName,
     solutionVersion,
     solutionId,

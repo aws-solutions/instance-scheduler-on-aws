@@ -24,6 +24,7 @@ export interface InstanceSchedulerStackProps extends StackProps {
   readonly appregApplicationName: string;
   readonly appregSolutionName: string;
   readonly factory?: FunctionFactory;
+  readonly targetPartition: "Commercial" | "China";
 }
 
 export class InstanceSchedulerStack extends Stack {
@@ -305,6 +306,7 @@ export class InstanceSchedulerStack extends Stack {
     const factory = props.factory ?? new PythonFunctionFactory();
 
     const coreScheduler = new CoreScheduler(this, {
+      targetPartition: props.targetPartition,
       solutionName: props.solutionName,
       solutionVersion: props.solutionVersion,
       solutionId: props.solutionId,

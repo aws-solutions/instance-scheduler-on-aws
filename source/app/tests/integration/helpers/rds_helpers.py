@@ -3,7 +3,10 @@
 from typing import TYPE_CHECKING
 
 import boto3
-from mypy_boto3_rds.type_defs import CreateDBInstanceResultTypeDef
+from mypy_boto3_rds.type_defs import (
+    CreateDBClusterResultTypeDef,
+    CreateDBInstanceResultTypeDef,
+)
 
 from tests.integration.helpers.boto_client_helpers import client_in_account_region
 
@@ -55,6 +58,37 @@ def create_rds_instances(
             Engine=engine,
         )
         instance_arn = result["DBInstance"]["DBInstanceArn"]
+        rds_client.add_tags_to_resource(
+            ResourceName=instance_arn,
+            Tags=[{"Key": "Schedule", "Value": schedule_name}],
+        )
+        ids.append(instance_id)
+
+    return tuple(ids)
+
+
+def create_rds_clusters(
+    count: int,
+    schedule_name: str = "test-schedule",
+    account: str = "123456789012",
+    region: str = "us-east-1",
+    instance_type: str = "db.m5.large",
+    engine: str = "postgres",
+    id_prefix: str = "test-rds-instance",
+) -> tuple[str, ...]:
+    rds_client: RDSClient = client_in_account_region("rds", account, region)
+
+    ids: list[str] = list()
+    for i in range(count):
+        instance_id = f"{id_prefix}-{i}"
+        result: CreateDBClusterResultTypeDef = rds_client.create_db_cluster(
+            DBClusterIdentifier=instance_id,
+            DBClusterInstanceClass=instance_type,
+            Engine=engine,
+            MasterUsername="user",
+            MasterUserPassword="password",
+        )
+        instance_arn = result["DBCluster"]["DBClusterArn"]
         rds_client.add_tags_to_resource(
             ResourceName=instance_arn,
             Tags=[{"Key": "Schedule", "Value": schedule_name}],
