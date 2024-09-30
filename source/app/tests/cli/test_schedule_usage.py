@@ -135,7 +135,7 @@ def test_describe_schedule_uses_correctly_handles_nth_weekday() -> None:
             {
                 "period": RunningPeriod(
                     name="test-period",
-                    cron_recurrence=CronRecurrenceExpression.parse(weekdays={"Mon#2"}),
+                    cron_recurrence=CronRecurrenceExpression.parse(weekdays={"Mon#1"}),
                 )
             }
         ],

@@ -3847,6 +3847,8 @@ exports[`InstanceSchedulerChinaStack snapshot test 1`] = `
                 "rds:DeleteDBSnapshot",
                 "rds:DescribeDBSnapshots",
                 "rds:StopDBInstance",
+                "rds:CreateDBSnapshot",
+                "rds:AddTagsToResource",
               ],
               "Effect": "Allow",
               "Resource": {
@@ -3859,6 +3861,7 @@ exports[`InstanceSchedulerChinaStack snapshot test 1`] = `
                 "rds:RemoveTagsFromResource",
                 "rds:StartDBInstance",
                 "rds:StopDBInstance",
+                "rds:CreateDBSnapshot",
               ],
               "Effect": "Allow",
               "Resource": {
@@ -3871,6 +3874,7 @@ exports[`InstanceSchedulerChinaStack snapshot test 1`] = `
                 "rds:RemoveTagsFromResource",
                 "rds:StartDBCluster",
                 "rds:StopDBCluster",
+                "rds:CreateDBClusterSnapshot",
               ],
               "Effect": "Allow",
               "Resource": {
@@ -9473,6 +9477,8 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
                 "rds:DeleteDBSnapshot",
                 "rds:DescribeDBSnapshots",
                 "rds:StopDBInstance",
+                "rds:CreateDBSnapshot",
+                "rds:AddTagsToResource",
               ],
               "Effect": "Allow",
               "Resource": {
@@ -9485,6 +9491,7 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
                 "rds:RemoveTagsFromResource",
                 "rds:StartDBInstance",
                 "rds:StopDBInstance",
+                "rds:CreateDBSnapshot",
               ],
               "Effect": "Allow",
               "Resource": {
@@ -9497,6 +9504,7 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
                 "rds:RemoveTagsFromResource",
                 "rds:StartDBCluster",
                 "rds:StopDBCluster",
+                "rds:CreateDBClusterSnapshot",
               ],
               "Effect": "Allow",
               "Resource": {

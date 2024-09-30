@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.5] -- 2024-09-30
+### Fixed
+- Fixed bug in Nth weekday logic that would sometimes cause Nth weekday to be interpreted as 1 week too early
+
+### Updated
+- added rds:CreateDBSnapshot and rds:AddTagsToResource snapshot to scheduling roles to support recent changes to
+RDS IAM requirements.
+
+### Security
+- Upgrade pyca/cryptography to mitigate GHSA-h4gh-qq45-vh27
+
 ## [3.0.4] -- 2024-08-30
 ### Fixed
 - Fixed China region compatibility issues by adding new -cn variants of solution stack templates
