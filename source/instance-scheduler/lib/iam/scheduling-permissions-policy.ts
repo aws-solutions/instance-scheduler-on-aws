@@ -47,21 +47,39 @@ export class SchedulingPermissionsPolicy extends Policy {
 
       new PolicyStatement({
         //StopDBInstance here is required
-        actions: ["rds:DeleteDBSnapshot", "rds:DescribeDBSnapshots", "rds:StopDBInstance"],
+        actions: [
+          "rds:DeleteDBSnapshot",
+          "rds:DescribeDBSnapshots",
+          "rds:StopDBInstance",
+          "rds:CreateDBSnapshot",
+          "rds:AddTagsToResource",
+        ],
         effect: Effect.ALLOW,
         resources: [Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:snapshot:*")],
       }),
 
       // start/stop/tag for rds instances
       new PolicyStatement({
-        actions: ["rds:AddTagsToResource", "rds:RemoveTagsFromResource", "rds:StartDBInstance", "rds:StopDBInstance"],
+        actions: [
+          "rds:AddTagsToResource",
+          "rds:RemoveTagsFromResource",
+          "rds:StartDBInstance",
+          "rds:StopDBInstance",
+          "rds:CreateDBSnapshot",
+        ],
         effect: Effect.ALLOW,
         resources: [Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:db:*")],
       }),
 
       // start/stop/tag for rds clusters
       new PolicyStatement({
-        actions: ["rds:AddTagsToResource", "rds:RemoveTagsFromResource", "rds:StartDBCluster", "rds:StopDBCluster"],
+        actions: [
+          "rds:AddTagsToResource",
+          "rds:RemoveTagsFromResource",
+          "rds:StartDBCluster",
+          "rds:StopDBCluster",
+          "rds:CreateDBClusterSnapshot",
+        ],
         effect: Effect.ALLOW,
         resources: [Fn.sub("arn:${AWS::Partition}:rds:*:${AWS::AccountId}:cluster:*")],
       }),

@@ -210,7 +210,10 @@ def _resolve_first_occurrence_of_weekday_in_month(
     weekday: int, reference_date: date
 ) -> date:
     reference_date = reference_date.replace(day=1)
+
     offset_to_first_day = weekday - reference_date.weekday() % 7
+    if offset_to_first_day < 0:
+        offset_to_first_day += 7
     return reference_date + timedelta(days=offset_to_first_day)
 
 

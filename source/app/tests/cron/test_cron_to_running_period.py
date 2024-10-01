@@ -10,6 +10,7 @@ from instance_scheduler.cron.cron_to_running_period import (
     _range_to_discrete_values,
     _resolve_first_occurrence_of_weekday_in_month,
     months_cron_expr_contains,
+    resolve_nth_weekday_as_monthday,
 )
 from instance_scheduler.cron.expression import CronRange
 from instance_scheduler.cron.parser import _parse_multi_general, parse_months_expr
@@ -181,7 +182,34 @@ def test_resolve_first_occurrence_of_weekday_in_month_returns_expected(
     weekday: int, expected: int
 ) -> None:
     # using April 2024 as test month.
-    reference_date = datetime(year=2024, month=4, day=1)
+    reference_date = datetime(year=2024, month=4, day=6)
     assert _resolve_first_occurrence_of_weekday_in_month(
         weekday, reference_date
     ) == reference_date.replace(day=expected)
+
+
+# using september 2024 which starts on a Sunday
+# su mo tu we th fr sa
+# 01 02 03 04 05 06 07
+# 08 09 10 11 12 13 14
+# 15 16 17 18 19 20 21
+# 22 23 24 25 26 27 28
+# 29 30 01
+@pytest.mark.parametrize(
+    "weekday, n, expected",
+    [
+        (0, 1, 2),  # first monday
+        (6, 1, 1),  # first sunday
+        (6, 2, 8),  # second sunday
+        (4, 3, 20),  # 3rd friday
+        (5, 3, 21),  # 3rd saturday
+        (5, 4, 28),  # 4th saturday
+        (1, 1, 3),  # 1st tuesday
+        (1, 3, 17),  # 3rd tuesday
+    ],
+)
+def test_resolve_nth_weekday_as_monthday_returns_expected(
+    weekday: int, n: int, expected: int
+) -> None:
+    reference_date = datetime(year=2024, month=9, day=1)
+    assert resolve_nth_weekday_as_monthday(weekday, n, reference_date) == expected

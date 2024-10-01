@@ -216,10 +216,12 @@ class RdsService(Service[RdsInstance]):
     def instance_is_in_scope(self, rds_inst: DBInstanceTypeDef) -> bool:
         """check whether the instance is within scope for scheduling"""
         db_id = rds_inst["DBInstanceIdentifier"]
+        db_arn = rds_inst["DBInstanceArn"]
+        db_tags: dict[str, str] = self.rds_resource_tags["db"].get(db_arn, {})
 
-        if self.rds_resource_tags["db"].get(rds_inst["DBInstanceArn"], None) is None:
+        if not db_tags.get(self._env.schedule_tag_key, None):
             self._logger.debug(
-                f"Rds instance {rds_inst} has no schedule tag named {self._env.schedule_tag_key}"
+                f"Rds instance {rds_inst} has no attached schedule using the schedule tag: {self._env.schedule_tag_key}"
             )
             return False
 
@@ -245,17 +247,16 @@ class RdsService(Service[RdsInstance]):
 
     def cluster_is_in_scope(self, rds_cluster: DBClusterTypeDef) -> bool:
         """check whether the cluster is within scope for scheduling"""
-        db_id = rds_cluster["DBClusterIdentifier"]
+        cluster_id = rds_cluster["DBClusterIdentifier"]
+        cluster_arn = rds_cluster["DBClusterArn"]
         engine = rds_cluster["Engine"]
+        cluster_tags: dict[str, str] = self.rds_resource_tags["cluster"].get(
+            cluster_arn, {}
+        )
 
-        if (
-            self.rds_resource_tags["cluster"].get(rds_cluster["DBClusterArn"], None)
-            is None
-        ):
+        if not cluster_tags.get(self._env.schedule_tag_key, None):
             self._logger.debug(
-                "Rds cluster {} has no schedule tag named {}",
-                rds_cluster,
-                self._env.schedule_tag_key,
+                f"Rds cluster {rds_cluster} has no attached schedule using the schedule tag: {self._env.schedule_tag_key}"
             )
             return False
 
@@ -264,21 +265,21 @@ class RdsService(Service[RdsInstance]):
                 if not self._env.enable_neptune_service:
                     self._logger.debug(
                         "Skipping cluster {} - neptune scheduling is not enabled",
-                        db_id,
+                        cluster_id,
                     )
                     return False
             case "docdb":
                 if not self._env.enable_docdb_service:
                     self._logger.debug(
                         "Skipping cluster {} - docdb scheduling is not enabled",
-                        db_id,
+                        cluster_id,
                     )
                     return False
             case _:
                 if not self._env.enable_rds_clusters:
                     self._logger.debug(
                         "Skipping cluster {} - rds cluster scheduling is not enabled",
-                        db_id,
+                        cluster_id,
                     )
                     return False
 
@@ -306,20 +307,14 @@ class RdsService(Service[RdsInstance]):
             ):
                 for instance in page.get("DBInstances", []):
                     if self.instance_is_in_scope(instance):
-                        resource_data = self._select_resource_data(
+                        rds_instance = self._parse_as_rds_instance(
                             rds_resource=instance,
                             is_cluster=False,
                         )
-                        schedule_name = resource_data.schedule_name
-                        if schedule_name:
-                            self._logger.debug(
-                                f"Selected rds instance {resource_data.id} in state ({resource_data.current_state}) for schedule {schedule_name}",
-                            )
-                            yield resource_data
-                        else:
-                            self._logger.debug(
-                                f"Skipping rds instance {resource_data.id} without schedule"
-                            )
+                        self._logger.debug(
+                            f"Selected rds instance {rds_instance.id} in state ({rds_instance.current_state}) for schedule {rds_instance.schedule_name}",
+                        )
+                        yield rds_instance
 
     def get_in_scope_rds_clusters(self) -> Iterator[RdsInstance]:
         tagged_clusters: dict[ResourceArn, dict[str, str]] = self.rds_resource_tags[
@@ -344,27 +339,23 @@ class RdsService(Service[RdsInstance]):
             ):
                 for cluster in page.get("DBClusters", []):
                     if self.cluster_is_in_scope(cluster):
-                        resource_data = self._select_resource_data(
+                        rds_instance = self._parse_as_rds_instance(
                             rds_resource=cluster,
                             is_cluster=True,
                         )
-                        schedule_name = resource_data.schedule_name
-                        if schedule_name:
-                            self._logger.debug(
-                                f"Selected rds cluster {resource_data.id} in state ({resource_data.current_state}) for schedule {schedule_name}"
-                            )
-                            yield resource_data
-                        else:
-                            self._logger.debug(
-                                f"Skipping rds cluster {resource_data.id} without a tagged schedule"
-                            )
+                        self._logger.debug(
+                            f"Selected rds cluster {rds_instance.id} in state ({rds_instance.current_state}) for schedule {rds_instance.schedule_name}"
+                        )
+                        yield rds_instance
 
     def describe_tagged_instances(self) -> Iterator[RdsInstance]:
         rds_instances = self.get_in_scope_rds_instances()
         rds_clusters = self.get_in_scope_rds_clusters()
         return chain(rds_instances, rds_clusters)
 
-    def _select_resource_data(self, rds_resource: Any, is_cluster: bool) -> RdsInstance:
+    def _parse_as_rds_instance(
+        self, rds_resource: Any, is_cluster: bool
+    ) -> RdsInstance:
         # type of rds_resource is actually DBInstanceTypeDef | DBClusterTypeDef
         arn_for_tags = (
             rds_resource["DBInstanceArn"]
