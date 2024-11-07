@@ -174,11 +174,13 @@ class CliRequestHandler(MainHandler[AdminCliRequest]):
                 json.dumps(self._event),
             )
 
-            # Supports cli versions from some minimum version to current solution version
+            # Supports cli versions from some minimum version to current solution minor version
+            solution_version = Version(self.version)
+            cli_version = Version(CURRENT_CLI_VERSION)
             if (
-                not Version(MINIMUM_SUPPORTED_CLI_VERSION)
-                <= Version(self.version)
-                <= Version(CURRENT_CLI_VERSION)
+                not Version(MINIMUM_SUPPORTED_CLI_VERSION) <= solution_version
+                or solution_version.major != cli_version.major
+                or solution_version.minor != cli_version.minor
             ):
 
                 raise UnsupportedVersionException(

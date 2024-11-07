@@ -138,11 +138,16 @@ class InstanceScheduler:
                     decision.instance.id, decision.new_state_table_state
                 )
 
-        self._handle_start_and_resize_actions(
+        for failed_instance, err in self._handle_start_and_resize_actions(
             actions_to_take[SchedulingAction.START],
             result_object=result,
             logger=self._logger,
-        )
+        ):
+            self._logger.info(f"{failed_instance.display_str} failed to start: {err} ")
+            self._instance_states.set_instance_state(
+                failed_instance.id, InstanceState.START_FAILED
+            )
+
         self._handle_stop_actions(
             actions_to_take[SchedulingAction.STOP],
             result_object=result,
@@ -211,10 +216,10 @@ class InstanceScheduler:
         :return: a decision on how to schedule the instance
         """
 
-        is_running, window_name = self._is_maintenance_window_running(
+        mw_is_running, window_name = self._is_maintenance_window_running(
             instance, current_dt
         )
-        if is_running:
+        if mw_is_running:
             return SchedulingDecision(
                 instance=instance,
                 action=SchedulingAction.START,
@@ -345,6 +350,15 @@ class InstanceScheduler:
                         reason="Instance in retain_running state -- do not remove the flag",
                     )
 
+                if stored_state == InstanceState.START_FAILED:
+                    return SchedulingDecision(
+                        instance=instance,
+                        action=SchedulingAction.START,
+                        new_state_table_state=InstanceState.RUNNING,
+                        desired_size=new_desired_type,
+                        reason="Instance failed to start previously. Attempting to retry",
+                    )
+
                 # normal scheduling behavior -- issue start action if schedule state changed, otherwise do nothing
                 if stored_state != schedule_state:  # type: ignore[comparison-overlap]
                     return SchedulingDecision(
@@ -381,7 +395,7 @@ class InstanceScheduler:
         start_actions: list[SchedulingDecision],
         result_object: SchedulingResult,
         logger: Logger,
-    ) -> None:
+    ) -> Iterator[tuple[AbstractInstance, Exception]]:
         filtered_actions = []
 
         # filter out instances that are already running
@@ -425,11 +439,10 @@ class InstanceScheduler:
         for action in filtered_actions:
             result_object.add_completed_action(action)
 
-        list(
-            self._service.start_instances(
-                [action.instance for action in filtered_actions]
-            )
-        )
+        for failed_instance, err in self._service.start_instances(
+            [action.instance for action in filtered_actions]
+        ):
+            yield failed_instance, err
 
     def _handle_stop_actions(
         self,

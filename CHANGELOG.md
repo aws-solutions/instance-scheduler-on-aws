@@ -4,7 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [3.0.5] -- 2024-10-01
+## [3.0.6] -- 2024-11-7
+
+### Changed
+- RDS instances will now be automatically started 10 minutes prior to their preferred maintenance windows
+
+### Fixed
+- Clamped role session name to 64 characters to fix scenario where longer 
+namespaces could cause runtime errors during sts assume
+- Fixed long-term retry logic for EC2/RDS scheduling. 
+EC2 and RDS will now retry start actions on instances that failed during the previous scheduling cycle
+- Fixed AccessDenied error when spoke account self-registration process attempted to create a log group
+
+### Security
+- Upgrade Werkzeug to mitigate CVE-2024-49766 and CVE-2024-49767
+
+## [3.0.5] -- 2024-10-1
 ### Fixed
 - Fixed bug in Nth weekday logic that would sometimes cause Nth weekday to be interpreted as 1 week too early
 

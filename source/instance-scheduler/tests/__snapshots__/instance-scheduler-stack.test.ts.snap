@@ -4606,10 +4606,11 @@ exports[`InstanceSchedulerChinaStack snapshot test 1`] = `
             },
             {
               "applies_to": [
+                "Resource::arn:<AWS::Partition>:logs:<AWS::Region>:<AWS::AccountId>:log-group:/aws/lambda/InstanceScheduler-<Namespace>-SpokeRegistration:*",
                 "Resource::arn:<AWS::Partition>:logs:<AWS::Region>:<AWS::AccountId>:log-group:/aws/lambda/InstanceScheduler-<Namespace>-SpokeRegistration:log-stream:*",
               ],
               "id": "AwsSolutions-IAM5",
-              "reason": "Wildcard required for creating and writing to log stream",
+              "reason": "Wildcard required for creating and writing to log group and stream",
             },
           ],
         },
@@ -4640,7 +4641,7 @@ exports[`InstanceSchedulerChinaStack snapshot test 1`] = `
                     {
                       "Ref": "Namespace",
                     },
-                    "-SpokeRegistration",
+                    "-SpokeRegistration:*",
                   ],
                 ],
               },
@@ -10236,10 +10237,11 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
             },
             {
               "applies_to": [
+                "Resource::arn:<AWS::Partition>:logs:<AWS::Region>:<AWS::AccountId>:log-group:/aws/lambda/InstanceScheduler-<Namespace>-SpokeRegistration:*",
                 "Resource::arn:<AWS::Partition>:logs:<AWS::Region>:<AWS::AccountId>:log-group:/aws/lambda/InstanceScheduler-<Namespace>-SpokeRegistration:log-stream:*",
               ],
               "id": "AwsSolutions-IAM5",
-              "reason": "Wildcard required for creating and writing to log stream",
+              "reason": "Wildcard required for creating and writing to log group and stream",
             },
           ],
         },
@@ -10270,7 +10272,7 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
                     {
                       "Ref": "Namespace",
                     },
-                    "-SpokeRegistration",
+                    "-SpokeRegistration:*",
                   ],
                 ],
               },

@@ -70,7 +70,9 @@ def assume_role(*, account: str, region: str, role_name: str) -> AssumedRole:
     )
 
     try:
-        session_name: Final = f"{role_name}-{account}-{region}"
+        # session name has a max length of 64
+        role_name_space = 64 - len(f"-{account}-{region}")
+        session_name: Final = f"{role_name[:role_name_space]}-{account}-{region}"
 
         token: Final = _sts().assume_role(
             RoleArn=spoke_account_role_arn, RoleSessionName=session_name

@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import re
 from collections.abc import Iterator, Sequence
+from datetime import date, datetime, time, timedelta
 from functools import cached_property
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Final, Optional, TypedDict
@@ -157,6 +158,24 @@ class RdsService(Service[RdsInstance]):
         start_weekday_expr = parse_weekdays_expr({start_day_string})
         start_time = parse_time_str(start_hhmm_string)
         end_time = parse_time_str(stop_hhmm_string)
+
+        # start 10 minutes early
+        # note: python can only subtract timedeltas from datetimes
+        adjusted_start_time = (
+            datetime.combine(date.today(), start_time) - timedelta(minutes=10)
+        ).time()
+
+        if start_time >= time(0, 10):
+            start_time = adjusted_start_time
+        else:
+            # delta will cross midnight
+            days_strings = ["sun", "mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+            index = days_strings.index(start_day_string, 1)
+            adjusted_start_day = days_strings[index - 1]
+
+            start_day_string = adjusted_start_day
+            start_weekday_expr = parse_weekdays_expr({adjusted_start_day})
+            start_time = adjusted_start_time
 
         # windows that do not overlap days only require one period for schedule
         if start_day_string == stop_day_string:
@@ -562,7 +581,7 @@ class RdsService(Service[RdsInstance]):
 
     def start_instances(
         self, instances_to_start: list[RdsInstance]
-    ) -> Iterator[tuple[str, ScheduleState]]:
+    ) -> Iterator[tuple[RdsInstance, Exception]]:
 
         for instance in instances_to_start:
             try:
@@ -573,7 +592,6 @@ class RdsService(Service[RdsInstance]):
 
                 self._tag_started_instances(instance)
 
-                yield instance.id, ScheduleState.RUNNING
             except Exception as ex:
                 self._logger.error(
                     "Error starting rds {} {} ({})",
@@ -581,3 +599,5 @@ class RdsService(Service[RdsInstance]):
                     instance.display_str,
                     str(ex),
                 )
+
+                yield instance, ex

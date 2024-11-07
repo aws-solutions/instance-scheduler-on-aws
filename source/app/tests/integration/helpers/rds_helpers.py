@@ -46,6 +46,7 @@ def create_rds_instances(
     instance_type: str = "db.m5.large",
     engine: str = "postgres",
     id_prefix: str = "test-rds-instance",
+    preferred_maintenance_window: str = "mon:01:00-mon:01:30",
 ) -> tuple[str, ...]:
     rds_client: RDSClient = client_in_account_region("rds", account, region)
 
@@ -56,6 +57,7 @@ def create_rds_instances(
             DBInstanceIdentifier=instance_id,
             DBInstanceClass=instance_type,
             Engine=engine,
+            PreferredMaintenanceWindow=preferred_maintenance_window,
         )
         instance_arn = result["DBInstance"]["DBInstanceArn"]
         rds_client.add_tags_to_resource(

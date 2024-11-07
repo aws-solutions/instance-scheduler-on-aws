@@ -24,7 +24,11 @@ class Service(Generic[T], ABC):
     @abstractmethod
     def start_instances(
         self, instances_to_start: list[T]
-    ) -> Iterator[tuple[str, ScheduleState]]:
+    ) -> Iterator[tuple[T, Exception]]:
+        """start a collection of instances
+
+        :returns: a tuple stream of instances that fail to start: (instance, exception)
+        """
         pass
 
     @abstractmethod
