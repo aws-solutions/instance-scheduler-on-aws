@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.0.5", cdkVersion: "2.150.0" }).synth();
+  new InstanceScheduler({ version: "3.0.6", cdkVersion: "2.164.1" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -164,6 +164,10 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     this.addJestMatch("**/*.test.ts");
     // use default snapshot resolution
     this.removeCustomSnapshotResolver();
+
+    this.addScripts({
+      "update-deps": "chmod +x ./update-all-dependencies.sh && exec ./update-all-dependencies.sh"
+    })
 
     new YamlFile(this, "solution-manifest.yaml", {
       obj: {

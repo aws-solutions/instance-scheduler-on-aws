@@ -73,7 +73,7 @@ export class SpokeRegistrationLambda {
             scope.formatArn({
               service: "logs",
               resource: "log-group",
-              resourceName: `/aws/lambda/${functionName}`,
+              resourceName: `/aws/lambda/${functionName}:*`,
               arnFormat: ArnFormat.COLON_RESOURCE_NAME,
             }),
           ],
@@ -138,9 +138,10 @@ export class SpokeRegistrationLambda {
       {
         id: "AwsSolutions-IAM5",
         appliesTo: [
+          "Resource::arn:<AWS::Partition>:logs:<AWS::Region>:<AWS::AccountId>:log-group:/aws/lambda/InstanceScheduler-<Namespace>-SpokeRegistration:*",
           "Resource::arn:<AWS::Partition>:logs:<AWS::Region>:<AWS::AccountId>:log-group:/aws/lambda/InstanceScheduler-<Namespace>-SpokeRegistration:log-stream:*",
         ],
-        reason: "Wildcard required for creating and writing to log stream",
+        reason: "Wildcard required for creating and writing to log group and stream",
       },
     ]);
 

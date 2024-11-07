@@ -284,24 +284,23 @@ class Ec2Service(Service[EC2Instance]):
 
     def start_instances(
         self, instances_to_start: list[EC2Instance]
-    ) -> Iterator[tuple[str, ScheduleState]]:
+    ) -> Iterator[tuple[EC2Instance, Exception]]:
         """
         start the EC2 instances with IDs in `instances_to_start`
 
         tag instances that were successfully started with the start tag keys and values
         configured at a stack value, and remove stop tag keys from the same instances
+
+        @returns a tuple of instances that failed to start and the error message associated
         """
-        instance_ids = [instance.id for instance in instances_to_start]
         responses: Final = bisect_retry(
-            instance_ids, lambda ids: self._ec2.start_instances(InstanceIds=ids)
+            instances_to_start,
+            lambda instances: self._ec2.start_instances(
+                InstanceIds=[instance.id for instance in instances]
+            ),
         )
         starting_instance_ids: Final[list[str]] = []
-        for failure in responses.failure_responses:
-            self._logger.error(
-                "Failed to start EC2 instance with ID {}: {}",
-                failure.failed_input,
-                str(failure.error),
-            )
+
         for response in responses.success_responses:
             starting_instance_ids.extend(
                 instance["InstanceId"] for instance in response["StartingInstances"]
@@ -313,10 +312,14 @@ class Ec2Service(Service[EC2Instance]):
             tag_templates_to_remove=self._scheduling_context.stopped_tags,
         )
 
-        yield from (
-            (instance_id, ScheduleState.RUNNING)
-            for instance_id in starting_instance_ids
-        )
+        for failure in responses.failure_responses:
+            self._logger.error(
+                "Failed to start EC2 instance with ID {}: {}",
+                failure.failed_input,
+                str(failure.error),
+            )
+
+            yield failure.failed_input, failure.error
 
     def _tag_instances(
         self,

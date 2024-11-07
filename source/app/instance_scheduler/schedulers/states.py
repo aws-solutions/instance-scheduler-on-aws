@@ -21,6 +21,7 @@ class InstanceState(str, Enum):
     UNKNOWN = "unknown"
     STOPPED_FOR_RESIZE = "stopped_for_resize"
     RETAIN_RUNNING = "retain-running"
+    START_FAILED = "start_failed"
 
 
 def is_valid_instance_state(value: Optional[str]) -> TypeGuard[InstanceState]:

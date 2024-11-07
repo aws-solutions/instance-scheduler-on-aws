@@ -7,6 +7,7 @@ from typing import Any, Iterator, Optional, Sequence
 from unittest.mock import patch
 
 from _pytest.fixtures import fixture
+from packaging.version import Version
 
 from instance_scheduler import __version__
 from instance_scheduler.handler.cli.cli_request_handler import (
@@ -70,6 +71,27 @@ def test_cli_receives_error_response_with_new_cli_version() -> None:
     assert result == {
         "Error": f"CLI version 100.0.0 is not supported for this version of the solution. Please update to a supported version ({get_supported_cli_versions()})."
     }
+
+
+def test_cli_success_with_cli_on_same_minor_version_but_greater_patch(
+    config_table: None,
+) -> None:
+    cli_version = Version(__version__)
+    greater_patch_version = (
+        f"{cli_version.major}.{cli_version.minor}.{cli_version.micro + 1}"
+    )
+    result = describe_schedules_with_cli(version=greater_patch_version)
+    assert "Schedules" in result
+
+
+def test_cli_success_with_cli_on_same_minor_version_but_smaller_patch(
+    config_table: None,
+) -> None:
+    cli_version = Version(__version__)
+    minor_version = cli_version.micro - 1 if cli_version.micro > 0 else 0
+    lower_patch_version = f"{cli_version.major}.{cli_version.minor}.{minor_version}"
+    result = describe_schedules_with_cli(version=lower_patch_version)
+    assert "Schedules" in result
 
 
 def test_create_schedule_throws_error_when_period_not_found(config_table: None) -> None:

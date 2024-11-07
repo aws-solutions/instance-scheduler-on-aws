@@ -176,6 +176,12 @@ class SchedulingOrchestratorHandler:
                 scheduler_request["periods"] = serialized_periods
                 result.append(self._run_scheduling_lambda(scheduler_request))
 
+            if not result:
+                self._logger.warning(
+                    "No targets to schedule. Please ensure you have correctly configured your target"
+                    " accounts and regions in your CloudFormation parameters"
+                )
+
             if should_collect_metric(DeploymentDescriptionMetric):
                 collect_metric(
                     self.build_deployment_description_metric(

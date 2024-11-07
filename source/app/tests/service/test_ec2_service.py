@@ -1,10 +1,11 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+import random
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import chain
 from typing import TYPE_CHECKING, Final
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 from zoneinfo import ZoneInfo
 
 import boto3
@@ -402,10 +403,7 @@ def test_start_instances(moto_backend: None) -> None:
         )
 
     result = list(service.start_instances(instances_to_start))
-    instance_results: Final = {instance_id: status for (instance_id, status) in result}
-
-    for instance_id in instances.stopped_ids:
-        assert instance_results[instance_id] == "running"
+    assert not result  # no errors
 
     ec2.get_waiter("instance_running").wait(InstanceIds=instances.stopped_ids)
 
@@ -418,14 +416,15 @@ def test_start_instances_with_errors(moto_backend: None) -> None:
     ec2: Final[EC2Client] = boto3.client("ec2")
     instance_type: Final[InstanceTypeType] = "m6g.xlarge"
     instances = create_instances_of_status(
-        ec2, instance_type=instance_type, qty_stopped=100
+        ec2, instance_type=instance_type, qty_stopped=8
     )
 
     service: Final = build_ec2_service()
 
-    instances_to_start: list[EC2Instance] = []
+    good_instances: list[EC2Instance] = []
+    bad_instances: list[EC2Instance] = []
     for instance_id in instances.stopped_ids:
-        instances_to_start.append(
+        good_instances.append(
             instance_data_from(
                 instance_id=instance_id,
                 instance_state="stopped",
@@ -434,7 +433,7 @@ def test_start_instances_with_errors(moto_backend: None) -> None:
         )
         # add a duplicate Instance with a bad identifier, interleaved
         bad_instance_id = "id-bad" + instance_id[6:]
-        instances_to_start.append(
+        bad_instances.append(
             instance_data_from(
                 instance_id=bad_instance_id,
                 instance_state="stopped",
@@ -442,16 +441,19 @@ def test_start_instances_with_errors(moto_backend: None) -> None:
             )
         )
 
+    # mix good/bad instance ids together to exercise bisect retry logic
+    instances_to_start = good_instances + bad_instances
+    random.shuffle(instances_to_start)
     result = list(service.start_instances(instances_to_start))
-    instance_results: Final = {instance_id: status for (instance_id, status) in result}
 
-    for instance_id in instances.stopped_ids:
-        assert instance_results[instance_id] == "running"
+    for bad_instance in bad_instances:
+        assert result.__contains__((bad_instance, ANY))
 
     ec2.get_waiter("instance_running").wait(InstanceIds=instances.stopped_ids)
 
-    statuses = ec2.describe_instance_status(InstanceIds=instances.stopped_ids)
-    for status in statuses["InstanceStatuses"]:
+    for status in ec2.describe_instance_status(
+        InstanceIds=[instance.id for instance in good_instances]
+    )["InstanceStatuses"]:
         assert status["InstanceState"]["Name"] == "running"
 
 
