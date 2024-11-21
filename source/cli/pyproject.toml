@@ -2,7 +2,7 @@
 
 [tool.poetry]
 name = "instance_scheduler_cli"
-version = "3.0.6"
+version = "3.0.7"
 description = "Instance Scheduler on AWS CLI"
 license = "Apache-2.0"
 authors = [ "Amazon Web Services" ]

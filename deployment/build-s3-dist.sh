@@ -2,7 +2,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 [[ $DEBUG ]] && set -x
-set -eu -o pipefail
+set -e -o pipefail
 
 header() {
     declare text=$1
@@ -17,12 +17,15 @@ usage() {
 }
 
 main() {
-    declare DIST_OUTPUT_BUCKET=$1 SOLUTION_NAME=$2 VERSION=$3
-    # Check to see if the required parameters have been provided:
-    if [ -z "$DIST_OUTPUT_BUCKET" ] || [ -z "$SOLUTION_NAME" ] || [ -z "$VERSION" ]; then
+    if [ ! "$1" ] || [ ! "$2" ] || [ ! "$3" ]; then
         usage
         exit 1
     fi
+    set -u
+
+    declare DIST_OUTPUT_BUCKET=$1 SOLUTION_NAME=$2 VERSION=$3
+    # Check to see if the required parameters have been provided:
+
 
     export DIST_OUTPUT_BUCKET
     export SOLUTION_NAME

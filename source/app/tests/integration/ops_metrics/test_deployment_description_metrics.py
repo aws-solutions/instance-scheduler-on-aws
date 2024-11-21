@@ -142,7 +142,7 @@ def test_orchestrator_sends_expected_metric(
             "solution": metrics_environ.solution_id,
             "version": metrics_environ.solution_version,
             "event_name": "deployment_description",
-            "context_version": 1,
+            "context_version": 2,
             "context": {
                 "services": UnorderedList(
                     ["ec2", "rds", "rds-clusters", "neptune", "docdb", "asg"]
@@ -170,6 +170,7 @@ def test_orchestrator_sends_expected_metric(
                     "use_ssm_maintenance_window": 1,
                     "non_default_timezone": 2,
                 },
+                "approximate_lambda_payload_size_bytes": 1084,  # semi-magic
             },
         }
 

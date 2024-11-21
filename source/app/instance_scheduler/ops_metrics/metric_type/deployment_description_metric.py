@@ -26,6 +26,7 @@ class DeploymentDescriptionMetric(OpsMetric):
     num_schedules: int
     num_cfn_schedules: int
     num_one_sided_schedules: int
+    approximate_lambda_payload_size_bytes: int
     schedule_flag_counts: ScheduleFlagCounts
     default_timezone: str
     create_rds_snapshots: bool
@@ -38,4 +39,4 @@ class DeploymentDescriptionMetric(OpsMetric):
     num_stopped_tags: int
     event_name: ClassVar[str] = "deployment_description"
     collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.DAILY
-    context_version: ClassVar[int] = 1
+    context_version: ClassVar[int] = 2

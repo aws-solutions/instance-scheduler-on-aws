@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.7] -- 2024-11-21
+
+### Security
+- Upgrade cross-spawn to mitigate CVE-2024-21538
+
 ## [3.0.6] -- 2024-11-7
 
 ### Changed

@@ -36,6 +36,7 @@ deployment/open-source/
 deployment/global-s3-assets
 deployment/regional-s3-assets
 __pycache__/
+build/
 deployment/test-reports
 deployment/coverage-reports
 !/jest.config.json

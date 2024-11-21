@@ -4,7 +4,7 @@ import json
 import traceback
 from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, TypeGuard, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict, TypeGuard, cast
 
 from instance_scheduler.boto_retry import get_client_with_standard_retry
 from instance_scheduler.handler.environments.orchestrator_environment import (
@@ -160,6 +160,8 @@ class SchedulingOrchestratorHandler:
             serialized_periods = periods.serialize()
 
             result = []
+
+            scheduler_request = None
             for target in list_all_targets(
                 ddb_config_item, self._env, self._logger, self._context
             ):
@@ -190,6 +192,7 @@ class SchedulingOrchestratorHandler:
                         periods,
                         self._env,
                         self._context,
+                        sample_scheduling_request=scheduler_request,
                     ),
                     logger=self._logger,
                 )
@@ -250,6 +253,7 @@ class SchedulingOrchestratorHandler:
         period_store: PeriodDefinitionStore,
         env: OrchestratorEnvironment,
         lambda_context: LambdaContext,
+        sample_scheduling_request: Optional[SchedulingRequest],
     ) -> DeploymentDescriptionMetric:
         flag_counts = ScheduleFlagCounts()
         schedules = schedule_store.find_all()
@@ -292,6 +296,11 @@ class SchedulingOrchestratorHandler:
             ops_dashboard_enabled=env.ops_dashboard_enabled,
             num_started_tags=len(env.start_tags),
             num_stopped_tags=len(env.stop_tags),
+            approximate_lambda_payload_size_bytes=(
+                len(str.encode(json.dumps(sample_scheduling_request)))
+                if sample_scheduling_request
+                else 0
+            ),
         )
 
         return metric
