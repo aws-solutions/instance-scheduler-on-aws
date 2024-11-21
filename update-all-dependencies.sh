@@ -4,6 +4,9 @@
 echo "Upgrading projen..."
 projen upgrade
 
+echo "Upgrading root npm..."
+npm update
+
 echo "Upgrading app..."
 pushd source/app || exit
 poetry update
@@ -20,3 +23,4 @@ npm update
 popd || exit
 
 echo "All dependencies successfully updated"
+echo "If you need to also update the solution version, do so inside .projenrc.ts and then re-run this script"

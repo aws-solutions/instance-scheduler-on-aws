@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.0.6", cdkVersion: "2.164.1" }).synth();
+  new InstanceScheduler({ version: "3.0.7", cdkVersion: "2.164.1" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -95,6 +95,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     "deployment/global-s3-assets",
     "deployment/regional-s3-assets",
     "__pycache__/",
+    "build/",
     this.testReportDir,
     this.coverageReportDir,
   ];
