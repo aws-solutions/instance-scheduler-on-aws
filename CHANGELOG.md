@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.8] -- 2025-1-31
+
+### Updated
+- Upgrade AWS Powertools from V2 to V3
+
+### Security
+- Upgrade jinja to mitigate CVE-2024-56201 and CVE-2024-56326
+
 ## [3.0.7] -- 2024-11-21
 
 ### Security

@@ -4563,7 +4563,7 @@ exports[`InstanceSchedulerChinaStack snapshot test 1`] = `
       },
       "Type": "AWS::Lambda::Function",
     },
-    "SpokeRegistrationLambdaPermission": {
+    "SpokeRegistrationLambdaCrossAccountPermission": {
       "Condition": "UsingAWSOrganizationsCondition",
       "Metadata": {
         "cfn_nag": {
@@ -10194,7 +10194,7 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       },
       "Type": "AWS::Lambda::Function",
     },
-    "SpokeRegistrationLambdaPermission": {
+    "SpokeRegistrationLambdaCrossAccountPermission": {
       "Condition": "UsingAWSOrganizationsCondition",
       "Metadata": {
         "cfn_nag": {

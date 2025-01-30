@@ -23,4 +23,4 @@ npm update
 popd || exit
 
 echo "All dependencies successfully updated"
-echo "If you need to also update the solution version, do so inside .projenrc.ts and then re-run this script"
+echo "If you need to also update the solution and/or CDK version, do so inside .projenrc.ts and then re-run this script"

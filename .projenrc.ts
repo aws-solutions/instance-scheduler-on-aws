@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.0.7", cdkVersion: "2.164.1" }).synth();
+  new InstanceScheduler({ version: "3.0.8", cdkVersion: "2.177.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -96,6 +96,10 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     "deployment/regional-s3-assets",
     "__pycache__/",
     "build/",
+    "internal/scripts/redpencil",
+    ".temp_redpencil",
+    "bom.json",
+    "internal/scripts/cfn-guard",
     this.testReportDir,
     this.coverageReportDir,
   ];
@@ -167,8 +171,8 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     this.removeCustomSnapshotResolver();
 
     this.addScripts({
-      "update-deps": "chmod +x ./update-all-dependencies.sh && exec ./update-all-dependencies.sh"
-    })
+      "update-deps": "chmod +x ./update-all-dependencies.sh && exec ./update-all-dependencies.sh",
+    });
 
     new YamlFile(this, "solution-manifest.yaml", {
       obj: {
@@ -419,10 +423,7 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
       `urllib3@^${urllib3Version}`,
     ].forEach((spec: string) => this.addDevDependency(spec));
 
-    [
-      "aws-lambda-powertools@^2.26.0",
-      "packaging@^24.0",
-    ].forEach((spec: string) => this.addDependency(spec));
+    ["aws-lambda-powertools@^3.4.1", "packaging@^24.0"].forEach((spec: string) => this.addDependency(spec));
 
     const pyproject = this.tryFindObjectFile("pyproject.toml");
     if (!pyproject) {

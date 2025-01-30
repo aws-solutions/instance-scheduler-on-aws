@@ -37,6 +37,10 @@ deployment/global-s3-assets
 deployment/regional-s3-assets
 __pycache__/
 build/
+internal/scripts/redpencil
+.temp_redpencil
+bom.json
+internal/scripts/cfn-guard
 deployment/test-reports
 deployment/coverage-reports
 !/jest.config.json

@@ -2,7 +2,7 @@
 
 [tool.poetry]
 name = "instance_scheduler"
-version = "3.0.7"
+version = "3.0.8"
 description = "Instance Scheduler on AWS"
 license = "Apache-2.0"
 authors = [ "Amazon Web Services" ]
@@ -10,7 +10,7 @@ homepage = "https://aws.amazon.com/solutions/implementations/instance-scheduler-
 readme = "README.md"
 
   [tool.poetry.dependencies]
-  aws-lambda-powertools = "^2.26.0"
+  aws-lambda-powertools = "^3.4.1"
   packaging = "^24.0"
   python = "^3.11"
 
