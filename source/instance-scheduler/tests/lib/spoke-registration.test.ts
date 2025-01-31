@@ -51,8 +51,8 @@ describe("spoke-registration", function () {
 
     describe("spoke-registration-lambda", function () {
       const lambdaPermissionResources = template.findResources("AWS::Lambda::Permission");
-      expect(lambdaPermissionResources).toContainKey("SpokeRegistrationLambdaPermission");
-      const lambdaPermission = lambdaPermissionResources["SpokeRegistrationLambdaPermission"];
+      expect(lambdaPermissionResources).toContainKey("SpokeRegistrationLambdaCrossAccountPermission");
+      const lambdaPermission = lambdaPermissionResources["SpokeRegistrationLambdaCrossAccountPermission"];
       it("is conditional on AwsOrganizations", function () {
         expect(lambdaPermission["Condition"]).toEqual("EnableAwsOrganizations");
       });

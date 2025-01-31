@@ -98,7 +98,7 @@ export class SpokeRegistrationLambda {
     props.scheduleLogGroup.grantWrite(spokeRegistrationPolicy);
 
     // Must use the L1 construct to conditionally create the resource based permission.
-    const permission = new CfnPermission(scope, "SpokeRegistrationLambdaPermission", {
+    const permission = new CfnPermission(scope, "SpokeRegistrationLambdaCrossAccountPermission", {
       functionName: this.lambdaFunction.functionName,
       principal: "*",
       principalOrgId: Fn.select(0, props.principals),
