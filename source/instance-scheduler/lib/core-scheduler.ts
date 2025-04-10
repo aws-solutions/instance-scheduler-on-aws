@@ -11,7 +11,7 @@ import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { NagSuppressions } from "cdk-nag";
 import { AnonymizedMetricsEnvironment } from "./anonymized-metrics-environment";
-import { AppRegistryForInstanceScheduler } from "./app-registry";
+import { AppRegistryIntegration } from "./app-registry";
 import { AsgScheduler } from "./asg-scheduler";
 import { cfnConditionToTrueFalse, overrideRetentionPolicies, overrideLogicalId, overrideProperty } from "./cfn";
 import { addCfnNagSuppressions } from "./cfn-nag";
@@ -73,17 +73,20 @@ export class CoreScheduler {
   public readonly configTable: Table;
   public readonly topic: Topic;
   public readonly asgOrch: LambdaFunction;
+  public readonly appRegistry?: AppRegistryIntegration;
 
   constructor(scope: Stack, props: CoreSchedulerProps) {
     /*The following resources are not supported in the China partition and must be omitted in the china stack*/
     if (props.targetPartition != "China") {
-      new AppRegistryForInstanceScheduler(scope, "AppRegistryForInstanceScheduler", {
+      this.appRegistry = new AppRegistryIntegration(scope, "AppRegistryForInstanceScheduler", {
         solutionId: props.solutionId,
         solutionName: props.solutionName,
         solutionVersion: props.solutionVersion,
         appregSolutionName: props.appregSolutionName,
         appregAppName: props.appregApplicationName,
       });
+
+      this.appRegistry.addApplicationTags(scope);
     }
 
     const USER_AGENT_EXTRA = `AwsSolution/${props.solutionId}/${props.solutionVersion}`;

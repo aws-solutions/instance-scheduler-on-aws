@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.0.8", cdkVersion: "2.177.0" }).synth();
+  new InstanceScheduler({ version: "3.0.9", cdkVersion: "2.188.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -413,7 +413,7 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
       "pytest-runner@^6.0.1",
       "pytest-xdist@^3.5.0",
       `python-dateutil@${pythonDateutilVersion}`,
-      `moto@{version = "^5.0.2", extras = ${JSON.stringify(motoExtras)}}`,
+      `moto@{version = "5.0.27", extras = ${JSON.stringify(motoExtras)}}`, //locked to 5.0.27 until 5.1.4 releases
       "types-freezegun@^1.1.10",
       `types-jmespath@${jmespathVersion}`,
       `types-python-dateutil@${pythonDateutilVersion}`,

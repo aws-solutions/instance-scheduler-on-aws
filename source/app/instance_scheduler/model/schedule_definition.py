@@ -52,6 +52,7 @@ class ScheduleParams(TypedDict):
     overwrite: NotRequired[bool]
     stop_new_instances: NotRequired[bool]
     ssm_maintenance_window: NotRequired[Sequence[str]]
+    use_maintenance_window: NotRequired[bool]
     retain_running: NotRequired[bool]
     enforced: NotRequired[bool]
     hibernate: NotRequired[bool]
@@ -82,6 +83,7 @@ def validate_as_schedule_params(
     validate_boolean(untyped_dict, "overwrite", required=False)
     validate_boolean(untyped_dict, "stop_new_instances", required=False)
     validate_string_list(untyped_dict, "ssm_maintenance_window", required=False)
+    validate_boolean(untyped_dict, "use_maintenance_windows", required=False)
     validate_boolean(untyped_dict, "retain_running", required=False)
     validate_boolean(untyped_dict, "enforced", required=False)
     validate_boolean(untyped_dict, "hibernate", required=False)
@@ -99,6 +101,7 @@ class ScheduleDefinition:
     override_status: Optional[str] = None
     stop_new_instances: Optional[bool] = None
     ssm_maintenance_window: Optional[Sequence[str]] = None
+    use_maintenance_window: Optional[bool] = None
     enforced: Optional[bool] = None
     hibernate: Optional[bool] = None
     retain_running: Optional[bool] = None
@@ -149,6 +152,9 @@ class ScheduleDefinition:
             **skip_if_empty(
                 "ssm_maintenance_window", {"SS": self.ssm_maintenance_window}
             ),
+            **skip_if_none(
+                "use_maintenance_window", {"BOOL": self.use_maintenance_window}
+            ),
             **skip_if_none("enforced", {"BOOL": self.enforced}),
             **skip_if_none("hibernate", {"BOOL": self.hibernate}),
             **skip_if_none("retain_running", {"BOOL": self.retain_running}),
@@ -174,6 +180,9 @@ class ScheduleDefinition:
                 optionally(parse_str_set, item.get("ssm_maintenance_window"), [])
             )
             or None,
+            use_maintenance_window=optionally(
+                parse_bool, item.get("use_maintenance_window"), None
+            ),
             enforced=optionally(parse_bool, item.get("enforced"), None),
             hibernate=optionally(parse_bool, item.get("hibernate"), None),
             retain_running=optionally(parse_bool, item.get("retain_running"), None),
@@ -194,6 +203,8 @@ class ScheduleDefinition:
             params["stop_new_instances"] = self.stop_new_instances
         if self.ssm_maintenance_window:
             params["ssm_maintenance_window"] = self.ssm_maintenance_window
+        if self.use_maintenance_window is not None:
+            params["use_maintenance_window"] = self.use_maintenance_window
         if self.enforced is not None:
             params["enforced"] = self.enforced
         if self.hibernate is not None:
@@ -215,6 +226,7 @@ class ScheduleDefinition:
             override_status=params.get("override_status", None),
             stop_new_instances=params.get("stop_new_instances", None),
             ssm_maintenance_window=params.get("ssm_maintenance_window", None),
+            use_maintenance_window=params.get("use_maintenance_window", None),
             enforced=params.get("enforced", None),
             hibernate=params.get("hibernate", None),
             retain_running=params.get("retain_running", None),
@@ -239,6 +251,11 @@ class ScheduleDefinition:
                 else True
             ),
             ssm_maintenance_window=self.ssm_maintenance_window,
+            use_maintenance_window=(
+                bool(self.use_maintenance_window)
+                if self.use_maintenance_window is not None
+                else True
+            ),
             enforced=bool(self.enforced),
             hibernate=bool(self.hibernate),
             retain_running=bool(self.retain_running),

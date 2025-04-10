@@ -165,6 +165,7 @@ def test_cfn_schedule_with_all_parameters(
             "Hibernate": "True",
             "RetainRunning": "True",
             "StopNewInstances": "True",
+            "UseMaintenanceWindow": "True",
             "SsmMaintenanceWindow": ["my_window_name"],
             "OverrideStatus": "running",
             "Periods": [
@@ -186,7 +187,6 @@ def test_cfn_schedule_with_all_parameters(
             ],
             # deprecated fields that shouldn't cause the template to error
             "Metrics": "True",  # type: ignore[typeddict-unknown-key]
-            "UseMaintenanceWindow": "True",
         }
     )
 
@@ -414,7 +414,7 @@ def test_update_from_deprecated_schedule_format_to_valid_schedule_format_succeed
         "NoStackPrefix": "True",
         "ServiceToken": "serviceTokenARN",
         "Periods": [{"EndTime": "16:59"}],
-        "UseMaintenanceWindow": "True",  # type: ignore[typeddict-unknown-key]
+        "Metrics": "True",  # type: ignore[typeddict-unknown-key]
     }
 
     valid_schedule_req: CfnScheduleResourceProperties = {

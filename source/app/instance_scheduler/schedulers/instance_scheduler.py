@@ -219,7 +219,7 @@ class InstanceScheduler:
         mw_is_running, window_name = self._is_maintenance_window_running(
             instance, current_dt
         )
-        if mw_is_running:
+        if schedule.use_maintenance_window and mw_is_running:
             return SchedulingDecision(
                 instance=instance,
                 action=SchedulingAction.START,

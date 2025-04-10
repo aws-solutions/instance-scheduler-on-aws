@@ -82,6 +82,7 @@ class CfnScheduleResourceProperties(TypedDict, total=False):
     RetainRunning: NotRequired[str]
     StopNewInstances: NotRequired[str]
     SsmMaintenanceWindow: NotRequired[list[str] | str]
+    UseMaintenanceWindow: NotRequired[str]
     OverrideStatus: NotRequired[str]
     Periods: NotRequired[list[CfnSchedulePeriodProperties]]
 
@@ -332,6 +333,9 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
                 ssm_maintenance_window=_ensure_list(
                     resource_properties.get("SsmMaintenanceWindow")
                 ),
+                use_maintenance_window=_parse_bool(
+                    resource_properties.get("UseMaintenanceWindow", None)
+                ),
                 enforced=_parse_bool(resource_properties.get("Enforced", None)),
                 hibernate=_parse_bool(resource_properties.get("Hibernate", None)),
                 retain_running=_parse_bool(
@@ -356,7 +360,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
                 # so we need to not break compatibility
                 continue
 
-            if key in {"UseMaintenanceWindow", "Metrics"}:
+            if key in {"Metrics"}:
                 # deprecated keys that no longer do anything but that not should throw errors
                 self._logger.warning(
                     f'Schedule contains deprecated field "${key}", this field will be ignored.'
