@@ -3,7 +3,7 @@
 import { Stack, StackProps } from "aws-cdk-lib";
 import { ArnPrincipal } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
-import { AppRegistryForInstanceScheduler } from "./app-registry";
+import { AppRegistryIntegration } from "./app-registry";
 import { ParameterWithLabel, YesNoParameter, YesNoType, addParameterGroup, overrideLogicalId } from "./cfn";
 import { SchedulerRole } from "./iam/scheduler-role";
 import { roleArnFor } from "./iam/roles";
@@ -80,7 +80,7 @@ export class SpokeStack extends Stack {
 
     /*The following resources are not supported in the China partition and must be omitted in the china stack*/
     if (props.targetPartition != "China") {
-      new AppRegistryForInstanceScheduler(this, "AppRegistryForInstanceScheduler", {
+      new AppRegistryIntegration(this, "AppRegistryForInstanceScheduler", {
         solutionId: props.solutionId,
         solutionName: props.solutionName,
         solutionVersion: props.solutionVersion,

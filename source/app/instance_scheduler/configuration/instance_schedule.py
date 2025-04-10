@@ -46,6 +46,7 @@ class InstanceSchedule:
     description: Optional[str] = None
     stop_new_instances: bool = True
     ssm_maintenance_window: Optional[Sequence[str]] = None
+    use_maintenance_window: bool = True
     enforced: bool = False
     hibernate: bool = False
     retain_running: bool = False
