@@ -118,6 +118,7 @@ def test_create_schedule_with_2_periods(
             "Enforced": False,
             "Hibernate": False,
             "Type": "schedule",
+            "UseMaintenanceWindow": True,
         }
     }
 
@@ -130,6 +131,7 @@ def test_create_schedule_with_2_periods(
         "retain_running": False,
         "enforced": False,
         "hibernate": False,
+        "use_maintenance_window": True,
     }
 
 
@@ -142,6 +144,7 @@ def test_create_schedule_with_2_maintenance_windows(
         name="cli-schedule",
         periods=["period"],
         ssm_maintenance_window=["window1", "window2"],
+        use_maintenance_window=True,
     )
 
     assert result == {
@@ -150,6 +153,7 @@ def test_create_schedule_with_2_maintenance_windows(
             "Periods": ["period"],
             "StopNewInstances": True,
             "SsmMaintenanceWindow": UnorderedList(["window1", "window2"]),
+            "UseMaintenanceWindow": True,
             "RetainRunning": False,
             "Enforced": False,
             "Hibernate": False,
@@ -164,6 +168,7 @@ def test_create_schedule_with_2_maintenance_windows(
         "periods": {"period"},
         "stop_new_instances": True,
         "ssm_maintenance_window": {"window1", "window2"},
+        "use_maintenance_window": True,
         "retain_running": False,
         "enforced": False,
         "hibernate": False,
@@ -423,7 +428,12 @@ def test_describe_all_schedules_returns_created_schedules(config_table: None) ->
     create_schedule_with_cli(
         periods=["period1"], name="schedule1", stop_new_instances=False
     )
-    create_schedule_with_cli(periods=["period2"], name="schedule2", retain_running=True)
+    create_schedule_with_cli(
+        periods=["period2"],
+        name="schedule2",
+        retain_running=True,
+        use_maintenance_window=False,
+    )
 
     result = describe_schedules_with_cli()
     assert result == {
@@ -437,6 +447,7 @@ def test_describe_all_schedules_returns_created_schedules(config_table: None) ->
                     "RetainRunning": False,
                     "Enforced": False,
                     "Hibernate": False,
+                    "UseMaintenanceWindow": True,
                 },
                 {
                     "Type": "schedule",
@@ -446,6 +457,7 @@ def test_describe_all_schedules_returns_created_schedules(config_table: None) ->
                     "RetainRunning": True,
                     "Enforced": False,
                     "Hibernate": False,
+                    "UseMaintenanceWindow": False,
                 },
             ]
         )
@@ -476,6 +488,7 @@ def test_describe_specific_schedule_returns_expected_schedule(
                 "RetainRunning": False,
                 "Enforced": False,
                 "Hibernate": False,
+                "UseMaintenanceWindow": True,
             },
         ]
     }
@@ -785,6 +798,7 @@ def create_schedule_with_cli(
     enforced: bool = False,
     hibernate: bool = False,
     ssm_maintenance_window: Optional[Sequence[str]] = None,
+    use_maintenance_window: Optional[bool] = True,
     version: str = __version__,
 ) -> Any:
     event: dict[str, Any] = {
@@ -797,6 +811,7 @@ def create_schedule_with_cli(
             "retain_running": retain_running,
             "enforced": enforced,
             "hibernate": hibernate,
+            "use_maintenance_window": use_maintenance_window,
         },
         "version": version,
     }

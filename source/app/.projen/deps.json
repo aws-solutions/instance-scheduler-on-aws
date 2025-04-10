@@ -47,7 +47,7 @@
     },
     {
       "name": "moto",
-      "version": "{version = \"^5.0.2\", extras = [\"autoscaling\",\"dynamodb\",\"ec2\",\"logs\",\"rds\",\"resourcegroupstaggingapi\",\"ssm\"]}",
+      "version": "{version = \"5.0.27\", extras = [\"autoscaling\",\"dynamodb\",\"ec2\",\"logs\",\"rds\",\"resourcegroupstaggingapi\",\"ssm\"]}",
       "type": "devenv"
     },
     {

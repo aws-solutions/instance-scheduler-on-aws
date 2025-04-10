@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.9] -- 2025-4-10
+
+### Security
+- Upgrade Jinja2 to mitigate CVE-2025-27516
+- Upgrade aws-cdk to mitigate CVE-2025-2598
+- Upgrade esbuild to mitigate GHSA-67mh-4wv8-2f99
+- Upgrade OpenSSL to mitigate CVE-2024-12797
+
+### Changed
+- Reintroduced --use-maintenance-window flag for schedules. The flag will be enabled by default but can be set to false
+to disable RDS preferred maintenance windows and EC2 maintenance windows
+
 ## [3.0.8] -- 2025-1-31
 
 ### Updated

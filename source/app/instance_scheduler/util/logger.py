@@ -8,12 +8,12 @@ from instance_scheduler import boto_retry
 
 if TYPE_CHECKING:
     from mypy_boto3_logs.client import CloudWatchLogsClient
-    from mypy_boto3_logs.type_defs import PutLogEventsRequestRequestTypeDef
+    from mypy_boto3_logs.type_defs import PutLogEventsRequestTypeDef
     from mypy_boto3_sns.client import SNSClient
 else:
     CloudWatchLogsClient = object
     SNSClient = object
-    PutLogEventsRequestRequestTypeDef = object
+    PutLogEventsRequestTypeDef = object
 
 LOG_MAX_BATCH_SIZE = 1048576
 LOG_ENTRY_ADDITIONAL = 26
@@ -149,7 +149,7 @@ class Logger:
             if len(self._buffer) == 0:
                 return
 
-            put_event_args: PutLogEventsRequestRequestTypeDef = {
+            put_event_args: PutLogEventsRequestTypeDef = {
                 "logGroupName": self._log_group,
                 "logStreamName": self._log_stream,
                 "logEvents": [

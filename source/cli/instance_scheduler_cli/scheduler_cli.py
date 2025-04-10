@@ -83,6 +83,7 @@ PARAM_KEEP_NEW = "--do-not-stop-new-instances"
 PARAM_WEEKDAYS = "--weekdays"
 PARAM_TIMEZONE = "--timezone"
 PARAM_SSM_MAINTENCE_WINDOW = "--ssm-maintenance-window"
+PARAM_USE_MAIN = "--use-maintenance-window"
 
 PARAM_STACK = "--stack"
 PARAM_REGION = "--region"
@@ -230,6 +231,14 @@ def build_parser() -> ArgumentParser:
             dest="stop_new_instances",
             action="store_false",
             help=HELP_SCHEDULE_KEEP_NEW,
+        )
+
+        schedule_parser.add_argument(
+            PARAM_USE_MAIN,
+            default=True,
+            type=lambda x: x.lower() in ("true", "1", "yes"),
+            dest="use_maintenance_window",
+            help=HELP_SCHEDULE_USE_MAIN,
         )
 
         schedule_parser.add_argument(

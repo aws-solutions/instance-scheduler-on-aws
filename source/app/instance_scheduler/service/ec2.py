@@ -140,7 +140,7 @@ class Ec2Service(Service[EC2Instance]):
         instance_id: Final = instance["InstanceId"]
         schedule_name: Final = tags.get(self._scheduler_tag_key, "")
         schedule = self._scheduling_context.get_schedule(schedule_name)
-        if schedule:
+        if schedule and schedule.use_maintenance_window:
             maint_windows = self._fetch_mw_schedules_for(schedule)
         else:
             maint_windows = []
