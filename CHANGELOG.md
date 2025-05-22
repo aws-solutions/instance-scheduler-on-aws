@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.10] -- 2025-5-22
+
+### Security
+- Upgrade setuptools to mitigate CVE-2025-47273
+- Upgrade aws-cdk to mitigate GHSA-5pq3-h73f-66hr and GHSA-qc59-cxj2-c2w4
+
+### Changed
+- Updated Lambda default memory size to 512MB
+
 ## [3.0.9] -- 2025-4-10
 
 ### Security

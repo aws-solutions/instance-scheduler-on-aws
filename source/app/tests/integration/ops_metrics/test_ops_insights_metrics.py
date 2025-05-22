@@ -69,6 +69,7 @@ def test_op_metric_is_sent_unlimited() -> None:
     assert InsightsMetric.collection_frequency == GatheringFrequency.UNLIMITED
 
 
+@pytest.mark.skip("insights metrics are currently disabled")
 @freeze_time(datetime(2023, 6, 12, 12, 0, 0, tzinfo=ZoneInfo("UTC")))
 def test_op_metrics_sent_to_internal_metrics_endpoint(
     state_table: str,
@@ -172,6 +173,7 @@ def test_op_metrics_sent_to_internal_metrics_endpoint(
     assert sent_metric == expected_metric
 
 
+@pytest.mark.skip("insights metrics are currently disabled")
 @freeze_time(datetime(2023, 6, 12, 12, 0, 0, tzinfo=ZoneInfo("UTC")))
 def test_aws_metrics_still_sent_when_internal_metrics_are_disabled(
     state_table: str,

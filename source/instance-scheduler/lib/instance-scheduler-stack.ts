@@ -258,7 +258,7 @@ export class InstanceSchedulerStack extends Stack {
         "Memory size of the Lambda function that schedules EC2 and RDS resources. Increase if you are experiencing high memory usage or timeouts.",
       type: "Number",
       allowedValues: memorySizeValues,
-      default: 128,
+      default: 512,
     });
 
     const asgHandlerMemorySize = new ParameterWithLabel(this, "AsgMemorySize", {
@@ -267,7 +267,7 @@ export class InstanceSchedulerStack extends Stack {
         "Memory size of the Lambda function that schedules ASG resources. Increase if you are experiencing high memory usage or timeouts.",
       type: "Number",
       allowedValues: memorySizeValues,
-      default: 128,
+      default: 512,
     });
 
     const orchestratorMemorySize = new ParameterWithLabel(this, "OrchestratorMemorySize", {
@@ -277,7 +277,7 @@ export class InstanceSchedulerStack extends Stack {
         "scheduling lambdas. Increase if you are experiencing high memory usage or timeouts.",
       type: "Number",
       allowedValues: memorySizeValues,
-      default: 128,
+      default: 512,
     });
 
     const enableDdbDeletionProtection = new EnabledDisabledParameter(this, "ddbDeletionProtection", {

@@ -1,5 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+import os
 from contextlib import contextmanager
 from typing import Iterator
 from unittest.mock import MagicMock, call, patch
@@ -184,6 +185,7 @@ def test_skips_describe_clusters_when_no_tagged_clusters_found(
 
 
 def test_describe_instances_respects_50_arn_filter_limit(moto_backend: None) -> None:
+    os.environ["MOTO_RDS_SNAPSHOT_LIMIT"] = "200"
     # see ADR-0007
     rds_instances = create_rds_instances(150)
     rds_service = build_rds_service()
