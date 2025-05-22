@@ -58,6 +58,7 @@ def create_rds_instances(
             DBInstanceClass=instance_type,
             Engine=engine,
             PreferredMaintenanceWindow=preferred_maintenance_window,
+            BackupRetentionPeriod=0,
         )
         instance_arn = result["DBInstance"]["DBInstanceArn"]
         rds_client.add_tags_to_resource(

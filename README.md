@@ -31,8 +31,10 @@ landing page](https://aws.amazon.com/solutions/implementations/instance-schedule
 
 ### One-Click Deploy From Amazon Web Services
 
-Refer to the [solution landing page](https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/) to
-deploy Instance Scheduler on AWS using our pre-packaged deployment assets.
+**[Launch in AWS Console](https://console.aws.amazon.com/cloudformation/home#/stacks/new?&templateURL=https://s3.amazonaws.com/solutions-reference/instance-scheduler-on-aws/latest/instance-scheduler-on-aws.template&redirectId=GitHub)**
+
+Refer to the [deployment instructions](https://docs.aws.amazon.com/solutions/latest/instance-scheduler-on-aws/step-1-launch-the-instance-scheduler-hub-stack.html) in our implementation guide
+for configuration details and step-by-step instructions on deploying Instance Scheduler on AWS using our pre-packaged deployment assets.
 
 ### Deploy from source code using CDK
 

@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import ANY, MagicMock
 from zoneinfo import ZoneInfo
 
+import pytest
 from freezegun import freeze_time
 from mypy_boto3_ec2.client import EC2Client
 from mypy_boto3_ec2.literals import InstanceTypeType
@@ -81,6 +82,16 @@ def get_sent_scheduling_action_metric(metrics_endpoint: MagicMock) -> Any:
     if not desired_metric:
         raise Exception("metric not found")
     return desired_metric
+
+
+def test_scheduling_execution_does_not_send_scheduling_action_metric_when_no_action_taken(
+    mock_metrics_endpoint: MagicMock,
+) -> None:
+    with MockMetricsEnviron(send_anonymous_metrics=True):
+        context.run_scheduling_request_handler(dt=dt)
+
+        with pytest.raises(Exception, match="metric not found"):
+            get_sent_scheduling_action_metric(mock_metrics_endpoint)
 
 
 @freeze_time(datetime(2023, 6, 12, 12, 0, 0, tzinfo=ZoneInfo("UTC")))

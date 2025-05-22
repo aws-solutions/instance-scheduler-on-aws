@@ -37,7 +37,7 @@ def test_rds_creates_snapshot_when_flag_enabled(
         )  # ensure instance actually stopped
         rds_client: RDSClient = boto3.client("rds")
         result: DBSnapshotMessageTypeDef = rds_client.describe_db_snapshots(
-            DBInstanceIdentifier=rds_instance
+            DBInstanceIdentifier=rds_instance, SnapshotType="manual"
         )
         assert len(result["DBSnapshots"]) == 1
 
@@ -65,6 +65,6 @@ def test_rds_does_not_create_snapshot_when_flag_disabled(
         )  # ensure instance actually stopped
         rds_client: RDSClient = boto3.client("rds")
         result: DBSnapshotMessageTypeDef = rds_client.describe_db_snapshots(
-            DBInstanceIdentifier=rds_instance
+            DBInstanceIdentifier=rds_instance, SnapshotType="manual"
         )
         assert len(result["DBSnapshots"]) == 0

@@ -6,7 +6,7 @@ import { CfnRule, Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events
 import { LambdaFunction as LambdaFunctionTarget } from "aws-cdk-lib/aws-events-targets";
 import { Role } from "aws-cdk-lib/aws-iam";
 import { Alias, Key } from "aws-cdk-lib/aws-kms";
-import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda/lib/function";
+import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { NagSuppressions } from "cdk-nag";

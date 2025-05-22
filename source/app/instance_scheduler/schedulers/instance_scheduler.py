@@ -10,7 +10,6 @@ from instance_scheduler.configuration.scheduling_context import SchedulingContex
 from instance_scheduler.handler.environments.scheduling_request_environment import (
     SchedulingRequestEnvironment,
 )
-from instance_scheduler.ops_metrics.metric_type.insights_metric import InsightsMetric
 from instance_scheduler.ops_metrics.metric_type.instance_count_metric import (
     InstanceCountMetric,
 )
@@ -74,32 +73,29 @@ class InstanceScheduler:
             self._logger,
         )
 
-        collect_metric(
-            SchedulingActionMetric(
-                duration_seconds=time_taken,
-                num_instances_scanned=sum(
-                    count.total() for count in result.instance_counts.by_type().values()
+        actions_taken = result.to_actions_taken(self._scheduling_context.service)
+        if actions_taken:
+            # only gather the metric if actions were actually taken
+            collect_metric(
+                SchedulingActionMetric(
+                    duration_seconds=time_taken,
+                    num_instances_scanned=sum(
+                        count.total()
+                        for count in result.instance_counts.by_type().values()
+                    ),
+                    num_unique_schedules=len(result.instance_counts.by_schedule()),
+                    actions=result.to_actions_taken(self._scheduling_context.service),
                 ),
-                num_unique_schedules=len(result.instance_counts.by_schedule()),
-                actions=result.to_actions_taken(self._scheduling_context.service),
-            ),
-            self._logger,
-        )
-
-        # dashboard metrics
-        cw_metrics = CloudWatchOperationalInsights(self._env, self._logger)
-        service_counts = ServiceInstanceCounts(
-            {self._service.service_name: result.instance_counts}
-        )
-
-        collect_metric(
-            InsightsMetric.from_service_counts(
-                service_counts, self._env.scheduler_frequency_minutes
-            ),
-            self._logger,
-        )
+                self._logger,
+            )
 
         if self._env.enable_ops_monitoring:
+            # dashboard metrics
+            cw_metrics = CloudWatchOperationalInsights(self._env, self._logger)
+            service_counts = ServiceInstanceCounts(
+                {self._service.service_name: result.instance_counts}
+            )
+
             cw_metrics.send_metrics_to_cloudwatch(
                 service_counts, self._env.scheduler_frequency_minutes
             )

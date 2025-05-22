@@ -13,20 +13,24 @@
       "es2022",
       "dom"
     ],
-    "module": "CommonJS",
+    "module": "NodeNext",
     "noEmitOnError": false,
-    "noFallthroughCasesInSwitch": true,
+    "noFallthroughCasesInSwitch": false,
     "noImplicitAny": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "resolveJsonModule": true,
     "strict": true,
     "strictNullChecks": true,
-    "strictPropertyInitialization": true,
+    "strictPropertyInitialization": false,
     "stripInternal": true,
     "target": "ES2022",
+    "moduleResolution": "nodenext",
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
     "forceConsistentCasingInFileNames": true,
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false
@@ -37,7 +41,10 @@
     ".projenrc.ts",
     "projenrc/**/*.ts"
   ],
-  "exclude": [],
+  "exclude": [
+    "node_modules",
+    "cdk.out"
+  ],
   "files": [
     "global.d.ts"
   ]

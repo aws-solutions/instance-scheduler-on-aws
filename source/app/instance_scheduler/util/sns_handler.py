@@ -11,7 +11,7 @@ else:
     SNSClient = object
 
 
-class SnsHandler(Handler):
+class SnsHandler(Handler):  # NOSONAR
     def __init__(
         self,
         *,

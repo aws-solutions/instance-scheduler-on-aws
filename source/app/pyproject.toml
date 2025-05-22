@@ -2,7 +2,7 @@
 
 [tool.poetry]
 name = "instance_scheduler"
-version = "3.0.9"
+version = "3.0.10"
 description = "Instance Scheduler on AWS"
 license = "Apache-2.0"
 authors = [ "Amazon Web Services" ]
@@ -57,7 +57,7 @@ urllib3 = "^1.26.15"
 ]
 
   [tool.poetry.group.dev.dependencies.moto]
-  version = "5.0.27"
+  version = "^5.1.4"
   extras = [
   "autoscaling",
   "dynamodb",

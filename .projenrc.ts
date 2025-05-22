@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.0.9", cdkVersion: "2.188.0" }).synth();
+  new InstanceScheduler({ version: "3.0.10", cdkVersion: "2.196.1" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -413,7 +413,7 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
       "pytest-runner@^6.0.1",
       "pytest-xdist@^3.5.0",
       `python-dateutil@${pythonDateutilVersion}`,
-      `moto@{version = "5.0.27", extras = ${JSON.stringify(motoExtras)}}`, //locked to 5.0.27 until 5.1.4 releases
+      `moto@{version = "^5.1.4", extras = ${JSON.stringify(motoExtras)}}`, //locked to 5.0.27 until 5.1.4 releases
       "types-freezegun@^1.1.10",
       `types-jmespath@${jmespathVersion}`,
       `types-python-dateutil@${pythonDateutilVersion}`,
@@ -451,7 +451,7 @@ class InstanceSchedulerCli extends PythonProject {
       outdir: "./source/cli",
       poetry: true,
       description: "Instance Scheduler on AWS CLI",
-      deps: ["python@^3.8.1", `boto3@${boto3Version}`, `jmespath@^${jmespathVersion}`],
+      deps: ["python@^3.9.0", `boto3@${boto3Version}`, `jmespath@^${jmespathVersion}`],
       pytest: false,
       ...options,
     });
@@ -463,7 +463,7 @@ class InstanceSchedulerCli extends PythonProject {
     [
       `boto3-stubs-lite@{version = "${boto3Version}", extras = ${JSON.stringify(boto3StubsExtras)}}`,
       "jsonschema@~4.17.3", // held back, 4.18.0 is a breaking change
-      `moto@{version = "^5.0.2", extras = ${JSON.stringify(motoExtras)}}`,
+      `moto@{version = "^5.1.4", extras = ${JSON.stringify(motoExtras)}}`,
       `types-jmespath@^${jmespathVersion}`,
       "types-PyYAML@^6.0.12.12",
       "types-requests@2.31.0.6", // held back, need to support urllib3@^1
