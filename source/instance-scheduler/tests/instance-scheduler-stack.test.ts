@@ -4,8 +4,7 @@ import { Template } from "aws-cdk-lib/assertions";
 import { createHubStack } from "./instance-scheduler-stack-factory";
 
 // share Templates for testing to avoid redundant Docker builds
-const hubStack = Template.fromStack(createHubStack({ targetPartition: "Commercial" }));
-const hubStackChina = Template.fromStack(createHubStack({ targetPartition: "China" }));
+const hubStack = Template.fromStack(createHubStack());
 
 test("InstanceSchedulerStack snapshot test", () => {
   const resources = hubStack.findResources("AWS::Lambda::Function");
@@ -16,29 +15,6 @@ test("InstanceSchedulerStack snapshot test", () => {
       "Omitted to remove snapshot dependency on code hash";
   }
   expect(hubStackJson).toMatchSnapshot();
-});
-
-test("InstanceSchedulerChinaStack snapshot test", () => {
-  const resources = hubStackChina.findResources("AWS::Lambda::Function");
-  const chinaHubStackJson = hubStackChina.toJSON();
-
-  for (const lambda_function in resources) {
-    chinaHubStackJson["Resources"][lambda_function]["Properties"]["Code"] =
-      "Omitted to remove snapshot dependency on code hash";
-  }
-  expect(hubStackChina).toMatchSnapshot();
-});
-
-test("Commercial stack includes AppRegistry", () => {
-  const appRegResources = hubStack.findResources("AWS::ServiceCatalogAppRegistry::Application");
-
-  expect(appRegResources).not.toBeEmpty();
-});
-
-test("China stack does not include AppRegistry", () => {
-  const appRegResources = hubStackChina.findResources("AWS::ServiceCatalogAppRegistry::Application");
-
-  expect(appRegResources).toBeEmpty();
 });
 
 test("Hub stack has expected defaults for started and stopped tags", () => {

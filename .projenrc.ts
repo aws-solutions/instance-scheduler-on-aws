@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.0.10", cdkVersion: "2.196.1" }).synth();
+  new InstanceScheduler({ version: "3.0.11", cdkVersion: "2.206.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -100,6 +100,8 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     ".temp_redpencil",
     "bom.json",
     "internal/scripts/cfn-guard",
+    "build",
+    "git-info",
     this.testReportDir,
     this.coverageReportDir,
   ];
@@ -451,7 +453,7 @@ class InstanceSchedulerCli extends PythonProject {
       outdir: "./source/cli",
       poetry: true,
       description: "Instance Scheduler on AWS CLI",
-      deps: ["python@^3.9.0", `boto3@${boto3Version}`, `jmespath@^${jmespathVersion}`],
+      deps: ["python@^3.11.0", `boto3@${boto3Version}`, `jmespath@^${jmespathVersion}`],
       pytest: false,
       ...options,
     });

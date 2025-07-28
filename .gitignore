@@ -41,6 +41,8 @@ internal/scripts/redpencil
 .temp_redpencil
 bom.json
 internal/scripts/cfn-guard
+build
+git-info
 deployment/test-reports
 deployment/coverage-reports
 !/jest.config.json

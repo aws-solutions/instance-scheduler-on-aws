@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.0.11] -- 2025-7-28
+### Security
+- Updated urllib3 to mitigate CVE-2025-50182
+- Updated requests to mitigate CVE-2024-47081
+- Updated brace-expansion to mitigate CVE-2025-5889
+- Updated OpenSSL to mitigate CVE-2024-12797
+
+### Changed
+- Minimum supported version of scheduler CLI raised from Python 3.9 to Python 3.11
+
+### Removed
+- Removed AppRegistry integration
+
 ## [3.0.10] -- 2025-5-22
 
 ### Security

@@ -3,7 +3,6 @@
 import { Stack, StackProps } from "aws-cdk-lib";
 import { ArnPrincipal } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
-import { AppRegistryIntegration } from "./app-registry";
 import { ParameterWithLabel, YesNoParameter, YesNoType, addParameterGroup, overrideLogicalId } from "./cfn";
 import { SchedulerRole } from "./iam/scheduler-role";
 import { roleArnFor } from "./iam/roles";
@@ -15,12 +14,9 @@ import { RemoteRegistrationCustomResource } from "./lambda-functions/remote-regi
 import { FunctionFactory, PythonFunctionFactory } from "./lambda-functions/function-factory";
 
 export interface SpokeStackProps extends StackProps {
-  readonly targetPartition: "Commercial" | "China";
   readonly solutionId: string;
   readonly solutionName: string;
   readonly solutionVersion: string;
-  readonly appregApplicationName: string;
-  readonly appregSolutionName: string;
   readonly factory?: FunctionFactory;
 }
 
@@ -77,17 +73,6 @@ export class SpokeStack extends Stack {
     });
 
     const USER_AGENT_EXTRA = `AwsSolution/${props.solutionId}/${props.solutionVersion}`;
-
-    /*The following resources are not supported in the China partition and must be omitted in the china stack*/
-    if (props.targetPartition != "China") {
-      new AppRegistryIntegration(this, "AppRegistryForInstanceScheduler", {
-        solutionId: props.solutionId,
-        solutionName: props.solutionName,
-        solutionVersion: props.solutionVersion,
-        appregAppName: props.appregApplicationName,
-        appregSolutionName: props.appregSolutionName,
-      });
-    }
 
     const schedulingRole = new SchedulerRole(this, "EC2SchedulerCrossAccountRole", {
       assumedBy: new ArnPrincipal(
