@@ -11,7 +11,6 @@ import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { NagSuppressions } from "cdk-nag";
 import { AnonymizedMetricsEnvironment } from "./anonymized-metrics-environment";
-import { AppRegistryIntegration } from "./app-registry";
 import { AsgScheduler } from "./asg-scheduler";
 import { cfnConditionToTrueFalse, overrideRetentionPolicies, overrideLogicalId, overrideProperty } from "./cfn";
 import { addCfnNagSuppressions } from "./cfn-nag";
@@ -28,7 +27,6 @@ import { SpokeRegistrationLambda } from "./lambda-functions/spoke-registration";
 import { SchedulingIntervalToCron } from "./scheduling-interval-mappings";
 
 export interface CoreSchedulerProps {
-  readonly targetPartition: "Commercial" | "China";
   readonly solutionName: string;
   readonly solutionVersion: string;
   readonly solutionId: string;
@@ -56,8 +54,6 @@ export interface CoreSchedulerProps {
   readonly startTags: string;
   readonly stopTags: string;
   readonly enableAwsOrganizations: CfnCondition;
-  readonly appregSolutionName: string;
-  readonly appregApplicationName: string;
   readonly enableOpsInsights: CfnCondition;
   readonly kmsKeyArns: string[];
   readonly factory: FunctionFactory;
@@ -73,22 +69,8 @@ export class CoreScheduler {
   public readonly configTable: Table;
   public readonly topic: Topic;
   public readonly asgOrch: LambdaFunction;
-  public readonly appRegistry?: AppRegistryIntegration;
 
   constructor(scope: Stack, props: CoreSchedulerProps) {
-    /*The following resources are not supported in the China partition and must be omitted in the china stack*/
-    if (props.targetPartition != "China") {
-      this.appRegistry = new AppRegistryIntegration(scope, "AppRegistryForInstanceScheduler", {
-        solutionId: props.solutionId,
-        solutionName: props.solutionName,
-        solutionVersion: props.solutionVersion,
-        appregSolutionName: props.appregSolutionName,
-        appregAppName: props.appregApplicationName,
-      });
-
-      this.appRegistry.addApplicationTags(scope);
-    }
-
     const USER_AGENT_EXTRA = `AwsSolution/${props.solutionId}/${props.solutionVersion}`;
 
     const metricsUuidGenerator = new MetricsUuidGenerator(scope, {
