@@ -15,54 +15,20 @@ function addAppStacks(app: App, props: AppProps): void {
   const solutionDetails = getSolutionContext(app);
 
   new InstanceSchedulerStack(app, "instance-scheduler-on-aws", {
-    targetPartition: "Commercial",
     synthesizer: props.synthesizer,
     description: `(${solutionDetails.solutionId}) ${solutionDetails.solutionName} ${props.solutionVersion}`,
     solutionId: solutionDetails.solutionId,
     solutionName: solutionDetails.solutionName,
     solutionVersion: props.solutionVersion,
-    appregApplicationName: solutionDetails.appRegAppName,
-    appregSolutionName: solutionDetails.appRegSolutionName,
     analyticsReporting: false,
   });
 
   new SpokeStack(app, "instance-scheduler-on-aws-remote", {
-    targetPartition: "Commercial",
     synthesizer: props.synthesizer,
     description: `(${solutionDetails.solutionId}S) ${solutionDetails.solutionName} remote ${props.solutionVersion}`,
     solutionId: solutionDetails.solutionId,
     solutionName: solutionDetails.solutionName,
     solutionVersion: props.solutionVersion,
-    appregApplicationName: solutionDetails.appRegAppName,
-    appregSolutionName: solutionDetails.appRegSolutionName,
-    analyticsReporting: false,
-  });
-}
-
-function addAppChinaStacks(app: App, props: AppProps): void {
-  const solutionDetails = getSolutionContext(app);
-
-  new InstanceSchedulerStack(app, "instance-scheduler-on-aws-cn", {
-    targetPartition: "China",
-    synthesizer: props.synthesizer,
-    description: `(${solutionDetails.solutionId}) ${solutionDetails.solutionName} ${props.solutionVersion}-China`,
-    solutionId: solutionDetails.solutionId,
-    solutionName: solutionDetails.solutionName,
-    solutionVersion: props.solutionVersion,
-    appregApplicationName: solutionDetails.appRegAppName,
-    appregSolutionName: solutionDetails.appRegSolutionName,
-    analyticsReporting: false,
-  });
-
-  new SpokeStack(app, "instance-scheduler-on-aws-remote-cn", {
-    targetPartition: "China",
-    synthesizer: props.synthesizer,
-    description: `(${solutionDetails.solutionId}S) ${solutionDetails.solutionName} remote ${props.solutionVersion}-China`,
-    solutionId: solutionDetails.solutionId,
-    solutionName: solutionDetails.solutionName,
-    solutionVersion: props.solutionVersion,
-    appregApplicationName: solutionDetails.appRegAppName,
-    appregSolutionName: solutionDetails.appRegSolutionName,
     analyticsReporting: false,
   });
 }
@@ -92,7 +58,6 @@ function main(): void {
   Aspects.of(app).add(new AwsSolutionsChecks({ verbose: true }));
 
   addAppStacks(app, { solutionVersion, synthesizer });
-  addAppChinaStacks(app, { solutionVersion, synthesizer });
 }
 
 main();

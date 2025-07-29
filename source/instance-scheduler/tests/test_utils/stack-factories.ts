@@ -83,7 +83,6 @@ export function newCoreScheduler(): Template {
   const stack = new Stack();
 
   new CoreScheduler(stack, {
-    targetPartition: "Commercial",
     solutionName,
     solutionVersion,
     solutionId,
@@ -111,8 +110,6 @@ export function newCoreScheduler(): Template {
     startTags,
     stopTags,
     enableAwsOrganizations: trueCondition(stack, conditions.enableAwsOrgs),
-    appregApplicationName,
-    appregSolutionName,
     enableOpsInsights: trueCondition(stack, conditions.deployOpsInsightsDashboard),
     kmsKeyArns: ["*"],
     factory: new TestFunctionFactory(),
