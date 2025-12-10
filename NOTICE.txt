@@ -777,11 +777,60 @@ mypy-boto3-sts under the MIT license.
 pytest-mock under the MIT license.
 pytest-runner under the MIT license.
 pytest-xdist under the MIT license.
-referencing 
 rpds-py under the MIT license.
 types-freezegun under the Apache-2.0 license license(s).
 types-python-dateutil under the Apache-2.0 license.
 tzdata under the Apache-2.0 license.
+@aws-sdk/xml-builder under the Apache-2.0 license.
+@smithy/uuid under the Apache-2.0 license.
+@aws-sdk/credential-provider-login under the Apache-2.0 license.
+@aws/lambda-invoke-store under the Apache-2.0 license.
+@aws-sdk/dynamodb-codec under the Apache-2.0 license.
+@aws-crypto/crc32c under the Apache-2.0 license.
+@aws-crypto/sha1-browser under the Apache-2.0 license.
+@aws-sdk/client-cloudwatch under the Apache-2.0 license.
+@aws-sdk/client-iam under the Apache-2.0 license.
+@aws-sdk/client-s3 under the Apache-2.0 license.
+@aws-sdk/client-sns under the Apache-2.0 license.
+@aws-sdk/client-sqs under the Apache-2.0 license.
+@aws-sdk/middleware-bucket-endpoint under the Apache-2.0 license.
+@aws-sdk/middleware-expect-continue under the Apache-2.0 license.
+@aws-sdk/middleware-flexible-checksums under the Apache-2.0 license.
+@aws-sdk/middleware-location-constraint under the Apache-2.0 license.
+@aws-sdk/middleware-sdk-s3 under the Apache-2.0 license.
+@aws-sdk/middleware-sdk-sqs under the Apache-2.0 license.
+@aws-sdk/middleware-ssec under the Apache-2.0 license.
+@aws-sdk/signature-v4-multi-region under the Apache-2.0 license.
+@aws-sdk/util-arn-parser under the Apache-2.0 license.
+@smithy/chunked-blob-reader under the Apache-2.0 license.
+@smithy/chunked-blob-reader-native under the Apache-2.0 license.
+@smithy/hash-blob-browser under the Apache-2.0 license.
+@smithy/hash-stream-node under the Apache-2.0 license.
+@smithy/md5-js under the Apache-2.0 license.
+@smithy/middleware-compression under the Apache-2.0 license.
+fflate under the MIT license.
+@esbuild/openharmony-arm64 under the MIT license.
+is-negative-zero under the MIT license.
+stop-iteration-iterator under the MIT license.
+generator-function under the MIT license.
+baseline-browser-mapping under the Apache-2.0 license.
+@babel/helper-globals under the MIT license.
+@jridgewell/remapping under the MIT license.
+end-of-stream under the MIT license.
+just-diff under the MIT license.
+just-diff-apply under the MIT license.
+nice-try under the MIT license.
+p-finally under the MIT license.
+parse-conflict-json under the ISC license.
+pump under the MIT license.
+strip-eof under the MIT license.
+handlebars under the MIT license.
+neo-async under the MIT license.
+wordwrap under the MIT license.
+uglify-js under the BSD-2-Clause license.
+librt under the MIT license.
+typing-inspection under the MIT license.
+referencing 
 
 ********************
 OPEN SOURCE LICENSES
