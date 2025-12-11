@@ -111,18 +111,13 @@
       "type": "devenv"
     },
     {
-      "name": "types-urllib3",
-      "version": "^1.26.15",
-      "type": "devenv"
-    },
-    {
       "name": "tzdata",
       "version": "^2023.3",
       "type": "devenv"
     },
     {
       "name": "urllib3",
-      "version": "^1.26.15",
+      "version": "^2.6.0",
       "type": "devenv"
     },
     {

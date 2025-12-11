@@ -130,7 +130,7 @@ class CustomResource(
     # Test if event is a request custom resource request from cloudformation
     @staticmethod
     def is_handling_request(
-        event: Mapping[str, Any]
+        event: Mapping[str, Any],
     ) -> TypeGuard[CustomResourceRequest[ResourcePropertiesType]]:
         return event.get("StackId") is not None
 
@@ -148,12 +148,12 @@ class CustomResource(
     # Returns the resource properties of the custom resource, these are used to pass data to te custom resource
     @property
     def resource_properties(self) -> ResourcePropertiesType:
-        return self.event.get("ResourceProperties", {})
+        return self.event.get("ResourceProperties", {})  # type: ignore
 
     # Returns the previous resource properties of the custom resource, these are used to customize the updates
     @property
     def old_resource_properties(self) -> ResourcePropertiesType:
-        return self.event.get("OldResourceProperties", {})
+        return self.event.get("OldResourceProperties", {})  # type: ignore
 
     # Returns optional timeout
     @property

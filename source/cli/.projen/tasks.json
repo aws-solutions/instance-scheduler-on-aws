@@ -40,7 +40,7 @@
       "description": "Install dependencies and update lockfile",
       "steps": [
         {
-          "exec": "poetry lock --no-update && poetry install"
+          "exec": "poetry lock && poetry install"
         }
       ]
     },

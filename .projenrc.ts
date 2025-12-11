@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.0.11", cdkVersion: "2.206.0" }).synth();
+  new InstanceScheduler({ version: "3.0.12", cdkVersion: "2.206.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -199,6 +199,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
       "pytest@^7.4.3",
       "pytest-cov@^4.1.0",
       "tox@^4.11.4",
+      "urllib3@2.6.0"
     ];
 
     const commonPythonProjectOptions: CommonPythonProjectOptions = {
@@ -403,7 +404,6 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
     const boto3Version = "^1.34.1";
     const jmespathVersion = "1.0.1";
     const pythonDateutilVersion = "2.8.2";
-    const urllib3Version = "1.26.15";
     [
       `boto3@${boto3Version}`,
       `boto3-stubs-lite@{version = "${boto3Version}", extras = ${JSON.stringify(boto3StubsExtras)}}`,
@@ -420,9 +420,8 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
       `types-jmespath@${jmespathVersion}`,
       `types-python-dateutil@${pythonDateutilVersion}`,
       "types-requests@2.31.0.6", // held back, need to support urllib3@^1
-      `types-urllib3@^${urllib3Version}`,
       "tzdata@^2023.3",
-      `urllib3@^${urllib3Version}`,
+      `urllib3@^2.6.0`,
     ].forEach((spec: string) => this.addDevDependency(spec));
 
     ["aws-lambda-powertools@^3.4.1", "packaging@^24.0"].forEach((spec: string) => this.addDependency(spec));
