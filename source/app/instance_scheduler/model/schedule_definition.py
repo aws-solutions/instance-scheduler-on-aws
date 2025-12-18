@@ -1,7 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+import hashlib
 import inspect
-from dataclasses import dataclass, field
+import json
+from dataclasses import asdict, dataclass, field
 from os import environ
 from typing import (
     TYPE_CHECKING,
@@ -25,6 +27,7 @@ from instance_scheduler.model.ddb_item_utils import (
     skip_if_empty,
     skip_if_none,
 )
+from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.period_identifier import PeriodIdentifier
 from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
 from instance_scheduler.util.validation import (
@@ -61,7 +64,7 @@ class ScheduleParams(TypedDict):
 
 
 def validate_as_schedule_params(
-    untyped_dict: dict[str, Any]
+    untyped_dict: dict[str, Any],
 ) -> TypeGuard[ScheduleParams]:
     """
     validate if an unknown dict conforms to the ScheduleParams shape
@@ -133,7 +136,11 @@ class ScheduleDefinition:
                 f"valid values are running and stopped"
             )
 
-        if not self.periods and not self.override_status:
+        if (
+            not self.periods
+            and not self.override_status
+            and not self.ssm_maintenance_window
+        ):
             raise InvalidScheduleDefinition(
                 "At least one period must be specified for a schedule"
             )
@@ -288,6 +295,22 @@ class ScheduleDefinition:
                 )
         return typed_periods
 
+    def fetch_period_definitions(
+        self,
+        period_store: PeriodDefinitionStore,
+    ) -> list[PeriodDefinition]:
+        periods: list[PeriodDefinition] = []
+        for period_id in self.periods:
+            period_def = period_store.find_by_name(period_id.name)
+
+            if not period_def:
+                raise InvalidScheduleDefinition(
+                    f"Unable to find period definition for {period_id.name}"
+                )
+
+            periods.append(period_def)
+        return periods
+
     def build_timezone(self) -> ZoneInfo:
         if self.timezone:
             return ZoneInfo(self.timezone)
@@ -295,6 +318,16 @@ class ScheduleDefinition:
             return ZoneInfo(environ["DEFAULT_TIMEZONE"])
         else:
             return ZoneInfo("UTC")
+
+    def to_hash(self, period_store: PeriodDefinitionStore) -> str:
+        periods = self.fetch_period_definitions(period_store)
+        hash_data = asdict(self)
+        hash_data["periods"] = [
+            period.to_item() for period in sorted(periods, key=lambda p: p.name)
+        ]
+        return hashlib.sha256(
+            json.dumps(hash_data, sort_keys=True).encode()
+        ).hexdigest()
 
 
 def _period_ids_from_csv(csv_str: Optional[str]) -> Sequence[PeriodIdentifier]:

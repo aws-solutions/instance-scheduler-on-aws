@@ -6,7 +6,7 @@ from instance_scheduler.configuration.running_period import RunningPeriod
 from instance_scheduler.configuration.running_period_dict_element import (
     RunningPeriodDictElement,
 )
-from instance_scheduler.schedulers.instance_states import InstanceStates
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from tests.integration.helpers.ec2_helpers import (
     create_ec2_instances,
     get_current_state,
@@ -25,7 +25,7 @@ one_sided_stop = RunningPeriodDictElement(
 
 
 def test_enforced_1_sided_start_takes_no_action_before_start_time(
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     running_instance, stopped_instance = create_ec2_instances(
         count=2, schedule_name="test-schedule"
@@ -47,7 +47,7 @@ def test_enforced_1_sided_start_takes_no_action_before_start_time(
 
 
 def test_enforced_1_sided_stop_takes_no_action_before_stop_time(
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     running_instance, stopped_instance = create_ec2_instances(
         count=2, schedule_name="test-schedule"
@@ -70,7 +70,7 @@ def test_enforced_1_sided_stop_takes_no_action_before_stop_time(
 
 def test_1_sided_stop_stops_at_stop_time(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     with simple_schedule(endtime="20:00") as context:
         # before stop (populates state table)
@@ -84,7 +84,7 @@ def test_1_sided_stop_stops_at_stop_time(
 
 def test_1_sided_start_starts_at_start_time(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     stop_ec2_instances(ec2_instance)
     with simple_schedule(begintime="10:00") as context:

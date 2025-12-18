@@ -5,30 +5,14 @@ from datetime import datetime, timedelta
 from typing import Optional, Sequence, TypedDict
 from zoneinfo import ZoneInfo
 
-from aws_lambda_powertools import Logger as PowerToolsLogger
-
+from aws_lambda_powertools import Logger
 from instance_scheduler import configuration
 from instance_scheduler.configuration.running_period import RunningPeriod
 from instance_scheduler.configuration.running_period_dict_element import (
     RunningPeriodDictElement,
 )
-from instance_scheduler.schedulers.states import ScheduleState
-from instance_scheduler.util.logger import Logger
+from instance_scheduler.scheduling.states import ScheduleState
 from instance_scheduler.util.time import is_aware
-
-DEBUG_ACTIVE_PERIOD_IN_SCHEDULE = 'Active period{} in schedule "{}": {}'
-DEBUG_NO_RUNNING_PERIODS = 'No running periods at this time found in schedule "{}" for this time, desired state is {}'
-DEBUG_OVERRIDE_STATUS = "Schedule override_status value is {}, desired state is {}"
-DEBUG_SCHEDULE = "Schedule is {}"
-DEBUG_SET_DESIRED_INSTANCE_TYPE = (
-    "Current type of instance is {}, desired type is {}, desired state is set to {} to "
-    "restart instance with the desired type"
-)
-DEBUG_STATE_ANY = (
-    '"Any" state period found for current time in schedule "{}", desired state is {}'
-)
-DEBUG_USED_PERIOD = 'Using period "{}" to set the desired state and instance size'
-DEBUG_USED_TIME_FOR_SCHEDULE = "Time used to determine desired for instance is {}"
 
 
 class PeriodWithDesiredState(TypedDict):
@@ -53,11 +37,11 @@ class InstanceSchedule:
     configured_in_stack: Optional[str] = None
 
     def __post_init__(self) -> None:
-        self._logger: Optional[Logger | PowerToolsLogger] = None
+        self._logger: Optional[Logger] = None
 
-    def _log_debug(self, msg: str, *args: Optional[str]) -> None:
+    def _log_debug(self, msg: str) -> None:
         if self._logger is not None:
-            self._logger.debug(msg, *args)
+            self._logger.debug(msg)
 
     def __str__(  # NOSONAR -- (cog-complexity) is just a string-formatting function
         self,
@@ -124,7 +108,7 @@ class InstanceSchedule:
     def get_desired_state(
         self,
         dt: datetime,
-        logger: Optional[Logger | PowerToolsLogger] = None,
+        logger: Optional[Logger] = None,
         check_adjacent_periods: bool = True,
     ) -> tuple[ScheduleState, Optional[str], Optional[str]]:
         """
@@ -201,7 +185,9 @@ class InstanceSchedule:
                 if self.override_status == configuration.OVERRIDE_STATUS_RUNNING
                 else ScheduleState.STOPPED
             )
-            self._log_debug(DEBUG_OVERRIDE_STATUS, self.override_status, desired_state)
+            self._log_debug(
+                f"Schedule override_status value is {self.override_status}, desired state is {desired_state}"
+            )
             return desired_state, None, "override_status"
 
         # get a list of all period schedules along with their desired states at the specified time

@@ -4,8 +4,7 @@ from datetime import datetime
 
 import pytest
 from dateutil.tz import tzutc
-
-from instance_scheduler.schedulers.instance_states import InstanceStates
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from tests.integration.helpers.ec2_helpers import get_current_state
 from tests.integration.helpers.run_handler import simple_schedule
 
@@ -36,7 +35,7 @@ def test_nth_weekday_scheduling(
     weekdayExpr: str,
     dayRunning: int,
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
 
     with simple_schedule(weekdays={weekdayExpr}) as context:

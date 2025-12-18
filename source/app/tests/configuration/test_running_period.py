@@ -4,7 +4,6 @@ import calendar
 from datetime import datetime, time
 
 import pytest
-
 from instance_scheduler.configuration.running_period import RunningPeriod
 from instance_scheduler.cron.cron_recurrence_expression import CronRecurrenceExpression
 from instance_scheduler.cron.parser import (
@@ -12,7 +11,7 @@ from instance_scheduler.cron.parser import (
     parse_months_expr,
     parse_weekdays_expr,
 )
-from instance_scheduler.schedulers.states import ScheduleState
+from instance_scheduler.scheduling.states import ScheduleState
 from tests.integration.helpers.schedule_helpers import quick_time
 from tests.logger import MockLogger
 

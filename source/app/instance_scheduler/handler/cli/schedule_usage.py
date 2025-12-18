@@ -4,9 +4,9 @@ import json
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
+from aws_lambda_powertools import Logger
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
-from instance_scheduler.schedulers.states import InstanceState, ScheduleState
-from instance_scheduler.util.logger import Logger
+from instance_scheduler.scheduling.states import InstanceState, ScheduleState
 
 
 def get_schedule_usage(

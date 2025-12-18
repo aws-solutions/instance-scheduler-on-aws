@@ -3,7 +3,6 @@
 import { Aws } from "aws-cdk-lib";
 import { Policy, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { NagSuppressions } from "cdk-nag";
-import { addCfnNagSuppressions } from "../cfn-nag";
 import { Construct } from "constructs";
 
 export class AsgSchedulingPermissionsPolicy extends Policy {
@@ -16,6 +15,7 @@ export class AsgSchedulingPermissionsPolicy extends Policy {
           "autoscaling:BatchPutScheduledUpdateGroupAction",
           "autoscaling:BatchDeleteScheduledAction",
           "autoscaling:CreateOrUpdateTags",
+          "autoscaling:DeleteTags",
         ],
         resources: [`arn:${Aws.PARTITION}:autoscaling:*:${Aws.ACCOUNT_ID}:autoScalingGroup:*:autoScalingGroupName/*`],
       }),
@@ -24,11 +24,6 @@ export class AsgSchedulingPermissionsPolicy extends Policy {
         resources: ["*"],
       }),
     );
-
-    addCfnNagSuppressions(this, {
-      id: "W12",
-      reason: "DescribeAutoScalingGroups and autoscaling:DescribeScheduledActions actions require wildcard permissions",
-    });
 
     NagSuppressions.addResourceSuppressions(this, [
       {

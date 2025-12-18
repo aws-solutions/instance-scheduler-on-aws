@@ -31,8 +31,6 @@ DEFAULT_TAGNAME = "Schedule"
 # format for time in configurations
 TIME_FORMAT_STRING = "%H:%M"
 
-# trace flag
-TRACE = "trace"
 
 # enable SSM maintenance windows
 ENABLE_SSM_MAINTENANCE_WINDOWS = "enable_ssm_maintenance_windows"

@@ -9,6 +9,7 @@ from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 class AnonymousMetricWrapper:
     timestamp: str
     uuid: str
+    hub_account_id: str
     solution: str
     version: str
     event_name: str

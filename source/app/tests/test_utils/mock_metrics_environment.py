@@ -17,6 +17,7 @@ class MockMetricsEnviron(MetricsEnvironment):
     solution_version: str = "my-solution-version"
     scheduler_frequency_minutes: int = 5
     metrics_uuid: uuid.UUID = uuid.uuid4()
+    hub_account_id: str = "123456789012"
 
     def _to_env_dict(self) -> dict[str, str]:
         return {
@@ -26,6 +27,7 @@ class MockMetricsEnviron(MetricsEnvironment):
             "SOLUTION_VERSION": self.solution_version,
             "SCHEDULING_INTERVAL_MINUTES": str(self.scheduler_frequency_minutes),
             "METRICS_UUID": str(self.metrics_uuid),
+            "HUB_ACCOUNT_ID": self.hub_account_id,
         }
 
     def __enter__(self) -> "MockMetricsEnviron":

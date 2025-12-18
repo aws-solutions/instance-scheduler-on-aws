@@ -5,7 +5,7 @@ from typing import Final
 
 from instance_scheduler.model import MWStore
 from instance_scheduler.model.maint_win import EC2SSMMaintenanceWindow
-from instance_scheduler.model.store.dynamo_client import hub_dynamo_client
+from instance_scheduler.util.session_manager import hub_dynamo_client
 
 
 class DynamoMWStore(MWStore):

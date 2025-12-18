@@ -3,10 +3,8 @@
 import json
 import re
 from collections.abc import Mapping
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, TypedDict, TypeGuard
 
-from instance_scheduler.boto_retry import get_client_with_standard_retry
 from instance_scheduler.handler import setup_demo_data as demo_data
 from instance_scheduler.handler.environments.main_lambda_environment import (
     MainLambdaEnv,
@@ -19,19 +17,17 @@ from instance_scheduler.model.store.dynamo_period_definition_store import (
 from instance_scheduler.model.store.dynamo_schedule_definition_store import (
     DynamoScheduleDefinitionStore,
 )
+from instance_scheduler.observability.powertools_logging import powertools_logger
 from instance_scheduler.util.custom_resource import (
     CustomResource,
     CustomResourceRequest,
     CustomResourceResponse,
 )
-from instance_scheduler.util.logger import Logger
 
 if TYPE_CHECKING:
     from aws_lambda_powertools.utilities.typing import LambdaContext
-    from mypy_boto3_logs import Client as LogsClient
 else:
     LambdaContext = object
-    LogsClient = object
 
 
 class ServiceSetupResourceProperties(TypedDict):
@@ -42,19 +38,7 @@ class ServiceSetupResourceProperties(TypedDict):
 
 ServiceSetupRequest = CustomResourceRequest[ServiceSetupResourceProperties]
 
-
-ERR_SETTING_CONFIG = "Error setting scheduler configuration {} "
-ERR_SETTING_RETENTION_LAMBDA_LOGGROUP = (
-    "Error setting or deleting retention period for log group {} ({})"
-)
-
-INF_CONFIG_SET = "Scheduler configuration set to {}"
-INFO_DELETE_LOG_RETENTION_POLICY = (
-    "Deleting log retention policy for Lambda CloudWatch loggroup {}"
-)
-INFO_SET_LOG_RETENTION_POLICY = (
-    "Setting log retention policy for Lambda CloudWatch loggroup {} to {} days"
-)
+logger = powertools_logger()
 
 
 class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
@@ -67,22 +51,9 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
         CustomResource.__init__(self, event, context)
         self.config_item_store = DdbConfigItemStore(env.config_table_name)
 
-        # Setup logging
-        classname = self.__class__.__name__
-        dt = datetime.now(timezone.utc)
-        log_stream = "{}-{:0>4d}{:0>2d}{:0>2d}".format(
-            classname, dt.year, dt.month, dt.day
-        )
-        self._logger = Logger(
-            log_group=env.log_group,
-            log_stream=log_stream,
-            topic_arn=env.topic_arn,
-            debug=env.enable_debug_logging,
-        )
-
     @staticmethod
     def is_handling_request(
-        event: Mapping[str, Any]
+        event: Mapping[str, Any],
     ) -> TypeGuard[CustomResourceRequest[ServiceSetupResourceProperties]]:
         return (
             event.get("StackId") is not None
@@ -95,40 +66,10 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
         :return:
         """
 
-        try:
-            self._logger.info(
-                "Handler {} : Received request {}",
-                self.__class__.__name__,
-                json.dumps(self.event),
-            )
-            CustomResource.handle_request(self)
-        finally:
-            self._logger.flush()
-
-    def set_lambda_logs_retention_period(self) -> None:
-        """
-        Sets the retention period of the log group associated with the Lambda context to
-        - resource_properties["log_retention_days"] if present
-        - default value of 30 otherwise
-        """
-        # note: this only updates the log retention of the Main lambda
-        if not self.context:
-            return
-
-        loggroup: str = self.context.log_group_name
-        log_client: LogsClient = get_client_with_standard_retry("logs")
-        retention_days = int(self.resource_properties.get("log_retention_days", 30))
-        try:
-            self._logger.info(INFO_SET_LOG_RETENTION_POLICY, loggroup, retention_days)
-            log_client.put_retention_policy(
-                logGroupName=loggroup, retentionInDays=int(retention_days)
-            )
-        except Exception as ex:
-            self._logger.warning(
-                ERR_SETTING_RETENTION_LAMBDA_LOGGROUP,
-                self.context.log_group_name,
-                str(ex),
-            )
+        logger.info(
+            f"Handler {self.__class__.__name__} : Received request {json.dumps(self.event)}"
+        )
+        CustomResource.handle_request(self)
 
     def _create_sample_schemas(self) -> None:
         try:
@@ -142,14 +83,11 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
                 schedule_store.put(demo_schedule)
 
         except Exception as ex:
-            self._logger.error(
-                "Error creating sample schedules and periods {}".format(ex)
-            )
+            logger.error(f"Error creating sample schedules and periods {ex}")
 
     # handles Create request from CloudFormation
     def _create_request(self) -> CustomResourceResponse:
         self._create_sample_schemas()
-        self.set_lambda_logs_retention_period()
         if self._env.enable_aws_organizations:
             org_id = parse_as_org_id(self.resource_properties)
             self.config_item_store.put(
@@ -180,15 +118,15 @@ class SchedulerSetupHandler(CustomResource[ServiceSetupResourceProperties]):
             org_id = parse_as_org_id(self.resource_properties)
 
             if org_id == prev_org_id:
-                self._logger.info(
+                logger.info(
                     "org_id has not changed, preserving registered spoke accounts..."
                 )
                 spoke_accounts = self.config_item_store.get().remote_account_ids
-                self._logger.info(
+                logger.info(
                     f"preserved {len(spoke_accounts)} registered spoke accounts"
                 )
             else:
-                self._logger.info(
+                logger.info(
                     f"org_id has not changed from {prev_org_id} to {org_id}, "
                     f"registered spoke accounts will not be preserved"
                 )

@@ -43,6 +43,7 @@ bom.json
 internal/scripts/cfn-guard
 build
 git-info
+.env
 deployment/test-reports
 deployment/coverage-reports
 !/jest.config.json

@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.0.12", cdkVersion: "2.206.0" }).synth();
+  new InstanceScheduler({ version: "3.1.0", cdkVersion: "2.232.2" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -70,7 +70,6 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
   ];
 
   private static readonly devDeps: string[] = [
-    "@cdklabs/cdk-ssm-documents",
     "@types/uuid",
     "@typescript-eslint/eslint-plugin",
     "eslint",
@@ -102,6 +101,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     "internal/scripts/cfn-guard",
     "build",
     "git-info",
+    ".env",
     this.testReportDir,
     this.coverageReportDir,
   ];
@@ -174,6 +174,12 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
 
     this.addScripts({
       "update-deps": "chmod +x ./update-all-dependencies.sh && exec ./update-all-dependencies.sh",
+      "deploy:hub":
+        "source .env && npx cdk deploy instance-scheduler-on-aws --require-approval=never --parameters RetainDataAndLogs=$RETAIN_DATA_AND_LOGS --parameters Trace=$ENABLE_DEBUG_LOGGING",
+      "destroy:hub": "source .env && npx cdk destroy instance-scheduler-on-aws -f",
+      "deploy:spoke":
+        "source .env && npx cdk deploy instance-scheduler-on-aws-remote --require-approval=never --parameters InstanceSchedulerAccount=$HUB_ACCOUNT",
+      "destroy:spoke": "source .env && npx cdk destroy instance-scheduler-on-aws-remote -f",
     });
 
     new YamlFile(this, "solution-manifest.yaml", {
@@ -199,7 +205,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
       "pytest@^7.4.3",
       "pytest-cov@^4.1.0",
       "tox@^4.11.4",
-      "urllib3@2.6.0"
+      "urllib3@^2"
     ];
 
     const commonPythonProjectOptions: CommonPythonProjectOptions = {
@@ -334,7 +340,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
       },
     });
 
-    this.addTask("e2e-tests", { exec: `jest --config ${e2eConfigFile}`, receiveArgs: true });
+    this.addTask("e2e-tests", { exec: `node --experimental-vm-modules node_modules/.bin/jest --config ${e2eConfigFile}`, receiveArgs: true });
   }
 
   private addTypescriptFiles(...files: string[]): void {
@@ -379,7 +385,7 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
       outdir: "./source/app",
       poetry: true,
       description: "Instance Scheduler on AWS",
-      deps: ["python@^3.11"],
+      deps: ["python@^3.12"],
       pytest: false,
       ...options,
     });
@@ -391,24 +397,27 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
       "ec2",
       "ecs",
       "lambda",
+      "events",
       "logs",
       "rds",
       "resourcegroupstaggingapi",
       "sns",
       "ssm",
       "sts",
+      "sqs",
+      "events",
     ];
 
-    const motoExtras = ["autoscaling", "dynamodb", "ec2", "logs", "rds", "resourcegroupstaggingapi", "ssm"];
+    const motoExtras = ["autoscaling", "dynamodb", "ec2", "logs", "rds", "resourcegroupstaggingapi", "ssm", "events"];
 
-    const boto3Version = "^1.34.1";
+    const boto3Version = "^1.40.4";
     const jmespathVersion = "1.0.1";
     const pythonDateutilVersion = "2.8.2";
     [
       `boto3@${boto3Version}`,
       `boto3-stubs-lite@{version = "${boto3Version}", extras = ${JSON.stringify(boto3StubsExtras)}}`,
       `botocore@${boto3Version}`,
-      "botocore-stubs@^1.31.66",
+      `botocore-stubs@${boto3Version}`,
       "freezegun@^1.3.1",
       `jmespath@${jmespathVersion}`,
       "pytest-mock@^3.12.0",
@@ -419,12 +428,11 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
       "types-freezegun@^1.1.10",
       `types-jmespath@${jmespathVersion}`,
       `types-python-dateutil@${pythonDateutilVersion}`,
-      "types-requests@2.31.0.6", // held back, need to support urllib3@^1
+      "types-requests@^2",
       "tzdata@^2023.3",
-      `urllib3@^2.6.0`,
     ].forEach((spec: string) => this.addDevDependency(spec));
 
-    ["aws-lambda-powertools@^3.4.1", "packaging@^24.0"].forEach((spec: string) => this.addDependency(spec));
+    ["aws-lambda-powertools@^3.4.1", "packaging@^24.0", "pydantic", "urllib3@^2",].forEach((spec: string) => this.addDependency(spec));
 
     const pyproject = this.tryFindObjectFile("pyproject.toml");
     if (!pyproject) {
@@ -437,7 +445,7 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
       throw new Error("Could not override install task");
     }
     installTask.reset();
-    installTask.exec("poetry lock --no-update && poetry install");
+    installTask.exec("poetry lock && poetry install");
   }
 }
 
@@ -482,7 +490,7 @@ class InstanceSchedulerCli extends PythonProject {
       throw new Error("Could not override install task");
     }
     installTask.reset();
-    installTask.exec("poetry lock --no-update && poetry install");
+    installTask.exec("poetry lock && poetry install");
   }
 }
 

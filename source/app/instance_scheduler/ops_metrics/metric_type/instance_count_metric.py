@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from instance_scheduler.ops_metrics import GatheringFrequency
 from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 
 
@@ -11,8 +10,8 @@ from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 class InstanceCountMetric(OpsMetric):
     service: str
     region: str
+    account: str
     num_instances: int
     num_schedules: int
     event_name: ClassVar[str] = "instance_count"
-    collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.DAILY
-    context_version: ClassVar[int] = 1
+    context_version: ClassVar[int] = 2

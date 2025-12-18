@@ -2,9 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from typing import TYPE_CHECKING
 
-from moto import mock_aws
-
 from instance_scheduler_cli.scheduler_cli import _service_client
+from moto import mock_aws
 
 if TYPE_CHECKING:
     from mypy_boto3_cloudformation import CloudFormationClient

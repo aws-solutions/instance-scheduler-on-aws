@@ -5,7 +5,6 @@ from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 from _pytest.python_api import raises
-
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
 from instance_scheduler.configuration.running_period import RunningPeriod
 from instance_scheduler.cron.cron_recurrence_expression import CronRecurrenceExpression

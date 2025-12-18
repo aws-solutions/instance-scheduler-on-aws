@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from instance_scheduler.ops_metrics import GatheringFrequency
 from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 
 
@@ -11,5 +10,4 @@ from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 class CliRequestMetric(OpsMetric):
     command_used: str
     event_name: ClassVar[str] = "cli_request"
-    collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.UNLIMITED
-    context_version: ClassVar[int] = 1
+    context_version: ClassVar[int] = 2

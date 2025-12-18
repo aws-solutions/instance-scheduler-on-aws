@@ -3,15 +3,18 @@
 from dataclasses import dataclass
 from typing import Final, Iterable, Optional
 
-from instance_scheduler.configuration.scheduling_context import SchedulingContext
+from instance_scheduler.configuration.scheduling_context import (
+    SchedulingContext,
+)
 from instance_scheduler.maint_win.ssm_mw_client import SSMMWClient
 from instance_scheduler.model import EC2SSMMaintenanceWindow, MWStore
 from instance_scheduler.model.store.in_memory_mw_store import (
     InMemoryMWStore,
     to_account_region_pk,
 )
-from instance_scheduler.util.logger import Logger
-from instance_scheduler.util.session_manager import AssumedRole
+from instance_scheduler.observability.powertools_logging import powertools_logger
+
+logger = powertools_logger()
 
 
 @dataclass(frozen=True)
@@ -41,7 +44,6 @@ class MaintenanceWindowContext:
     """
 
     _context: Final[SchedulingContext]
-    _spoke_scheduler_role: Final[AssumedRole]
     _ddb_store: Final[MWStore]
 
     _prefetched_windows: Optional[dict[str, list[EC2SSMMaintenanceWindow]]] = None
@@ -49,15 +51,11 @@ class MaintenanceWindowContext:
     def __init__(
         self,
         scheduling_context: SchedulingContext,
-        spoke_scheduler_role: AssumedRole,
         mw_store: MWStore,
-        logger: Logger,
     ):
         self._context = scheduling_context
-        self._spoke_scheduler_role = spoke_scheduler_role
-        self._ssm_mw_client = SSMMWClient(spoke_scheduler_role)
+        self._ssm_mw_client = SSMMWClient(scheduling_context.assumed_role)
         self._ddb_store = mw_store
-        self._logger = logger
 
     def reconcile_ssm_with_dynamodb(self) -> None:
         """
@@ -66,13 +64,13 @@ class MaintenanceWindowContext:
         (it only provides info about the next execution in the future) As such, any windows stored in dynamodb and
         currently in a running state need to be preserved until after the running window has concluded
         """
-        self._logger.info(
+        logger.info(
             "Beginning reconciliation of maintenance windows between SSM and DDB"
         )
-        account = self._context.account_id
-        region = self._context.region
+        account = self._context.assumed_role.account
+        region = self._context.assumed_role.region
 
-        raw_ssm_data = SSMMWClient(self._spoke_scheduler_role).get_mws_from_ssm()
+        raw_ssm_data = self._ssm_mw_client.get_mws_from_ssm()
         filtered_ssm_data = _collect_by_nameid(
             self.filter_by_windows_defined_in_schedules(
                 self.filter_by_windows_with_next_execution_time(raw_ssm_data)
@@ -100,7 +98,7 @@ class MaintenanceWindowContext:
                 self._ddb_store.put(updated_window)
                 in_mem_store.put(updated_window)
             except Exception as e:
-                self._logger.error(
+                logger.error(
                     f"error updating maintenance window {updated_window.name_id} -- skipping update. Error: {e}"
                 )
 
@@ -112,7 +110,7 @@ class MaintenanceWindowContext:
                 self._ddb_store.delete(deleted_window)  # update window in ddb
                 in_mem_store.delete(deleted_window)
             except Exception as e:
-                self._logger.error(
+                logger.error(
                     f"error deleting maintenance window {deleted_window.name_id} -- skipping delete. Error: {e}"
                 )
 
@@ -121,7 +119,7 @@ class MaintenanceWindowContext:
             in_mem_store.find_by_account_region(account, region)
         )
 
-        self._logger.info(
+        logger.info(
             f"reconciliation complete! updated: {len(deltas.updated)}, "
             f"deleted: {len(deltas.deleted)}, "
             f"total_windows_loaded: {sum([len(mws) for mws in self._prefetched_windows.values()])}"
@@ -150,9 +148,9 @@ class MaintenanceWindowContext:
         self, windows: Iterable[EC2SSMMaintenanceWindow]
     ) -> Iterable[EC2SSMMaintenanceWindow]:
 
-        # collect all windows referenced by schedules
+        # collect all windows referenced by schedules (must have been preloaded into the cache)
         referenced_windows: set[str] = set()
-        for schedule in self._context.schedules.values():
+        for schedule in self._context.schedule_store.find_all(cache_only=True).values():
             if schedule.ssm_maintenance_window:
                 referenced_windows.update(schedule.ssm_maintenance_window)
 

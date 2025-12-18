@@ -5,7 +5,6 @@ from typing import Final
 from zoneinfo import ZoneInfo
 
 from freezegun import freeze_time
-
 from instance_scheduler.model.maint_win import EC2SSMMaintenanceWindow
 
 # use common UTC zoneinfo in these tests to allow proper emulation of SSM API

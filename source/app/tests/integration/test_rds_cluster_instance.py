@@ -3,9 +3,8 @@
 from typing import TYPE_CHECKING
 
 import boto3
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from mypy_boto3_rds.type_defs import DBClusterMemberTypeDef
-
-from instance_scheduler.schedulers.instance_states import InstanceStates
 from tests.integration.helpers.rds_helpers import (
     get_rds_cluster_state,
     get_rds_instance_state,
@@ -32,8 +31,7 @@ def tag_rds_instance(
 
 
 def test_rds_cluster_instances_are_not_scheduled_individually(
-    rds_cluster: str,
-    rds_instance_states: InstanceStates,
+    rds_cluster: str, scheduling_context: SchedulingContext
 ) -> None:
     rds_client: RDSClient = boto3.client("rds")
 

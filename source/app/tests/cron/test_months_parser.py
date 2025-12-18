@@ -1,7 +1,5 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from pytest import raises
-
 from instance_scheduler.cron.expression import (
     CronAll,
     CronRange,
@@ -9,6 +7,7 @@ from instance_scheduler.cron.expression import (
     CronUnion,
 )
 from instance_scheduler.cron.parser import month_names, parse_months_expr
+from pytest import raises
 
 
 def test_months_parser_parses_none_as_all() -> None:

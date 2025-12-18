@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, Final, Optional, Union
 from zoneinfo import ZoneInfo
 
 from dateutil.parser import isoparse
-
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
 from instance_scheduler.configuration.running_period import RunningPeriod
 from instance_scheduler.configuration.running_period_dict_element import (
@@ -19,7 +18,7 @@ from instance_scheduler.configuration.time_utils import parse_time_str
 from instance_scheduler.cron.cron_recurrence_expression import CronRecurrenceExpression
 from instance_scheduler.cron.expression import CronSingleValueNumeric
 from instance_scheduler.model.ddb_item_utils import skip_if_none
-from instance_scheduler.schedulers.states import ScheduleState
+from instance_scheduler.scheduling.states import ScheduleState
 from instance_scheduler.util.time import is_aware
 from instance_scheduler.util.validation import (
     validate_number_item,

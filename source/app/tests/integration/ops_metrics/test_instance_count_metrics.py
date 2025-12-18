@@ -6,16 +6,12 @@ from typing import Any
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
 
+import pytest
 from freezegun import freeze_time
-
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.period_identifier import PeriodIdentifier
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
-from instance_scheduler.ops_metrics import GatheringFrequency
-from instance_scheduler.ops_metrics.metric_type.instance_count_metric import (
-    InstanceCountMetric,
-)
-from instance_scheduler.schedulers.instance_states import InstanceStates
 from tests.integration.helpers.ec2_helpers import create_ec2_instances
 from tests.integration.helpers.run_handler import SchedulingTestContext
 from tests.integration.helpers.schedule_helpers import quick_time
@@ -49,14 +45,13 @@ def get_sent_instance_count_metric(metrics_endpoint: MagicMock) -> Any:
     return desired_metric
 
 
-def test_instance_count_metric_is_daily_metric() -> None:
-    assert InstanceCountMetric.collection_frequency is GatheringFrequency.DAILY
-
-
+@pytest.mark.skip(
+    "deprecated metric, data to be moved to deployment_description metric"
+)
 @freeze_time(datetime(2023, 6, 12, 12, 0, 0, tzinfo=ZoneInfo("UTC")))
 def test_scheduling_execution_sends_expected_instance_count_metric(
     mock_metrics_endpoint: MagicMock,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     with MockMetricsEnviron(
         send_anonymous_metrics=True

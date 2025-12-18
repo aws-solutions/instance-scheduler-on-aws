@@ -1,40 +1,54 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ArnFormat, Aspects, CfnCondition, Duration, Fn, Stack } from "aws-cdk-lib";
-import { Table } from "aws-cdk-lib/aws-dynamodb";
-import { Effect, Policy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { CfnPermission, Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
-import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
-import { Topic } from "aws-cdk-lib/aws-sns";
+import { Aws, CfnCondition, Duration, Fn, Stack } from "aws-cdk-lib";
+import { Effect, Policy, PolicyStatement, Role, ServicePrincipal, CfnRole, CfnPolicy } from "aws-cdk-lib/aws-iam";
+import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
 import { NagSuppressions } from "cdk-nag";
-import { ConditionAspect, cfnConditionToTrueFalse } from "../cfn";
-import { addCfnNagSuppressions } from "../cfn-nag";
 import { FunctionFactory } from "./function-factory";
-import { SpokeDeregistrationRunbook } from "../runbooks/spoke-deregistration";
+import { InstanceSchedulerDataLayer } from "../instance-scheduler-data-layer";
+import { ISLogGroups } from "../observability/log-groups";
+import { EventBus } from "aws-cdk-lib/aws-events";
+import { SchedulerRole } from "../iam/scheduler-role";
+import { RegionRegistrationCustomResource } from "./region-registration";
+import { addCfnGuardSuppression, addCfnGuardSuppressionCfnResource } from "../helpers/cfn-guard";
+import { updateSSMParams } from "../iam/ssm-params-region-registration-permission";
 
 export interface SpokeRegistrationLambdaProps {
+  readonly dataLayer: InstanceSchedulerDataLayer;
   readonly solutionVersion: string;
-  readonly logRetentionDays: RetentionDays;
-  readonly configTable: Table;
-  readonly snsErrorReportingTopic: Topic;
-  readonly scheduleLogGroup: LogGroup;
   readonly USER_AGENT_EXTRA: string;
-  readonly enableDebugLogging: CfnCondition;
-  readonly principals: string[];
+  readonly schedulingIntervalMinutes: number;
+  readonly scheduleTagKey: string;
+  readonly asgRulePrefix: string;
+  readonly asgMetadataTagKey: string;
+  readonly localEventBusName: string;
+  readonly globalEventBus: EventBus;
   readonly namespace: string;
   readonly enableAwsOrganizations: CfnCondition;
+  readonly principals: string[];
   readonly factory: FunctionFactory;
+  readonly ssmParamUpdateRoleName: string;
+  readonly ssmParamPathName: string;
 }
 export class SpokeRegistrationLambda {
   static getFunctionName(namespace: string) {
     return `InstanceScheduler-${namespace}-SpokeRegistration`;
   }
+  static roleName(namespace: string) {
+    return `${namespace}-SpokeRegistrationHandler-Role`;
+  }
+  static roleNameForSpokeTemplateInvokeFunction(namespace: string) {
+    return `${namespace}-SpokeRegistrationInvokeFunction-Role`;
+  }
+
   readonly lambdaFunction: LambdaFunction;
 
   constructor(scope: Stack, props: SpokeRegistrationLambdaProps) {
     const role = new Role(scope, "SpokeRegistrationRole", {
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
+      roleName: SpokeRegistrationLambda.roleName(props.namespace),
     });
+    addCfnGuardSuppression(role, ["CFN_NO_EXPLICIT_RESOURCE_NAMES"]);
 
     const functionName = SpokeRegistrationLambda.getFunctionName(props.namespace);
 
@@ -42,16 +56,25 @@ export class SpokeRegistrationLambda {
       functionName: functionName,
       description: "spoke account registration handler, version " + props.solutionVersion,
       index: "instance_scheduler/handler/spoke_registration.py",
-      handler: "handle_spoke_registration_event",
-      memorySize: 128,
+      handler: "lambda_handler",
+      memorySize: 512,
+      logGroup: ISLogGroups.adminLogGroup(scope),
       role: role,
-      timeout: Duration.minutes(1),
+      timeout: Duration.minutes(15),
       environment: {
-        CONFIG_TABLE: props.configTable.tableName,
         USER_AGENT_EXTRA: props.USER_AGENT_EXTRA,
-        LOG_GROUP: props.scheduleLogGroup.logGroupName,
-        ISSUES_TOPIC_ARN: props.snsErrorReportingTopic.topicArn,
-        ENABLE_DEBUG_LOGS: cfnConditionToTrueFalse(props.enableDebugLogging),
+        CONFIG_TABLE: props.dataLayer.configTable.tableName,
+        REGISTRY_TABLE: props.dataLayer.registry.tableName,
+        SCHEDULER_ROLE_NAME: SchedulerRole.roleName(props.namespace),
+        SCHEDULE_TAG_KEY: props.scheduleTagKey,
+        HUB_STACK_NAME: Aws.STACK_NAME,
+        SCHEDULING_INTERVAL_MINUTES: props.schedulingIntervalMinutes.toString(),
+        ASG_SCHEDULED_RULES_PREFIX: props.asgRulePrefix,
+        ASG_METADATA_TAG_KEY: props.asgMetadataTagKey,
+        LOCAL_EVENT_BUS_NAME: props.localEventBusName,
+        GLOBAL_EVENT_BUS_NAME: props.globalEventBus.eventBusName,
+        SSM_PARAM_PATH_NAME: props.ssmParamPathName,
+        SSM_PARAM_UPDATE_ROLE_NAME: props.ssmParamUpdateRoleName,
       },
     });
 
@@ -59,67 +82,102 @@ export class SpokeRegistrationLambda {
       throw new Error("lambdaFunction role is missing");
     }
 
-    // GovCloud and GCR regions do not support logging config property which was used to prevent
-    // log group name collisions since the lambda name must be well known.
-    // To work around this a lambda-managed log group and appropriate policy must be used to prevent name collisions.
-    // Thus, log retention cannot be set until these regions reach feature parity.
     const spokeRegistrationPolicy = new Policy(scope, "SpokeRegistrationPolicy", {
       roles: [this.lambdaFunction.role],
       statements: [
         new PolicyStatement({
+          actions: ["sts:AssumeRole"],
           effect: Effect.ALLOW,
-          actions: ["logs:CreateLogGroup"],
           resources: [
-            scope.formatArn({
-              service: "logs",
-              resource: "log-group",
-              resourceName: `/aws/lambda/${functionName}:*`,
-              arnFormat: ArnFormat.COLON_RESOURCE_NAME,
-            }),
+            `arn:${Aws.PARTITION}:iam::*:role/${RegionRegistrationCustomResource.ssmParamUpdateRoleName(props.namespace)}`,
+            `arn:${Aws.PARTITION}:iam::*:role/${SchedulerRole.roleName(props.namespace)}`,
           ],
         }),
-        new PolicyStatement({
-          effect: Effect.ALLOW,
-          actions: ["logs:CreateLogStream", "logs:PutLogEvents"],
-          resources: [
-            scope.formatArn({
-              service: "logs",
-              resource: "log-group",
-              resourceName: `/aws/lambda/${functionName}:log-stream:*`,
-              arnFormat: ArnFormat.COLON_RESOURCE_NAME,
-            }),
-          ],
-        }),
+        updateSSMParams(props.namespace),
       ],
     });
 
-    props.configTable.grantReadWriteData(spokeRegistrationPolicy);
-    props.snsErrorReportingTopic.grantPublish(spokeRegistrationPolicy);
-    props.scheduleLogGroup.grantWrite(spokeRegistrationPolicy);
-
-    // Must use the L1 construct to conditionally create the resource based permission.
-    const permission = new CfnPermission(scope, "SpokeRegistrationLambdaCrossAccountPermission", {
-      functionName: this.lambdaFunction.functionName,
-      principal: "*",
-      principalOrgId: Fn.select(0, props.principals),
-      action: "lambda:InvokeFunction",
-    });
-    Aspects.of(permission).add(new ConditionAspect(props.enableAwsOrganizations));
-
-    new SpokeDeregistrationRunbook(scope, {
-      lambdaFunction: this.lambdaFunction,
-      namespace: props.namespace,
-    });
+    props.dataLayer.configTable.grantReadData(spokeRegistrationPolicy);
+    props.dataLayer.registry.grantReadWriteData(spokeRegistrationPolicy);
+    props.globalEventBus.grantPutEventsTo(spokeRegistrationPolicy);
+    ISLogGroups.adminLogGroup(scope).grantWrite(spokeRegistrationPolicy);
 
     const defaultPolicy = this.lambdaFunction.role.node.tryFindChild("DefaultPolicy");
     if (!defaultPolicy) {
       throw Error("Unable to find default policy on lambda role");
     }
 
-    addCfnNagSuppressions(defaultPolicy, {
-      id: "W12",
-      reason: "Wildcard required for xray",
+    const isPrincipalsNotEmpty = new CfnCondition(scope, "isPrincipalsNotEmpty", {
+      expression: Fn.conditionNot(
+        new CfnCondition(scope, "isPrincipalsEmpty", {
+          expression: Fn.conditionEquals(Fn.select(0, props.principals), ""),
+        }),
+      ),
     });
+
+    // spoke account custom resource will use this role to invoke function to register account-regions.
+    const spokeAccountInvokeFunctionRole = new CfnRole(scope, "SpokeAccountInvokeFunctionRole", {
+      roleName: SpokeRegistrationLambda.roleNameForSpokeTemplateInvokeFunction(props.namespace),
+      assumeRolePolicyDocument: Fn.conditionIf(
+        props.enableAwsOrganizations.logicalId,
+        {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: {
+                AWS: "*",
+              },
+              Action: "sts:AssumeRole",
+              Condition: {
+                "ForAnyValue:StringEquals": {
+                  "aws:PrincipalOrgID": Fn.select(0, props.principals),
+                },
+                ArnLike: {
+                  "aws:PrincipalArn": `arn:aws:iam::*:role/${RegionRegistrationCustomResource.invokeFunctionRemoteRoleName(props.namespace)}`,
+                },
+              },
+            },
+          ],
+        },
+        {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: {
+                AWS: props.principals,
+              },
+              Action: "sts:AssumeRole",
+              Condition: {
+                ArnLike: {
+                  "aws:PrincipalArn": `arn:aws:iam::*:role/${RegionRegistrationCustomResource.invokeFunctionRemoteRoleName(props.namespace)}`,
+                },
+              },
+            },
+          ],
+        },
+      ),
+    });
+
+    spokeAccountInvokeFunctionRole.cfnOptions.condition = isPrincipalsNotEmpty;
+    addCfnGuardSuppressionCfnResource(spokeAccountInvokeFunctionRole, ["CFN_NO_EXPLICIT_RESOURCE_NAMES"]);
+
+    const spokeAccountInvokeFunctionPolicy = new Policy(scope, "SpokeAccountInvokeFunctionPolicy", {
+      statements: [
+        new PolicyStatement({
+          actions: ["lambda:InvokeFunction"],
+          effect: Effect.ALLOW,
+          resources: [`arn:${Aws.PARTITION}:lambda:${Aws.REGION}:${Aws.ACCOUNT_ID}:function:${functionName}`],
+        }),
+      ],
+    });
+    spokeAccountInvokeFunctionPolicy.attachToRole(
+      Role.fromRoleArn(scope, "SpokeAccountInvokeFunctionRoleRef", spokeAccountInvokeFunctionRole.attrArn),
+    );
+    spokeAccountInvokeFunctionPolicy.node.addDependency(spokeAccountInvokeFunctionRole);
+    const spokeAccountInvokeFunctionPolicyCfnPolicy = spokeAccountInvokeFunctionPolicy.node.defaultChild as CfnPolicy;
+    spokeAccountInvokeFunctionPolicyCfnPolicy.cfnOptions.condition = isPrincipalsNotEmpty;
 
     NagSuppressions.addResourceSuppressions(defaultPolicy, [
       {
@@ -135,49 +193,6 @@ export class SpokeRegistrationLambda {
         appliesTo: ["Action::kms:GenerateDataKey*", "Action::kms:ReEncrypt*"],
         reason: "Permission to use solution CMK with dynamo/sns",
       },
-      {
-        id: "AwsSolutions-IAM5",
-        appliesTo: [
-          "Resource::arn:<AWS::Partition>:logs:<AWS::Region>:<AWS::AccountId>:log-group:/aws/lambda/InstanceScheduler-<Namespace>-SpokeRegistration:*",
-          "Resource::arn:<AWS::Partition>:logs:<AWS::Region>:<AWS::AccountId>:log-group:/aws/lambda/InstanceScheduler-<Namespace>-SpokeRegistration:log-stream:*",
-        ],
-        reason: "Wildcard required for creating and writing to log group and stream",
-      },
     ]);
-
-    addCfnNagSuppressions(
-      this.lambdaFunction,
-      {
-        id: "W89",
-        reason: "This Lambda function does not need to access any resource provisioned within a VPC.",
-      },
-      {
-        id: "W58",
-        reason: "This Lambda function has permission provided to write to CloudWatch logs using the iam roles.",
-      },
-      {
-        id: "W92",
-        reason:
-          "Lambda function is invoke by new account registration/deregistration events and is not likely to have much concurrency",
-      },
-      {
-        id: "F13",
-        reason:
-          "This lambda scopes invoke permissions to members of the same AWS organization. This is the narrowest possible" +
-          " scope that still allows new spoke accounts to register themselves with the hub after being deployed",
-      },
-    );
-
-    // This L1 resource does not work with the addCfnNagSuppressions helper function
-    permission.addMetadata("cfn_nag", {
-      rules_to_suppress: [
-        {
-          id: "F13",
-          reason:
-            "Lambda permission policy requires principal wildcard for spoke accounts to self register by invoking this function." +
-            "This is acceptable as we are narrowing the authorized accounts to only those contained within the org via principalOrgId",
-        },
-      ],
-    });
   }
 }

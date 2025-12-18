@@ -28,7 +28,9 @@ action_not_failing: Final = MagicMock(
 
 
 def test_bisect_retry_no_inputs_not_called() -> None:
-    bisect_retry([], action_not_failing)
+    result = bisect_retry([], action_not_failing)
+    assert len(result.success_responses) == 0
+    assert len(result.failure_responses) == 0
     action_not_failing.assert_not_called()
 
 
@@ -36,7 +38,10 @@ def test_bisect_retry_no_errors_called_once() -> None:
     inputs: Final = [[0], list(range(2)), list(range(1000))]
     for example in inputs:
         action_not_failing.reset_mock()
-        bisect_retry(example, action_not_failing)
+        result = bisect_retry(example, action_not_failing)
+        assert len(result.success_responses) == 1
+        assert len(result.failure_responses) == 0
+        assert result.success_responses[0].successful_input == example
         action_not_failing.assert_called_once_with(example)
 
 
@@ -105,11 +110,11 @@ def test_bisect_retry_many_errors() -> None:
     # expected sum if all failing inputs are represented in failure responses
     expected_sum: Final = reduce(operator.add, failing_inputs)
     actual_sum = 0
-    for item in result.failure_responses:
-        actual_sum += item.failed_input
-        assert isinstance(item.error, ValueError)
-    for item in result.success_responses:
-        assert item is None
+    for failure in result.failure_responses:
+        actual_sum += failure.failed_input
+        assert isinstance(failure.error, ValueError)
+    for success in result.success_responses:
+        assert success.response is None
     assert actual_sum == expected_sum
 
     # \sum_{i=0}^{log_2(n)} 2^i = 2n-1

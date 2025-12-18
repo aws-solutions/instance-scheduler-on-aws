@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 from unittest.mock import ANY, MagicMock, patch
 
-from instance_scheduler.util.session_manager import assume_role
+from instance_scheduler.util.session_manager import (
+    AssumedRole,
+    assume_role,
+    lambda_execution_role,
+)
 
 
 @patch("instance_scheduler.util.session_manager.Session")
@@ -51,3 +55,29 @@ def test_uses_correct_domain_in_china(
         endpoint_url=f"https://sts.{region_name}.amazonaws.com.cn",
         config=ANY,
     )
+
+
+def test_assumed_role_client_uses_default_region() -> None:
+    """Test that AssumedRole.client uses the role's region when no region is provided"""
+    mock_session = MagicMock()
+    assumed_role = AssumedRole(
+        session=mock_session,
+        role_name="test-role",
+        account="123456789012",
+        region="us-west-2",
+    )
+
+    assumed_role.client("ec2")
+
+    mock_session.client.assert_called_once_with(
+        "ec2", region_name="us-west-2", config=ANY
+    )
+
+
+def test_lambda_execution_role(moto_backend: None) -> None:
+    """Test that lambda_execution_role returns correct AssumedRole with current session info"""
+    result = lambda_execution_role()
+
+    assert result.account == "123456789012"  # moto default acct
+    assert result.region == "us-east-1"  # moto default region
+    assert result.role_name == ""

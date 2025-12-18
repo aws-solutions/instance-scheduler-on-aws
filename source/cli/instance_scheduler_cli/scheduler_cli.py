@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 import boto3
 import jmespath
-
 from instance_scheduler_cli import __version__
 
 EVENT_SOURCE = "scheduler.cli"

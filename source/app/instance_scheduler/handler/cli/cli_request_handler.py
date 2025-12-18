@@ -7,8 +7,6 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Callable, TypeGuard, cast
 from zoneinfo import ZoneInfo
 
-from packaging.version import Version
-
 from instance_scheduler import __version__
 from instance_scheduler.handler.base import MainHandler
 from instance_scheduler.handler.cli.schedule_usage import get_schedule_usage
@@ -39,13 +37,14 @@ from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleAlreadyExistsException,
     UnknownScheduleException,
 )
+from instance_scheduler.observability.powertools_logging import powertools_logger
 from instance_scheduler.ops_metrics.metric_type.cli_request_metric import (
     CliRequestMetric,
 )
 from instance_scheduler.ops_metrics.metrics import collect_metric
 from instance_scheduler.util import safe_json
-from instance_scheduler.util.logger import Logger
 from instance_scheduler.util.validation import ValidationException, validate_string
+from packaging.version import Version
 
 if TYPE_CHECKING:
     from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -55,9 +54,9 @@ else:
 CURRENT_CLI_VERSION = __version__
 MINIMUM_SUPPORTED_CLI_VERSION = "3.0.0"
 
-CLI_SOURCE = "scheduler.cli"
+logger = powertools_logger()
 
-LOG_STREAM = "{}-{:0>4d}{:0>2d}{:0>2d}"
+CLI_SOURCE = "scheduler.cli"
 
 AdminCliRequest = dict[str, Any]
 
@@ -91,17 +90,6 @@ class CliRequestHandler(MainHandler[AdminCliRequest]):
         self._context = context
         self._schedule_store = DynamoScheduleDefinitionStore(env.config_table_name)
         self._period_store = DynamoPeriodDefinitionStore(env.config_table_name)
-
-        # Setup logging
-        classname = self.__class__.__name__
-        dt = datetime.now(timezone.utc)
-        log_stream = LOG_STREAM.format(classname, dt.year, dt.month, dt.day)
-        self._logger = Logger(
-            log_group=env.log_group,
-            log_stream=log_stream,
-            topic_arn=env.topic_arn,
-            debug=env.enable_debug_logging,
-        )
 
     @property
     def action(self) -> Any:
@@ -168,10 +156,8 @@ class CliRequestHandler(MainHandler[AdminCliRequest]):
             return d
 
         try:
-            self._logger.info(
-                "Handler {} : Received CLI request {}",
-                self.__class__.__name__,
-                json.dumps(self._event),
+            logger.info(
+                f"Handler {self.__class__.__name__} : Received CLI request {json.dumps(self._event)}"
             )
 
             # Supports cli versions from some minimum version to current solution minor version
@@ -187,9 +173,7 @@ class CliRequestHandler(MainHandler[AdminCliRequest]):
                     f"CLI version {self.version} is not supported for this version of the solution. Please update to a supported version ({get_supported_cli_versions()})."
                 )
 
-            collect_metric(
-                CliRequestMetric(command_used=self.action), logger=self._logger
-            )
+            collect_metric(CliRequestMetric(command_used=self.action), logger=logger)
 
             api_result = self.handle_command(self.action, self.parameters)
 
@@ -198,17 +182,15 @@ class CliRequestHandler(MainHandler[AdminCliRequest]):
 
             # log formatted result
             json_result = safe_json(result, 3)
-            self._logger.info("Call result is {}", json_result)
+            logger.info(f"Call result is {json_result}")
 
             return json.loads(
                 json_result
             )  # returned as dict to allow lambda to control final format
 
         except Exception as ex:
-            self._logger.info("Call failed, error is {}", str(ex))
+            logger.info(f"Call failed, error is {str(ex)}")
             return {"Error": str(ex)}
-        finally:
-            self._logger.flush()
 
     def handle_command(self, command: str, parameters: dict[str, Any]) -> Any:
         commands: dict[str, Callable[[dict[str, Any]], Any]] = {

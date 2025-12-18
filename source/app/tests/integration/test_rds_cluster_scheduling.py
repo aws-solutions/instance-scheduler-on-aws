@@ -1,10 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from instance_scheduler.handler.environments.main_lambda_environment import (
     MainLambdaEnv,
 )
-from instance_scheduler.schedulers.instance_states import InstanceStates
 from tests.integration.helpers.rds_helpers import (
     get_rds_cluster_state,
     stop_rds_clusters,
@@ -14,8 +13,7 @@ from tests.integration.helpers.schedule_helpers import quick_time
 
 
 def test_rds_cluster_starts_at_beginning_of_period(
-    rds_cluster: str,
-    rds_instance_states: InstanceStates,
+    rds_cluster: str, scheduling_context: SchedulingContext
 ) -> None:
     with simple_schedule(begintime="10:00", endtime="20:00") as context:
         stop_rds_clusters(rds_cluster)
@@ -35,7 +33,7 @@ def test_rds_cluster_starts_at_beginning_of_period(
 
 def test_rds_cluster_stops_at_end_of_period(
     rds_cluster: str,
-    rds_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
     test_suite_env: MainLambdaEnv,
 ) -> None:
     with simple_schedule(begintime="10:00", endtime="20:00") as context:

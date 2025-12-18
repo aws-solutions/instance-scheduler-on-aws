@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 from datetime import datetime, timezone
 
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from instance_scheduler.model.period_definition import PeriodDefinition
-from instance_scheduler.schedulers.instance_states import InstanceStates
 from tests.integration.helpers.ec2_helpers import get_current_state
 from tests.integration.helpers.run_handler import multi_period_schedule
 from tests.integration.helpers.schedule_helpers import quick_time
@@ -11,7 +11,7 @@ from tests.integration.helpers.schedule_helpers import quick_time
 
 def test_adjacent_periods_do_not_get_stopped_in_the_middle(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     with multi_period_schedule(
         period_definitions=[
@@ -30,7 +30,7 @@ def test_adjacent_periods_do_not_get_stopped_in_the_middle(
 
 def test_adjacent_periods_across_midnight_do_not_get_stopped_in_the_middle(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
 
     with multi_period_schedule(
@@ -54,7 +54,7 @@ def test_adjacent_periods_across_midnight_do_not_get_stopped_in_the_middle(
 
 def test_not_running_period(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     # example schedule that turns an instance off from 6pm to 7pm on tuesdays
     with multi_period_schedule(
