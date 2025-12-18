@@ -10,9 +10,8 @@ from mypy_boto3_ec2.type_defs import (
     DescribeInstanceStatusResultTypeDef,
     TagTypeDef,
 )
-
 from tests.conftest import get_ami
-from tests.integration.helpers.boto_client_helpers import client_in_account_region
+from tests.integration.helpers.boto_client_helpers import assume_mocked_role
 
 
 def create_ec2_instances(
@@ -22,7 +21,7 @@ def create_ec2_instances(
     region: str = "us-east-1",
     instance_type: InstanceTypeType = "t2.micro",
 ) -> tuple[str, ...]:
-    ec2_client: EC2Client = client_in_account_region("ec2", account, region)
+    ec2_client: EC2Client = assume_mocked_role(account, region).client("ec2")
     create_response = ec2_client.run_instances(
         ImageId=get_ami(region),
         MinCount=count,
@@ -42,7 +41,7 @@ def stop_ec2_instances(
     account: str = "123456789012",
     region: str = "us-east-1",
 ) -> None:
-    ec2_client: EC2Client = client_in_account_region("ec2", account, region)
+    ec2_client: EC2Client = assume_mocked_role(account, region).client("ec2")
     ec2_client.stop_instances(InstanceIds=instance_ids)
 
 
@@ -51,7 +50,7 @@ def start_ec2_instances(
     account: str = "123456789012",
     region: str = "us-east-1",
 ) -> None:
-    ec2_client: EC2Client = client_in_account_region("ec2", account, region)
+    ec2_client: EC2Client = assume_mocked_role(account, region).client("ec2")
     ec2_client.start_instances(InstanceIds=instance_ids)
 
 

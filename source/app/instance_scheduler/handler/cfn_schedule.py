@@ -1,11 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from collections.abc import Mapping
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, NotRequired, Optional, TypedDict, TypeGuard
 
 from botocore.exceptions import ClientError
-
 from instance_scheduler.handler.environments.main_lambda_environment import (
     MainLambdaEnv,
 )
@@ -18,12 +16,12 @@ from instance_scheduler.model.store.dynamo_period_definition_store import (
 from instance_scheduler.model.store.dynamo_schedule_definition_store import (
     DynamoScheduleDefinitionStore,
 )
+from instance_scheduler.observability.powertools_logging import powertools_logger
 from instance_scheduler.util.custom_resource import (
     CustomResource,
     CustomResourceRequest,
     CustomResourceResponse,
 )
-from instance_scheduler.util.logger import Logger
 
 if TYPE_CHECKING:
     from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -91,6 +89,9 @@ class InvalidScheduleConfiguration(Exception):
     pass
 
 
+logger = powertools_logger()
+
+
 class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
     """
     Implements custom resource handler for CFN support for schedules/periods
@@ -108,26 +109,12 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
         :param context: Lambda context
         """
         CustomResource.__init__(self, event, context)
-        self._logger = self._init_logger(env)
         self.schedule_store = DynamoScheduleDefinitionStore(env.config_table_name)
         self.period_store = DynamoPeriodDefinitionStore(env.config_table_name)
 
-    def _init_logger(self, env: MainLambdaEnv) -> Logger:
-        classname = self.__class__.__name__
-        dt = datetime.now(timezone.utc)
-        log_stream = "{}-{:0>4d}{:0>2d}{:0>2d}".format(
-            classname, dt.year, dt.month, dt.day
-        )
-        return Logger(
-            log_group=env.log_group,
-            log_stream=log_stream,
-            topic_arn=env.topic_arn,
-            debug=env.enable_debug_logging,
-        )
-
     @staticmethod
     def is_handling_request(
-        event: Mapping[str, Any]
+        event: Mapping[str, Any],
     ) -> TypeGuard[CustomResourceRequest[CfnScheduleResourceProperties]]:
         """
         Tests if this handler handles the event
@@ -145,7 +132,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
 
         This request will fail if creating a new schedule would overwrite an existing one
         """
-        self._logger.info(f"received create request for:\n{self.resource_properties}")
+        logger.info(f"received create request for:\n{self.resource_properties}")
         try:
             schedule_def, period_defs = self._parse_schedule_template_item(
                 self.resource_properties
@@ -160,7 +147,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
                         self.period_store.transact_put(period_def, overwrite=False)
                     )
             # ------ End Transaction --------
-            self._logger.info(
+            logger.info(
                 f"successfully created schedule:"
                 f"\n{schedule_def}"
                 f"\n{[str(period_def) for period_def in period_defs]}"
@@ -169,8 +156,6 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
         except ClientError as ce:
             # indicates a transaction failure
             return self.ErrorResponse(reason=f"unable to create schedule: {ce}")
-        finally:
-            self._logger.flush()
 
     def _update_request(self) -> CustomResourceResponse:
         """
@@ -196,7 +181,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
             delete_request against the original resource which will handle the deletion behavior for us.
         """
 
-        self._logger.info(f"received update request for:\n{self.resource_properties}")
+        logger.info(f"received update request for:\n{self.resource_properties}")
         try:
             schedule_def, period_defs = self._parse_schedule_template_item(
                 self.resource_properties
@@ -223,7 +208,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
                         self.period_store.transact_put(period_def, overwrite=True)
                     )
             # ------ End Transaction --------
-            self._logger.info(
+            logger.info(
                 f"successfully updated schedule:"
                 f"\n{schedule_def}"
                 f"\n{[str(period_def) for period_def in period_defs]}"
@@ -232,8 +217,6 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
         except ClientError as ce:
             # indicates a transaction failure
             return self.ErrorResponse(reason=f"unable to update schedule: {ce}")
-        finally:
-            self._logger.flush()
 
             # handles Delete request from CloudFormation
 
@@ -243,7 +226,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
 
         This request will indicate potential problems by failing if the schedule or any of its periods do not exist
         """
-        self._logger.info(f"received delete request for:\n{self.resource_properties}")
+        logger.info(f"received delete request for:\n{self.resource_properties}")
         try:
             schedule_def, period_defs = self._parse_schedule_template_item(
                 self.resource_properties
@@ -262,15 +245,13 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
                         )
                     )
             # ------ End Transaction --------
-            self._logger.info(
+            logger.info(
                 f"successfully deleted schedule {schedule_def.name} and periods {[p_def.name for p_def in period_defs]}"
             )
             return self.OkResponse(physical_resource_id=schedule_def.name)
         except ClientError as ce:
             # indicates a transaction failure
             return self.ErrorResponse(reason=f"unable to delete schedule: {ce}")
-        finally:
-            self._logger.flush()
 
     def _parse_schedule_template_item(
         self, resource_properties: CfnScheduleResourceProperties
@@ -362,7 +343,7 @@ class CfnScheduleHandler(CustomResource[CfnScheduleResourceProperties]):
 
             if key in {"Metrics"}:
                 # deprecated keys that no longer do anything but that not should throw errors
-                self._logger.warning(
+                logger.warning(
                     f'Schedule contains deprecated field "${key}", this field will be ignored.'
                 )
                 continue

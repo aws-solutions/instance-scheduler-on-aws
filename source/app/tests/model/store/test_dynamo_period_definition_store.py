@@ -6,7 +6,6 @@ import boto3
 import pytest
 from _pytest.fixtures import fixture
 from botocore.exceptions import ClientError
-
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.store.ddb_transact_write import WriteTransaction
 from instance_scheduler.model.store.dynamo_period_definition_store import (

@@ -1,17 +1,20 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
+// import { InstanceSchedulerStack } from "../../lib/instance-scheduler-stack";
 import {
   conditions,
-  coreScheduler,
-  logRetentionDays,
+  mockCoreScheduler,
   principals,
   schedulingIntervalMinutes,
+  namespace,
+  stackName,
 } from "../test_utils/stack-factories";
 
+const coreScheduler = mockCoreScheduler();
 describe("core scheduler", function () {
   const functions = coreScheduler.findResources("AWS::Lambda::Function");
   const functionIds = Object.getOwnPropertyNames(functions);
-  expect(functionIds).toHaveLength(8);
+  expect(functionIds).toHaveLength(15);
   const mainFunctionId = functionIds.find((funcId: string) => funcId == "Main");
   if (!mainFunctionId) {
     throw Error("unable to locate main function");
@@ -46,7 +49,7 @@ describe("core scheduler", function () {
     });
 
     describe("policy", function () {
-      it("grants admin access to root principal", function () {
+      it("grants admin access to root principal and cloudwatch", function () {
         expect(key.Properties.KeyPolicy.Statement).toEqual(
           expect.arrayContaining([
             {
@@ -54,8 +57,29 @@ describe("core scheduler", function () {
               Effect: "Allow",
               Principal: {
                 AWS: {
-                  "Fn::Join": ["", ["arn:", { Ref: "AWS::Partition" }, ":iam::", { Ref: "AWS::AccountId" }, ":root"]],
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        Ref: "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        Ref: "AWS::AccountId",
+                      },
+                      ":root",
+                    ],
+                  ],
                 },
+              },
+              Resource: "*",
+            },
+            {
+              Action: ["kms:Decrypt", "kms:Encrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*"],
+              Effect: "Allow",
+              Principal: {
+                Service: "logs.amazonaws.com",
               },
               Resource: "*",
             },
@@ -76,9 +100,7 @@ describe("core scheduler", function () {
       });
 
       it("has expected name", function () {
-        expect(alias.Properties.AliasName).toEqual({
-          "Fn::Join": ["", ["alias/", { Ref: "AWS::StackName" }, "-instance-scheduler-encryption-key"]],
-        });
+        expect(alias.Properties.AliasName).toEqual(`alias/AwsSolutions/InstanceScheduler/${namespace}/${stackName}`);
       });
 
       it("targets key", function () {
@@ -314,7 +336,7 @@ describe("core scheduler", function () {
 
   const logGroups = coreScheduler.findResources("AWS::Logs::LogGroup");
   const logGroupIds = Object.getOwnPropertyNames(logGroups);
-  expect(logGroupIds).toHaveLength(7);
+  expect(logGroupIds).toHaveLength(2);
 
   describe("setup custom resource", function () {
     const setupResources = coreScheduler.findResources("Custom::ServiceSetup");
@@ -331,7 +353,6 @@ describe("core scheduler", function () {
 
     it("has expected properties", function () {
       expect(setupResourceId).toEqual("SchedulerConfigHelper");
-      expect(setupResource.Properties).toHaveProperty("log_retention_days", logRetentionDays);
       expect(setupResource.Properties).toHaveProperty("remote_account_ids", principals);
       expect(setupResource.Properties).toHaveProperty("timeout", 120);
     });

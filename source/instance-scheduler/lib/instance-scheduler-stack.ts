@@ -1,6 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Aws, CfnMapping, CfnOutput, Stack, StackProps } from "aws-cdk-lib";
+import { Aws, CfnCondition, CfnMapping, CfnOutput, Stack, StackProps } from "aws-cdk-lib";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
 import {
@@ -25,8 +25,36 @@ export interface InstanceSchedulerStackProps extends StackProps {
 }
 
 export class InstanceSchedulerStack extends Stack {
+  public static sharedConfig: {
+    retainDataAndLogsCondition: CfnCondition;
+    enableDebugLoggingCondition: CfnCondition;
+    logRetentionDays: number;
+    namespace: string;
+  };
+
   constructor(scope: Construct, id: string, props: InstanceSchedulerStackProps) {
     super(scope, id, props);
+
+    const namespace = new ParameterWithLabel(this, "Namespace", {
+      label: "Namespace",
+      description: "Unique identifier per deployment. Cannot contain spaces.",
+      default: "default",
+    });
+
+    const usingAWSOrganizations = new YesNoParameter(this, "UsingAWSOrganizations", {
+      label: "Use AWS Organizations",
+      description: "Deploy resources to enable automatic spoke stack registration using AWS Organizations.",
+      default: YesNoType.No,
+    });
+
+    const principals = new ParameterWithLabel(this, "Principals", {
+      label: "Organization ID/remote account IDs",
+      type: "CommaDelimitedList",
+      description:
+        "(Required) If using AWS Organizations, provide the Organization ID. Eg. o-xxxxyyy. " +
+        "Else, provide a comma-separated list of spoke account ids (max 40) that should be trusted. Eg.: 1111111111, 2222222222",
+      default: "",
+    });
 
     const scheduleTagKey = new ParameterWithLabel(this, "TagName", {
       label: "Schedule tag key",
@@ -37,12 +65,24 @@ export class InstanceSchedulerStack extends Stack {
       maxLength: 127,
     });
 
-    const schedulerIntervalMinutes = new ParameterWithLabel(this, "SchedulerFrequency", {
-      label: "Scheduling interval (minutes)",
-      type: "Number",
-      description: "Interval in minutes between scheduler executions. For EC2 and RDS",
-      allowedValues: schedulerIntervalValues,
-      default: "5",
+    const retainDataAndLogs = new EnabledDisabledParameter(this, "RetainDataAndLogs", {
+      label: "Retain data and logs",
+      description:
+        "Enable data retention for solution DB tables and logs. When enabled, " +
+        "all solution DB tables, logs, and encryption keys will be retained when deleting this stack. " +
+        "To delete these resources when deleting this stack, first disable this parameter.",
+      default: EnabledDisabledType.Enabled,
+    });
+
+    addParameterGroup(this, {
+      label: `Infrastructure (${props.solutionVersion})`,
+      parameters: [namespace, usingAWSOrganizations, principals, scheduleTagKey, retainDataAndLogs],
+    });
+
+    const enableScheduling = new YesNoParameter(this, "SchedulingActive", {
+      label: "Enable scheduling",
+      description: 'Set to "No" to suspend all scheduling operations.',
+      default: YesNoType.Yes,
     });
 
     const defaultTimezone = new ParameterWithLabel(this, "DefaultTimezone", {
@@ -52,79 +92,59 @@ export class InstanceSchedulerStack extends Stack {
       allowedValues: SUPPORTED_TIME_ZONES,
     });
 
-    const enableScheduling = new YesNoParameter(this, "SchedulingActive", {
-      label: "Enable scheduling",
-      description: 'Set to "No" to disable scheduling for all services.',
-      default: YesNoType.Yes,
+    const schedulerIntervalMinutes = new ParameterWithLabel(this, "SchedulerFrequency", {
+      label: "Scheduling interval (minutes)",
+      type: "Number",
+      description: "Interval in minutes between scheduler executions. For EC2 and RDS",
+      allowedValues: schedulerIntervalValues,
+      default: "5",
     });
-
-    addParameterGroup(this, {
-      label: `Scheduler (${props.solutionVersion})`,
-      parameters: [scheduleTagKey, schedulerIntervalMinutes, defaultTimezone, enableScheduling],
-    });
-
-    const enableEc2 = new EnabledDisabledParameter(this, "ScheduleEC2", {
-      label: "Enable EC2 scheduling",
-      description: "Enable scheduling EC2 instances.",
-      default: EnabledDisabledType.Enabled,
-    });
-
-    const enableRds = new EnabledDisabledParameter(this, "ScheduleRds", {
-      label: "Enable RDS instance scheduling",
-      description: "Enable scheduling individual RDS instances (not clusters).",
-      default: EnabledDisabledType.Enabled,
-    });
-
-    const enableRdsClusters = new EnabledDisabledParameter(this, "EnableRdsClusterScheduling", {
-      label: "Enable RDS cluster scheduling",
-      description: "Enable scheduling RDS clusters (multi-AZ and Aurora).",
-      default: EnabledDisabledType.Enabled,
-    });
-
-    const enableNeptune = new EnabledDisabledParameter(this, "ScheduleNeptune", {
-      label: "Enable Neptune cluster scheduling",
-      description: "Enable scheduling Neptune clusters.",
-      default: EnabledDisabledType.Enabled,
-    });
-
-    const enableDocDb = new EnabledDisabledParameter(this, "ScheduleDocDb", {
-      label: "Enable DocumentDB cluster scheduling",
-      description: "Enable scheduling DocumentDB clusters.",
-      default: EnabledDisabledType.Enabled,
-    });
-
-    const enableAsgs = new EnabledDisabledParameter(this, "ScheduleASGs", {
-      label: "Enable AutoScaling Group scheduling",
-      description: "Enable scheduling AutoScaling Groups",
-      default: EnabledDisabledType.Enabled,
-    });
-
-    addParameterGroup(this, {
-      label: "Services",
-      parameters: [enableEc2, enableRds, enableRdsClusters, enableNeptune, enableDocDb, enableAsgs],
-    });
-
-    const startTags = new ParameterWithLabel(this, "StartedTags", {
-      label: "Start tags",
-      description:
-        "Comma-separated list of tag keys and values of the format key=value, key=value,... that are set on started instances. Leave blank to disable.",
-      default: "InstanceScheduler-LastAction=Started By {scheduler} {year}-{month}-{day} {hour}:{minute} {timezone}",
-    });
-
-    const stopTags = new ParameterWithLabel(this, "StoppedTags", {
-      label: "Stop tags",
-      description:
-        "Comma-separated list of tag keys and values of the format key=value, key=value,... that are set on stopped instances. Leave blank to disable.",
-      default: "InstanceScheduler-LastAction=Stopped By {scheduler} {year}-{month}-{day} {hour}:{minute} {timezone}",
-    });
-
-    addParameterGroup(this, { label: "Tagging", parameters: [startTags, stopTags] });
 
     const enableEc2SsmMaintenanceWindows = new YesNoParameter(this, "EnableSSMMaintenanceWindows", {
       label: "Enable EC2 SSM Maintenance Windows",
       description:
         "Allow schedules to specify a maintenance window name. Instance Scheduler will ensure the instance is running during that maintenance window.",
       default: YesNoType.No,
+    });
+
+    const createRdsSnapshots = new YesNoParameter(this, "CreateRdsSnapshot", {
+      label: "Create RDS instance snapshots on stop",
+      description: "Create snapshots before stopping RDS instances (not clusters).",
+      default: YesNoType.No,
+    });
+
+    const rulePrefix = new ParameterWithLabel(this, "AsgRulePrefix", {
+      label: "ASG action name prefix",
+      description:
+        "The prefix Instance Scheduler will use when naming Scheduled Scaling actions for AutoScaling Groups. Actions with this prefix will be added and removed by Instance Scheduler as needed.",
+      default: "IS-",
+    });
+
+    const scheduledTagKey = new ParameterWithLabel(this, "AsgScheduledTagKey", {
+      label: "ASG scheduled tag key (DEPRECATED)",
+      description: "Deprecated. This parameter exists for migration purposes only and should not be edited.",
+      default: "scheduled",
+    });
+
+    addParameterGroup(this, {
+      label: "GlobalSettings",
+      parameters: [
+        enableScheduling,
+        defaultTimezone,
+        schedulerIntervalMinutes,
+        enableEc2SsmMaintenanceWindows,
+        createRdsSnapshots,
+        rulePrefix,
+        scheduledTagKey,
+      ],
+    });
+
+    const regions = new ParameterWithLabel(this, "Regions", {
+      label: "Region(s)",
+      type: "CommaDelimitedList",
+      description:
+        "Comma-separated List of regions in which resources should be scheduled. Leave blank for current region only.",
+      default: "",
     });
 
     const kmsKeyArns = new ParameterWithLabel(this, "KmsKeyArns", {
@@ -140,68 +160,28 @@ export class InstanceSchedulerStack extends Stack {
       default: "",
     });
 
-    const createRdsSnapshots = new YesNoParameter(this, "CreateRdsSnapshot", {
-      label: "Create RDS instance snapshots on stop",
-      description: "Create snapshots before stopping RDS instances (not clusters).",
-      default: YesNoType.No,
-    });
-
-    const scheduledTagKey = new ParameterWithLabel(this, "AsgScheduledTagKey", {
-      label: "ASG scheduled tag key",
-      description: "Key for the tag Instance Scheduler will add to scheduled AutoScaling Groups",
-      default: "scheduled",
-    });
-
-    const rulePrefix = new ParameterWithLabel(this, "AsgRulePrefix", {
-      label: "ASG action name prefix",
+    const licenseManagerArns = new ParameterWithLabel(this, "LicenseManagerArns", {
+      label: "License Manager Arns for EC2",
       description:
-        "The prefix Instance Scheduler will use when naming Scheduled Scaling actions for AutoScaling Groups. Actions with this prefix will be added and removed by Instance Scheduler as needed.",
-      default: "is-",
-    });
-
-    addParameterGroup(this, {
-      label: "Service-specific",
-      parameters: [enableEc2SsmMaintenanceWindows, kmsKeyArns, createRdsSnapshots, scheduledTagKey, rulePrefix],
-    });
-
-    const usingAWSOrganizations = new YesNoParameter(this, "UsingAWSOrganizations", {
-      label: "Use AWS Organizations",
-      description: "Deploy resources to enable automatic spoke stack registration using AWS Organizations.",
-      default: YesNoType.No,
-    });
-
-    const namespace = new ParameterWithLabel(this, "Namespace", {
-      label: "Namespace",
-      description: "Unique identifier per deployment. Cannot contain spaces.",
-      default: "default",
-    });
-
-    const principals = new ParameterWithLabel(this, "Principals", {
-      label: "Organization ID/remote account IDs",
+        "comma-separated list of license manager arns to grant Instance Scheduler ec2:StartInstance permissions to provide the EC2 " +
+        " service with license manager permissions to start the instances." +
+        " This allows the scheduler to start EC2 instances with license manager configuration enabled." +
+        " Leave blank to disable." +
+        " For details on the exact policy created, refer to security section of the implementation guide" +
+        " (https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/)",
       type: "CommaDelimitedList",
-      description:
-        "(Required) If using AWS Organizations, provide the Organization ID. Eg. o-xxxxyyy. " +
-        "Else, provide a comma-separated list of spoke account ids to schedule. Eg.: 1111111111, 2222222222 or {param: ssm-param-name}",
       default: "",
     });
 
-    const regions = new ParameterWithLabel(this, "Regions", {
-      label: "Region(s)",
-      type: "CommaDelimitedList",
-      description:
-        "Comma-separated List of regions in which resources should be scheduled. Leave blank for current region only.",
-      default: "",
-    });
-
-    const scheduleLambdaAccount = new YesNoParameter(this, "ScheduleLambdaAccount", {
-      label: "Enable hub account scheduling",
-      description: "Enable scheduling in this account.",
-      default: YesNoType.Yes,
-    });
-
     addParameterGroup(this, {
-      label: "Account structure",
-      parameters: [usingAWSOrganizations, namespace, principals, regions, scheduleLambdaAccount],
+      label: "Hub-Account Scheduling",
+      parameters: [regions, kmsKeyArns, licenseManagerArns],
+    });
+
+    const enableDebugLogging = new YesNoParameter(this, "Trace", {
+      label: "Enable CloudWatch debug Logs",
+      description: "Enable debug-level logging in CloudWatch Logs.",
+      default: YesNoType.No,
     });
 
     const logRetentionValues: RetentionDays[] = [
@@ -231,12 +211,6 @@ export class InstanceSchedulerStack extends Stack {
       default: RetentionDays.ONE_MONTH,
     });
 
-    const enableDebugLogging = new YesNoParameter(this, "Trace", {
-      label: "Enable CloudWatch debug Logs",
-      description: "Enable debug-level logging in CloudWatch Logs.",
-      default: YesNoType.No,
-    });
-
     const enableOpsMonitoring = new EnabledDisabledParameter(this, "OpsMonitoring", {
       label: "Operational Monitoring",
       description: "Deploy operational metrics and an Ops Monitoring Dashboard to Cloudwatch",
@@ -245,7 +219,7 @@ export class InstanceSchedulerStack extends Stack {
 
     addParameterGroup(this, {
       label: "Monitoring",
-      parameters: [logRetentionDays, enableDebugLogging, enableOpsMonitoring],
+      parameters: [enableDebugLogging, logRetentionDays, enableOpsMonitoring],
     });
 
     const memorySizeValues = ["128", "384", "512", "640", "768", "896", "1024", "1152", "1280", "1408", "1536"];
@@ -253,15 +227,6 @@ export class InstanceSchedulerStack extends Stack {
       label: "SchedulingRequestHandler Memory size (MB)",
       description:
         "Memory size of the Lambda function that schedules EC2 and RDS resources. Increase if you are experiencing high memory usage or timeouts.",
-      type: "Number",
-      allowedValues: memorySizeValues,
-      default: 512,
-    });
-
-    const asgHandlerMemorySize = new ParameterWithLabel(this, "AsgMemorySize", {
-      label: "AsgHandler Memory size (MB)",
-      description:
-        "Memory size of the Lambda function that schedules ASG resources. Increase if you are experiencing high memory usage or timeouts.",
       type: "Number",
       allowedValues: memorySizeValues,
       default: 512,
@@ -277,17 +242,9 @@ export class InstanceSchedulerStack extends Stack {
       default: 512,
     });
 
-    const enableDdbDeletionProtection = new EnabledDisabledParameter(this, "ddbDeletionProtection", {
-      label: "Protect DynamoDB Tables",
-      description:
-        "Enable deletion protection for DynamoDB tables used by the solution. This will cause the tables to be retained" +
-        " when deleting this stack. To delete the tables when deleting this stack, first disable this parameter.",
-      default: EnabledDisabledType.Enabled,
-    });
-
     addParameterGroup(this, {
       label: "Other",
-      parameters: [memorySize, asgHandlerMemorySize, orchestratorMemorySize, enableDdbDeletionProtection],
+      parameters: [memorySize, orchestratorMemorySize],
     });
 
     const sendAnonymizedUsageMetricsMapping = new CfnMapping(this, "Send");
@@ -300,6 +257,13 @@ export class InstanceSchedulerStack extends Stack {
       sendAnonymizedUsageMetricsMapping.findInMap(anonymizedUsageKey1, anonymizedUsageKey2),
     );
 
+    InstanceSchedulerStack.sharedConfig = {
+      retainDataAndLogsCondition: retainDataAndLogs.getCondition(),
+      enableDebugLoggingCondition: enableDebugLogging.getCondition(),
+      logRetentionDays: logRetentionDays.valueAsNumber,
+      namespace: namespace.valueAsString,
+    };
+
     const factory = props.factory ?? new PythonFunctionFactory();
 
     const coreScheduler = new CoreScheduler(this, {
@@ -307,35 +271,23 @@ export class InstanceSchedulerStack extends Stack {
       solutionVersion: props.solutionVersion,
       solutionId: props.solutionId,
       memorySizeMB: memorySize.valueAsNumber,
-      asgMemorySizeMB: asgHandlerMemorySize.valueAsNumber,
       orchestratorMemorySizeMB: orchestratorMemorySize.valueAsNumber,
-      logRetentionDays: logRetentionDays.valueAsNumber,
       principals: principals.valueAsList,
       schedulingEnabled: enableScheduling.getCondition(),
       schedulingIntervalMinutes: schedulerIntervalMinutes.valueAsNumber,
       namespace: namespace.valueAsString,
       sendAnonymizedMetrics,
-      enableDebugLogging: enableDebugLogging.getCondition(),
       tagKey: scheduleTagKey.valueAsString,
       defaultTimezone: defaultTimezone.valueAsString,
-      enableEc2: enableEc2.getCondition(),
-      enableRds: enableRds.getCondition(),
-      enableRdsClusters: enableRdsClusters.getCondition(),
-      enableNeptune: enableNeptune.getCondition(),
-      enableDocdb: enableDocDb.getCondition(),
       enableRdsSnapshots: createRdsSnapshots.getCondition(),
       regions: regions.valueAsList,
-      enableSchedulingHubAccount: scheduleLambdaAccount.getCondition(),
       enableEc2SsmMaintenanceWindows: enableEc2SsmMaintenanceWindows.getCondition(),
-      startTags: startTags.valueAsString,
-      stopTags: stopTags.valueAsString,
       enableAwsOrganizations: usingAWSOrganizations.getCondition(),
       enableOpsInsights: enableOpsMonitoring.getCondition(),
       kmsKeyArns: kmsKeyArns.valueAsList,
+      licenseManagerArns: licenseManagerArns.valueAsList,
       factory,
-      enableDdbDeletionProtection: enableDdbDeletionProtection.getCondition(),
-      enableAsgs: enableAsgs.getCondition(),
-      scheduledTagKey: scheduledTagKey.valueAsString,
+      asgMetadataTagKey: scheduledTagKey.valueAsString,
       rulePrefix: rulePrefix.valueAsString,
     });
 
@@ -345,7 +297,7 @@ export class InstanceSchedulerStack extends Stack {
     });
 
     new CfnOutput(this, "ConfigurationTable", {
-      value: coreScheduler.configTable.tableArn,
+      value: coreScheduler.dataLayer.configTable.tableArn,
       description: "DynamoDB Configuration table ARN",
     });
 
@@ -362,6 +314,16 @@ export class InstanceSchedulerStack extends Stack {
     new CfnOutput(this, "ServiceInstanceScheduleServiceToken", {
       value: coreScheduler.cfnScheduleCustomResourceHandler.functionArn,
       description: "Custom resource provider ARN - use as ServiceToken property value for CloudFormation Schedules",
+    });
+
+    new CfnOutput(this, "RegionalEventBusName", {
+      value: coreScheduler.regionalEventBusName,
+      description: "Regional event bus name.",
+    });
+
+    new CfnOutput(this, "SchedulingEventOutputBus", {
+      value: coreScheduler.globalEventBus.eventBusArn,
+      description: "Scheduling Event Bus ARN",
     });
   }
 }

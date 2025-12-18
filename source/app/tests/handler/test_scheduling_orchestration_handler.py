@@ -6,56 +6,33 @@ from unittest.mock import MagicMock, patch
 
 import boto3
 from _pytest.fixtures import fixture
-
 from instance_scheduler.handler.scheduling_orchestrator import (
     OrchestrationRequest,
     SchedulingOrchestratorHandler,
     prefetch_schedules_and_periods,
 )
 from instance_scheduler.handler.scheduling_request import SchedulingRequest
-from instance_scheduler.model.ddb_config_item import DdbConfigItem
+from instance_scheduler.model.managed_instance import RegisteredEc2Instance
+from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.period_identifier import PeriodIdentifier
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
-from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
-from instance_scheduler.model.store.dynamo_period_definition_store import (
-    DynamoPeriodDefinitionStore,
+from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
+from instance_scheduler.model.store.resource_registry import ResourceRegistry
+from instance_scheduler.model.store.schedule_definition_store import (
+    ScheduleDefinitionStore,
 )
-from instance_scheduler.model.store.dynamo_schedule_definition_store import (
-    DynamoScheduleDefinitionStore,
-)
+from instance_scheduler.scheduling.states import InstanceState
+from instance_scheduler.util.arn import ARN
 from tests.context import MockLambdaContext
 from tests.logger import MockLogger
 from tests.test_utils.mock_orchestrator_environment import MockOrchestratorEnvironment
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient
-    from mypy_boto3_ssm.client import SSMClient
 else:
-    SSMClient = object
     DynamoDBClient = object
 
 mockEvent: OrchestrationRequest = {"scheduled_action": "run_orchestrator"}
-moto_hub_account = "123456789012"
-
-
-def orchestrator_env_overrides(
-    schedule_regions: list[str] = [],
-    enable_ec2_service: bool = False,
-    enable_rds_service: bool = False,
-    enable_rds_clusters: bool = False,
-    enable_neptune_service: bool = False,
-    enable_docdb_service: bool = False,
-    enable_schedule_hub_account: bool = False,
-) -> dict[str, Any]:
-    return {
-        "schedule_regions": schedule_regions,
-        "enable_ec2_service": enable_ec2_service,
-        "enable_rds_service": enable_rds_service,
-        "enable_rds_clusters": enable_rds_clusters,
-        "enable_neptune_service": enable_neptune_service,
-        "enable_docdb_service": enable_docdb_service,
-        "enable_schedule_hub_account": enable_schedule_hub_account,
-    }
 
 
 @fixture
@@ -73,9 +50,20 @@ def scheduling_request_from_lambda_invoke(call_args: Any) -> SchedulingRequest:
 
 def test_prefetch_gracefully_handles_invalid_configurations(
     config_table: str,
-    period_store: DynamoPeriodDefinitionStore,
-    schedule_store: DynamoScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+    schedule_store: ScheduleDefinitionStore,
 ) -> None:
+    # Add valid period and schedule
+    period_store.put(
+        PeriodDefinition(name="valid-period", begintime="09:00", endtime="17:00")
+    )
+    schedule_store.put(
+        ScheduleDefinition(
+            name="valid-schedule", periods=[PeriodIdentifier("valid-period")]
+        )
+    )
+
+    # Add invalid period via direct DDB insert
     ddb_client: DynamoDBClient = boto3.client("dynamodb")
     ddb_client.put_item(
         TableName=config_table,
@@ -96,69 +84,62 @@ def test_prefetch_gracefully_handles_invalid_configurations(
     schedules, periods = prefetch_schedules_and_periods(
         MockOrchestratorEnvironment(), MockLogger()
     )
-    assert len(periods.find_all()) == 0
-    assert len(schedules.find_all()) == 0
-    # todo: write assertions against the errors that get logged to sns (see output to MockLogger)
+    # Should have 1 valid schedule and 1 valid period, invalid ones filtered out
+    assert len(periods.find_all()) == 1
+    assert len(schedules.find_all()) == 1
+    assert "valid-schedule" in schedules.find_all()
+    assert "valid-period" in periods.find_all()
 
 
 # ##------------------- FAN OUT BEHAVIOR -----------------## #
-def test_no_region_provided_uses_local_region(
+def test_no_scheduling_targets(
     mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
+    resource_registry: ResourceRegistry,
+    registry_table: str,
+    config_table: str,
 ) -> None:
     orchestrator = SchedulingOrchestratorHandler(
         event=mockEvent,
         context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=[],
-            enable_ec2_service=True,
-            enable_schedule_hub_account=True,
-        ),
+        env=MockOrchestratorEnvironment(registry_table=registry_table),
         logger=MockLogger(),
     )
     orchestrator.handle_request()
-    assert mocked_lambda_invoke.call_count == 1
-    scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args
-    )
-    assert scheduling_request["account"] == moto_hub_account
-    assert scheduling_request["service"] == "ec2"
-    assert scheduling_request["region"] == "us-east-1"
-
-
-def test_no_service_provided_does_not_run_any_lambdas(
-    mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
-) -> None:
-    orchestrator = SchedulingOrchestratorHandler(
-        event=mockEvent,
-        context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1"], enable_schedule_hub_account=True
-        ),
-        logger=MockLogger(),
-    )
-    orchestrator.handle_request()
-
     assert mocked_lambda_invoke.call_count == 0
 
 
-def test_remote_account_only_does_not_schedule_locally(
+def test_single_scheduling_target(
     mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
+    resource_registry: ResourceRegistry,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+    registry_table: str,
 ) -> None:
-    config_item_store.put(
-        DdbConfigItem(organization_id="", remote_account_ids=["222233334444"])
+    period_store.put(
+        PeriodDefinition(name="test-period", begintime="09:00", endtime="17:00")
+    )
+    schedule_store.put(
+        ScheduleDefinition(
+            name="test-schedule", periods=[PeriodIdentifier("test-period")]
+        )
+    )
+
+    resource_registry.put(
+        RegisteredEc2Instance(
+            account="111111111111",
+            region="us-east-1",
+            resource_id="i-1",
+            arn=ARN("arn:aws:ec2:us-east-1:111111111111:instance/i-1"),
+            schedule="test-schedule",
+            name="test-instance",
+            stored_state=InstanceState.RUNNING,
+        )
     )
 
     orchestrator = SchedulingOrchestratorHandler(
         event=mockEvent,
         context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1"],
-            enable_ec2_service=True,
-            enable_schedule_hub_account=False,
-        ),
+        env=MockOrchestratorEnvironment(registry_table=registry_table),
         logger=MockLogger(),
     )
     orchestrator.handle_request()
@@ -168,316 +149,84 @@ def test_remote_account_only_does_not_schedule_locally(
     scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
         mocked_lambda_invoke.call_args
     )
-    assert scheduling_request["service"] == "ec2"
-    assert scheduling_request["account"] == "222233334444"
+    assert scheduling_request["account"] == "111111111111"
     assert scheduling_request["region"] == "us-east-1"
+    assert scheduling_request["service"] == "ec2"
+    schedules = scheduling_request["schedules"]
+    periods = scheduling_request["periods"]
+    assert any(s["name"] == "test-schedule" for s in schedules)
+    assert any(p["name"] == "test-period" for p in periods)
 
 
-def test_1region_1service_calls_scheduler_x1(
+def test_multiple_scheduling_targets(
     mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
+    resource_registry: ResourceRegistry,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+    registry_table: str,
 ) -> None:
+    period_store.put(
+        PeriodDefinition(name="period1", begintime="09:00", endtime="17:00")
+    )
+    period_store.put(
+        PeriodDefinition(name="period2", begintime="18:00", endtime="22:00")
+    )
+    schedule_store.put(
+        ScheduleDefinition(name="schedule1", periods=[PeriodIdentifier("period1")])
+    )
+    schedule_store.put(
+        ScheduleDefinition(name="schedule2", periods=[PeriodIdentifier("period2")])
+    )
+
+    resource_registry.put(
+        RegisteredEc2Instance(
+            account="111111111111",
+            region="us-east-1",
+            resource_id="i-1",
+            arn=ARN("arn:aws:ec2:us-east-1:111111111111:instance/i-1"),
+            schedule="schedule1",
+            name="instance1",
+            stored_state=InstanceState.RUNNING,
+        )
+    )
+    resource_registry.put(
+        RegisteredEc2Instance(
+            account="222222222222",
+            region="us-west-2",
+            resource_id="i-2",
+            arn=ARN("arn:aws:ec2:us-west-2:222222222222:instance/i-2"),
+            schedule="schedule2",
+            name="instance2",
+            stored_state=InstanceState.RUNNING,
+        )
+    )
+
     orchestrator = SchedulingOrchestratorHandler(
         event=mockEvent,
         context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1"],
-            enable_ec2_service=True,
-            enable_schedule_hub_account=True,
-        ),
-        logger=MockLogger(),
-    )
-    orchestrator.handle_request()
-
-    assert mocked_lambda_invoke.call_count == 1
-
-    scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args
-    )
-    assert scheduling_request["account"] == moto_hub_account
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-
-
-def test_2region_1service_calls_scheduler_x2(
-    mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
-) -> None:
-    orchestrator = SchedulingOrchestratorHandler(
-        event=mockEvent,
-        context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1", "us-east-2"],
-            enable_ec2_service=True,
-            enable_schedule_hub_account=True,
-        ),
+        env=MockOrchestratorEnvironment(registry_table=registry_table),
         logger=MockLogger(),
     )
     orchestrator.handle_request()
 
     assert mocked_lambda_invoke.call_count == 2
 
-    # first call
-    scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[0]
-    )
+    requests = [
+        scheduling_request_from_lambda_invoke(call)
+        for call in mocked_lambda_invoke.call_args_list
+    ]
+    targets = [(r["account"], r["region"], r["service"]) for r in requests]
 
-    assert scheduling_request["account"] == moto_hub_account
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
+    assert ("111111111111", "us-east-1", "ec2") in targets
+    assert ("222222222222", "us-west-2", "ec2") in targets
 
-    # second call
-    scheduling_request = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[1]
-    )
-    assert scheduling_request["account"] == moto_hub_account
-    assert scheduling_request["region"] == "us-east-2"
-    assert scheduling_request["service"] == "ec2"
-
-
-def test_2accounts_1region_1service_nolocal_calls_scheduler_twice(
-    mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
-) -> None:
-    config_item_store.put(
-        DdbConfigItem(
-            organization_id="", remote_account_ids=["222233334444", "333344445555"]
-        )
-    )
-
-    orchestrator = SchedulingOrchestratorHandler(
-        event=mockEvent,
-        context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1"],
-            enable_ec2_service=True,
-            enable_schedule_hub_account=False,
-        ),
-        logger=MockLogger(),
-    )
-    orchestrator.handle_request()
-
-    assert mocked_lambda_invoke.call_count == 2
-
-    # first call
-    scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[0]
-    )
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-    assert scheduling_request["account"] == "222233334444"
-
-    # second call
-    scheduling_request = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[1]
-    )
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-    assert scheduling_request["account"] == "333344445555"
-
-
-def test_2accounts_1region_1service_with_local_calls_scheduler_x3(
-    mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
-) -> None:
-    config_item_store.put(
-        DdbConfigItem(
-            organization_id="", remote_account_ids=["222233334444", "333344445555"]
-        )
-    )
-
-    orchestrator = SchedulingOrchestratorHandler(
-        event=mockEvent,
-        context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1"],
-            enable_ec2_service=True,
-            enable_schedule_hub_account=True,
-        ),
-        logger=MockLogger(),
-    )
-    orchestrator.handle_request()
-
-    assert mocked_lambda_invoke.call_count == 3
-
-    # first call
-    scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[0]
-    )
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-    assert scheduling_request["account"] == moto_hub_account
-
-    # second call
-    scheduling_request = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[1]
-    )
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-    assert scheduling_request["account"] == "222233334444"
-
-    # third call
-    scheduling_request = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[2]
-    )
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-    assert scheduling_request["account"] == "333344445555"
-
-
-def test_1region_2service_calls_scheduler_x2(
-    mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
-) -> None:
-    orchestrator = SchedulingOrchestratorHandler(
-        event=mockEvent,
-        context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1"],
-            enable_ec2_service=True,
-            enable_rds_service=True,
-            enable_schedule_hub_account=True,
-        ),
-        logger=MockLogger(),
-    )
-    orchestrator.handle_request()
-
-    assert mocked_lambda_invoke.call_count == 2
-
-    # first call
-    scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[0]
-    )
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-
-    # second call
-    scheduling_request = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[1]
-    )
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "rds"
-
-
-def test_3account_3region_2service_calls_scheduler_x18(
-    mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
-) -> None:
-    config_item_store.put(
-        DdbConfigItem(
-            organization_id="",
-            remote_account_ids=["111122223333", "222233334444", "333344445555"],
-        )
-    )
-
-    orchestrator = SchedulingOrchestratorHandler(
-        event=mockEvent,
-        context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1", "us-east-2", "us-west-1"],
-            enable_ec2_service=True,
-            enable_rds_service=True,
-            enable_schedule_hub_account=False,
-        ),
-        logger=MockLogger(),
-    )
-    orchestrator.handle_request()
-
-    assert mocked_lambda_invoke.call_count == 18
-    for index, call in enumerate(mocked_lambda_invoke.call_args_list):
-        scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
-            call
-        )
-        assert scheduling_request["region"]  # assert exists
-        assert scheduling_request["account"]
-        assert scheduling_request["service"]
-
-
-# ##------------------- SSM Parameter Resolution -----------------## #
-def test_ssm_parameter_string_list_is_resolved_to_account_ids(
-    mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
-) -> None:
-    ssm_client: SSMClient = boto3.client("ssm")
-    ssm_client.put_parameter(
-        Name="my_ssm_param", Value="555566667777,666677778888", Type="StringList"
-    )
-
-    config_item_store.put(
-        DdbConfigItem(
-            organization_id="",
-            remote_account_ids=["{param:my_ssm_param}", "111122223333"],
-        )
-    )
-
-    orchestrator = SchedulingOrchestratorHandler(
-        event=mockEvent,
-        context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1"],
-            enable_ec2_service=True,
-            enable_schedule_hub_account=False,
-        ),
-        logger=MockLogger(),
-    )
-    orchestrator.handle_request()
-
-    # first call
-    scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[0]
-    )
-    assert scheduling_request["account"] == "555566667777"
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-
-    # second call
-    scheduling_request = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[1]
-    )
-    assert scheduling_request["account"] == "666677778888"
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-
-    # third call
-    scheduling_request = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args_list[2]
-    )
-    assert scheduling_request["account"] == "111122223333"
-    assert scheduling_request["region"] == "us-east-1"
-    assert scheduling_request["service"] == "ec2"
-
-
-def test_ssm_parameter_string_is_resolved_to_account_id(
-    mocked_lambda_invoke: MagicMock,
-    config_item_store: DdbConfigItemStore,
-) -> None:
-    ssm_client: SSMClient = boto3.client("ssm")
-    ssm_client.put_parameter(Name="my_ssm_param", Value="555566667777", Type="String")
-
-    config_item_store.put(
-        DdbConfigItem(
-            organization_id="",
-            remote_account_ids=["{param:my_ssm_param}"],
-        )
-    )
-
-    orchestrator = SchedulingOrchestratorHandler(
-        event=mockEvent,
-        context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=["us-east-1"],
-            enable_ec2_service=True,
-            enable_schedule_hub_account=False,
-        ),
-        logger=MockLogger(),
-    )
-    orchestrator.handle_request()
-
-    assert mocked_lambda_invoke.call_count == 1
-
-    scheduling_request: SchedulingRequest = scheduling_request_from_lambda_invoke(
-        mocked_lambda_invoke.call_args
-    )
-    assert scheduling_request["service"] == "ec2"
-    assert scheduling_request["account"] == "555566667777"
-    assert scheduling_request["region"] == "us-east-1"
+    # Verify schedules are properly encoded for each target
+    for request in requests:
+        schedules = request["schedules"]
+        periods = request["periods"]
+        if request["account"] == "111111111111":
+            assert any(s["name"] == "schedule1" for s in schedules)
+            assert any(p["name"] == "period1" for p in periods)
+        elif request["account"] == "222222222222":
+            assert any(s["name"] == "schedule2" for s in schedules)
+            assert any(p["name"] == "period2" for p in periods)

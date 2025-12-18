@@ -4,12 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Literal, Optional
 
-from aws_lambda_powertools import Logger as PowerToolsLogger
-
+from aws_lambda_powertools import Logger
 from instance_scheduler.cron.cron_recurrence_expression import CronRecurrenceExpression
-from instance_scheduler.schedulers.states import ScheduleState
+from instance_scheduler.scheduling.states import ScheduleState
 from instance_scheduler.util.display_helper import time_str
-from instance_scheduler.util.logger import Logger
 
 
 class RunningPeriodValidationException(Exception):
@@ -24,7 +22,7 @@ class RunningPeriod:
     cron_recurrence: CronRecurrenceExpression = CronRecurrenceExpression()
 
     def __post_init__(self) -> None:
-        self._logger: Optional[Logger | PowerToolsLogger] = None
+        self._logger: Optional[Logger] = None
         self._validate()
 
     def _validate(self) -> None:
@@ -39,12 +37,12 @@ class RunningPeriod:
                 f"must be before endtime {self.endtime.strftime('%H:%M')}"
             )
 
-    def _log_debug(self, msg: str, *args: str) -> None:
+    def _log_debug(self, msg: str) -> None:
         if self._logger is not None:
-            self._logger.debug(msg, *args)
+            self._logger.debug(msg)
 
     def get_desired_state(
-        self, logger: Optional[Logger | PowerToolsLogger], current_dt: datetime
+        self, logger: Optional[Logger], current_dt: datetime
     ) -> ScheduleState:
         """
         Test if the instance should be running at the specified dt, all conditions configured a period should be true
@@ -53,7 +51,7 @@ class RunningPeriod:
         :return: desired state for the instance in the period
         """
         self._logger = logger
-        self._log_debug('Checking conditions for period "{}"', self.name)
+        self._log_debug(f'Checking conditions for period "{self.name}"')
         if not self.cron_recurrence.contains(current_dt):
             return ScheduleState.STOPPED
         return self.check_time(current_dt)
@@ -104,13 +102,9 @@ class RunningPeriod:
 
         self._log_debug(
             "Period CheckTime Result:\n"
-            "  PeriodType: {}\n"
-            "  timeChecked: {} ({})\n"
-            "  desiredState: {}",
-            period_type,
-            dt.isoformat(),
-            time_str(time_to_check),
-            desired_state,
+            f"  PeriodType: {period_type}\n"
+            f"  timeChecked: {dt.isoformat()} ({time_str(time_to_check)})\n"
+            f"  desiredState: {desired_state}"
         )
         return desired_state
 

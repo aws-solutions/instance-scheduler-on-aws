@@ -3,11 +3,7 @@
 import json
 import re
 from datetime import date
-from typing import Any, Iterator, Optional, Sequence
-from unittest.mock import patch
-
-from _pytest.fixtures import fixture
-from packaging.version import Version
+from typing import Any, Optional, Sequence
 
 from instance_scheduler import __version__
 from instance_scheduler.handler.cli.cli_request_handler import (
@@ -25,16 +21,10 @@ from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleDefinitionStore,
 )
 from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
+from packaging.version import Version
 from tests.context import MockLambdaContext
-from tests.logger import MockLogger
 from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
 from tests.test_utils.unordered_list import UnorderedList
-
-
-@fixture(autouse=True)
-def mock_logger() -> Iterator[None]:
-    with patch("instance_scheduler.handler.cli.cli_request_handler.Logger", MockLogger):
-        yield
 
 
 def test_is_handling_request() -> None:

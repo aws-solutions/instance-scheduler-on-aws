@@ -3,17 +3,11 @@
 from typing import Iterator
 from unittest.mock import patch
 
-import boto3
-from pytest import fixture
-
 from instance_scheduler.handler.config_resource import (
     SchedulerSetupHandler,
     ServiceSetupRequest,
     ServiceSetupResourceProperties,
     is_org_id,
-)
-from instance_scheduler.handler.environments.main_lambda_environment import (
-    MainLambdaEnv,
 )
 from instance_scheduler.handler.setup_demo_data import DEMO_PERIODS, DEMO_SCHEDULES
 from instance_scheduler.model.ddb_config_item import DdbConfigItem
@@ -24,6 +18,7 @@ from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleDefinitionStore,
 )
 from instance_scheduler.util.custom_resource import CustomResourceRequest
+from pytest import fixture
 from tests.context import MockLambdaContext
 from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
 from tests.test_utils.unordered_list import UnorderedList
@@ -231,24 +226,6 @@ def test_update_request_overwrites_remote_accounts_when_orgs_disabled(
         remote_account_ids=["333344445555", "444455556666"],
         organization_id="",
     )
-
-
-def test_sets_lambda_logs_retention_period_on_create(
-    test_suite_env: MainLambdaEnv, config_item_store: DdbConfigItemStore
-) -> None:
-    """With no period, expect set to default"""
-    log_group = test_suite_env.log_group
-    handler = SchedulerSetupHandler(
-        new_create_request(
-            {"timeout": 120, "remote_account_ids": [], "log_retention_days": 30}
-        ),
-        MockLambdaContext(log_group),
-        MockMainLambdaEnv(),
-    )
-    handler.handle_request()
-    response = boto3.client("logs").describe_log_groups(logGroupNamePrefix=log_group)
-    assert response["logGroups"][0]["logGroupName"] == log_group
-    assert response["logGroups"][0]["retentionInDays"] == 30
 
 
 def test_creates_example_schedules_on_create(

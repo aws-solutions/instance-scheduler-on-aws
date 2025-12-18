@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { App, Aspects, DefaultStackSynthesizer, StackSynthesizer } from "aws-cdk-lib";
-import { AwsSolutionsChecks } from "cdk-nag";
+import { App, DefaultStackSynthesizer, StackSynthesizer } from "aws-cdk-lib";
 import { getSolutionContext } from "./instance-scheduler/lib/cdk-context";
 import { InstanceSchedulerStack } from "./instance-scheduler/lib/instance-scheduler-stack";
 import { SpokeStack } from "./instance-scheduler/lib/remote-stack";
@@ -55,7 +54,6 @@ function main(): void {
   }
 
   const app = new App();
-  Aspects.of(app).add(new AwsSolutionsChecks({ verbose: true }));
 
   addAppStacks(app, { solutionVersion, synthesizer });
 }

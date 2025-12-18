@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from typing import Final
 
 from instance_scheduler.model.maint_win import EC2SSMMaintenanceWindow
-from instance_scheduler.model.store.dynamo_client import hub_dynamo_client
+from instance_scheduler.util.session_manager import hub_dynamo_client
 
 
 class EC2SSMMaintenanceWindowStore:

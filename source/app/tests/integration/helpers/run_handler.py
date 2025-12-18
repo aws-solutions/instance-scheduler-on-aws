@@ -5,14 +5,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Iterator, Optional, Sequence, TypedDict
 
-from mypy_boto3_ec2.literals import InstanceTypeType
-
-from instance_scheduler.handler.environments.scheduling_request_environment import (
-    SchedulingRequestEnvironment,
-)
 from instance_scheduler.handler.scheduling_request import (
     SchedulingRequest,
-    SchedulingRequestHandler,
+    handle_scheduling_request,
 )
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.period_identifier import PeriodIdentifier
@@ -23,12 +18,21 @@ from instance_scheduler.model.store.in_memory_period_definition_store import (
 from instance_scheduler.model.store.in_memory_schedule_definition_store import (
     InMemoryScheduleDefinitionStore,
 )
-from instance_scheduler.util.scheduling_target import SchedulingTarget
+from mypy_boto3_ec2.literals import InstanceTypeType
 from tests.context import MockLambdaContext
-from tests.logger import MockLogger
 from tests.test_utils.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
+
+
+@dataclass(frozen=True)
+class SchedulingTarget:
+    account: str
+    service: str
+    region: str
+
+    def __str__(self) -> str:
+        return f"{self.account}-{self.region}-{self.service}"
 
 
 def _default_schedules() -> list[ScheduleDefinition]:
@@ -60,30 +64,28 @@ class SchedulingTestContext:
         self,
         dt: datetime,
         target: SchedulingTarget = target(),
-        environment: SchedulingRequestEnvironment = MockSchedulingRequestEnvironment(),
+        environment: MockSchedulingRequestEnvironment = MockSchedulingRequestEnvironment(),
     ) -> Any:
+        with environment.patch_env():
+            schedule_store = InMemoryScheduleDefinitionStore()
+            period_store = InMemoryPeriodDefinitionStore()
+            for schedule in self.schedules:
+                schedule_store.put(schedule)
+            for period in self.periods:
+                period_store.put(period)
 
-        schedule_store = InMemoryScheduleDefinitionStore()
-        period_store = InMemoryPeriodDefinitionStore()
-        for schedule in self.schedules:
-            schedule_store.put(schedule)
-        for period in self.periods:
-            period_store.put(period)
+            event: SchedulingRequest = {
+                "action": "scheduler:run",
+                "account": target.account,
+                "region": target.region,
+                "service": target.service,
+                "current_dt": dt.isoformat(),
+                "schedules": schedule_store.serialize(),
+                "periods": period_store.serialize(),
+                "dispatch_time": "2023-05-12 14:55:10.600619",
+            }
 
-        event: SchedulingRequest = {
-            "action": "scheduler:run",
-            "account": target.account,
-            "region": target.region,
-            "service": target.service,
-            "current_dt": dt.isoformat(),
-            "schedules": schedule_store.serialize(),
-            "periods": period_store.serialize(),
-            "dispatch_time": "2023-05-12 14:55:10.600619",
-        }
-
-        return SchedulingRequestHandler(
-            event, MockLambdaContext(), environment, MockLogger()
-        ).handle_request()
+            return handle_scheduling_request(event, MockLambdaContext())
 
 
 @contextmanager

@@ -9,6 +9,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
+    List,
     Literal,
     NotRequired,
     Optional,
@@ -17,9 +18,8 @@ from typing import (
     TypeVar,
 )
 
-from urllib3 import HTTPResponse, PoolManager
-
 from instance_scheduler.handler.base import MainHandler
+from urllib3 import BaseHTTPResponse, PoolManager
 
 if TYPE_CHECKING:
     from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -198,6 +198,15 @@ class CustomResource(
         new_id = "{}-{}-{}".format(self.__class__.__name__, self.stack_name, uu)
         return new_id.lower()
 
+    def purge_empty_strings(
+        self, resource_properties: ResourcePropertiesType, attribute_name: str
+    ) -> List[str]:
+        attribute_value: List[str] = resource_properties.get(attribute_name, [])
+
+        if len(attribute_value) == 1 and attribute_value[0] == "":
+            return []
+        return attribute_value
+
     # Handles Create request, overwrite in inherited class to implement create actions
     @abstractmethod
     def _create_request(self) -> CustomResourceResponse:
@@ -260,7 +269,7 @@ class CustomResource(
         # PUT request to cloudformation
         try:
             http = PoolManager()
-            http_response: HTTPResponse = http.request(  # type: ignore[no-untyped-call]
+            http_response: BaseHTTPResponse = http.request(
                 "PUT",
                 self.response_url,
                 headers=headers,

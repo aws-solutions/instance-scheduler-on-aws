@@ -4,6 +4,47 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [3.1.0] -- 2025-12-18
+### Added
+- Added Support for License Manager controlled EC2 instances
+- Added `IS-MinDesiredMax` control tag to ASGs to simplify management of ASG resources
+- Added support for retrying Insufficient Capacity Errors on EC2 with different instance sizes
+  - Use `IS-PreferredInstanceTypes` control tag to specify acceptable instance types that can be used
+- Added `IS-GlobalEvents` (in hub) and `IS-LocalEvents` (in all targets) event buses that will output the following events:
+  - `Resource Registered` whenever a resource is registered for scheduling
+  - `Scheduling Action` whenever a resource is started/stopped by the scheduler
+
+### Changed
+- Instance Scheduler now listens for tagging events and tracks managed instances in an internal
+`registry` table
+  - Optimized scheduling orchestration to improve scaling performance for larger deployments.
+- Managed regions is now defined per-account in the remote stack rather than globally on the hub stack
+- Instance Scheduler will now apply informational tags to resources during scheduling:
+    - `IS-ManagedBy` -- indicates location of Instance Scheduler Hub Stack
+    - `IS-LastAction` -- displays the last successful action taken by instance scheduler
+    - `IS-Error` -- displays error code when errors occur during scheduling
+    - `IS-ErrorMessage` -- displays additional information about the most recent error code
+- Cleaned up Operational Insights dashboard and added widgets to display ASG scheduling metrics
+- Brought ASG scheduling flows inline with other scheduling flows
+- Moved logs into dedicated `-scheduling-logs` and `-administrative-logs` log groups
+- Restructured logs to use structured-logging optimized for log-insights queries and provided pre-canned 
+queries that can be used in the CloudWatch Log Insights console.
+
+### Removed
+- Listing member accounts via an SSM parameter (passing
+  `{param: ssm-param-name}` to the accounts parameter on the hub stack)
+  is no longer supported.
+- Scheduled instance resizing (defining `period-name@size` in a schedule)
+  is no longer supported.
+- Started/Stopped tags configuration parameter on hub stack has been removed (replaced by informational tagging feature)
+- Deployments of more than 40 accounts must now use organizations mode
+- EnableXXXScheduling properties removed -- Service-specific scheduling is now handled automatically in response to tagging events
+- Removed per-schedule metrics from cloudwatch
+
+### Security
+- Updated Filelock to mitigate CVE-2025-68146
+- Updated js-yaml to mitigate CVE-2025-64718
+
 ## [3.0.12] -- 2025-12-10
 ### Security
 - Updated urllib3 to mitigate CVE-2025-66471
@@ -61,9 +102,9 @@ to disable RDS preferred maintenance windows and EC2 maintenance windows
 - RDS instances will now be automatically started 10 minutes prior to their preferred maintenance windows
 
 ### Fixed
-- Clamped role session name to 64 characters to fix scenario where longer 
+- Clamped role session name to 64 characters to fix scenario where longer
 namespaces could cause runtime errors during sts assume
-- Fixed long-term retry logic for EC2/RDS scheduling. 
+- Fixed long-term retry logic for EC2/RDS scheduling.
 EC2 and RDS will now retry start actions on instances that failed during the previous scheduling cycle
 - Fixed AccessDenied error when spoke account self-registration process attempted to create a log group
 
@@ -161,7 +202,7 @@ RDS IAM requirements.
 - Fixed bug that would sometimes cause the CFN schedule custom resource to error when many schedules were deployed in parallel
 - Fixed bug that would cause spoke stacks to not be correctly deregistered from the hub stack when undeployed
 - Fixed bug in cli describe_schedule_usage command that would incorrectly estimate the behavior of schedules using nth weekday expressions
-- Fixed bug that would cause schedules using monthday ranges of the format "n-31" to fail to load in months 
+- Fixed bug that would cause schedules using monthday ranges of the format "n-31" to fail to load in months
   with less days then the end of the range (such as February)
 - Fixed configured_in_stack property not being correctly applied to periods deployed by CloudFormation custom resource.
 

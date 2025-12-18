@@ -9,4 +9,5 @@ export interface AnonymizedMetricsEnvironment {
   SOLUTION_VERSION: string;
   SCHEDULING_INTERVAL_MINUTES: string;
   METRICS_UUID: string;
+  HUB_ACCOUNT_ID: string;
 }

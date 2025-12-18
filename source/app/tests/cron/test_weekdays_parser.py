@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 from typing import Final
 
-from pytest import raises
-
 from instance_scheduler.cron.expression import (
     CronAll,
     CronLastWeekday,
@@ -14,6 +12,7 @@ from instance_scheduler.cron.expression import (
     CronUnion,
 )
 from instance_scheduler.cron.parser import parse_weekdays_expr, weekday_names
+from pytest import raises
 
 
 def test_weekdays_parser_parses_none_as_all() -> None:

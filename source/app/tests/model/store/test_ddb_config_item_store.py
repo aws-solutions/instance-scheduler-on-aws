@@ -1,7 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from _pytest.fixtures import fixture
-
 from instance_scheduler.model.ddb_config_item import DdbConfigItem
 from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
 from tests.test_utils.unordered_list import UnorderedList

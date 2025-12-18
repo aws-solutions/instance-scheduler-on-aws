@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from typing import Any, Mapping, Optional, Sequence, TypeGuard
+from typing import Any, Iterator, Mapping, Optional, Sequence, TypeGuard
 
 from instance_scheduler.model.period_definition import (
     PeriodDefinition,
@@ -49,11 +49,18 @@ class InMemoryPeriodDefinitionStore(PeriodDefinitionStore):
         cls, data: SerializedInMemoryPeriodDefinitionStore
     ) -> "InMemoryPeriodDefinitionStore":
         periods: dict[str, PeriodDefinition] = {}
-        for period_params in data:
-            period_def = PeriodDefinition.from_period_params(period_params)
+        for period_def in cls.deserialize_to_sequence(data):
             periods[period_def.name] = period_def
 
         return InMemoryPeriodDefinitionStore(periods)
+
+    @classmethod
+    def deserialize_to_sequence(
+        cls, data: SerializedInMemoryPeriodDefinitionStore
+    ) -> Iterator[PeriodDefinition]:
+        for period_params in data:
+            period_def = PeriodDefinition.from_period_params(period_params)
+            yield period_def
 
     @staticmethod
     def validate_serial_data(

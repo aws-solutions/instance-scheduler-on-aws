@@ -5,17 +5,16 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Final, Optional, Sequence
 
 from botocore.exceptions import ClientError
-
 from instance_scheduler.model.period_definition import (
     InvalidPeriodDefinition,
     PeriodDefinition,
 )
-from instance_scheduler.model.store.dynamo_client import hub_dynamo_client
 from instance_scheduler.model.store.period_definition_store import (
     PeriodAlreadyExistsException,
     PeriodDefinitionStore,
     UnknownPeriodException,
 )
+from instance_scheduler.util.session_manager import hub_dynamo_client
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.type_defs import TransactWriteItemTypeDef

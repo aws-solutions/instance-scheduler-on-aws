@@ -6,11 +6,10 @@ from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 import boto3
-
 from instance_scheduler.handler.metrics_uuid_custom_resource import (
     CreateUuidRequest,
     MetricsUuidCustomResource,
-    handle_metrics_uuid_request,
+    lambda_handler,
 )
 from instance_scheduler.util.custom_resource import (
     CustomResourceRequest,
@@ -48,7 +47,7 @@ def test_metrics_uuid_generates_new_uuid_when_one_not_present(
 ) -> None:
     with MockMetricsUuidEnviron():
         event = new_create_request()
-        handle_metrics_uuid_request(event, MockLambdaContext())
+        lambda_handler(event, MockLambdaContext())
 
         response: CustomResourceResponse = mocked_cfn_callback.call_args.args[0]
         assert response["Status"] == "SUCCESS"
@@ -74,7 +73,7 @@ def test_metrics_uuid_uses_existing_uuid_when_one_is_present(
         )
 
         event = new_create_request()
-        handle_metrics_uuid_request(event, MockLambdaContext())
+        lambda_handler(event, MockLambdaContext())
 
         response: CustomResourceResponse = mocked_cfn_callback.call_args.args[0]
         assert response["Status"] == "SUCCESS"

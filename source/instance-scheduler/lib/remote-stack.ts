@@ -1,17 +1,20 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Stack, StackProps } from "aws-cdk-lib";
-import { ArnPrincipal } from "aws-cdk-lib/aws-iam";
+import { CfnOutput, CfnResource, CustomResource, Stack, StackProps } from "aws-cdk-lib";
+import { ArnPrincipal, CfnPolicy, CfnRole, CompositePrincipal } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import { ParameterWithLabel, YesNoParameter, YesNoType, addParameterGroup, overrideLogicalId } from "./cfn";
 import { SchedulerRole } from "./iam/scheduler-role";
 import { roleArnFor } from "./iam/roles";
 import { SchedulingRequestHandlerLambda } from "./lambda-functions/scheduling-request-handler";
-import { AsgHandler } from "./lambda-functions/asg-handler";
-
-import { AsgSchedulingRole } from "./iam/asg-scheduling-role";
-import { RemoteRegistrationCustomResource } from "./lambda-functions/remote-registration";
 import { FunctionFactory, PythonFunctionFactory } from "./lambda-functions/function-factory";
+import { addCfnGuardSuppression } from "./helpers/cfn-guard";
+import { HubResourceRegistration } from "./lambda-functions/resource-registration";
+import { IceErrorRetry } from "./lambda-functions/ice-error-retry";
+import { RegionEventRulesCustomResource } from "./lambda-functions/region-event-rules";
+import { RegionRegistrationCustomResource } from "./lambda-functions/region-registration";
+import { TargetStack } from "./stack-types";
+import { SpokeRegistrationLambda } from "./lambda-functions/spoke-registration";
 
 export interface SpokeStackProps extends StackProps {
   readonly solutionId: string;
@@ -21,8 +24,28 @@ export interface SpokeStackProps extends StackProps {
 }
 
 export class SpokeStack extends Stack {
+  public static sharedConfig: {
+    namespace: string;
+  };
+
   constructor(scope: Construct, id: string, props: SpokeStackProps) {
     super(scope, id, props);
+
+    const namespace = new ParameterWithLabel(this, "Namespace", {
+      label: "Namespace",
+      description:
+        "Unique identifier used to differentiate between multiple solution deployments. " +
+        "Must be set to the same value as the Hub stack. Must be non-empty for Organizations deployments.",
+      default: "default",
+    });
+
+    const usingAWSOrganizations = new YesNoParameter(this, "UsingAWSOrganizations", {
+      label: "Use AWS Organizations",
+      description:
+        "Use AWS Organizations to automate spoke account registration. " +
+        "Must be set to the same value as the Hub stack",
+      default: YesNoType.No,
+    });
 
     const instanceSchedulerAccount = new ParameterWithLabel(this, "InstanceSchedulerAccount", {
       label: "Hub Account ID",
@@ -33,25 +56,26 @@ export class SpokeStack extends Stack {
     });
     const hubAccountId = instanceSchedulerAccount.valueAsString;
 
-    const usingAWSOrganizations = new YesNoParameter(this, "UsingAWSOrganizations", {
-      label: "Use AWS Organizations",
+    const scheduleTagKey = new ParameterWithLabel(this, "ScheduleTagKey", {
+      label: "Schedule tag key",
       description:
-        "Use AWS Organizations to automate spoke account registration. " +
-        "Must be set to the same value as the Hub stack",
-      default: YesNoType.No,
-    });
-
-    const namespace = new ParameterWithLabel(this, "Namespace", {
-      label: "Namespace",
-      description:
-        "Unique identifier used to differentiate between multiple solution deployments. " +
-        "Must be set to the same value as the Hub stack. Must be non-empty for Organizations deployments.",
-      default: "default",
+        "The tag key Instance Scheduler will read to determine the schedule for a resource. Must be set to the same value as the Hub stack. ",
+      default: "Schedule",
+      minLength: 1,
+      maxLength: 127,
     });
 
     addParameterGroup(this, {
-      label: "Account structure",
-      parameters: [instanceSchedulerAccount, usingAWSOrganizations, namespace],
+      label: "Infrastructure",
+      parameters: [namespace, usingAWSOrganizations, instanceSchedulerAccount, scheduleTagKey],
+    });
+
+    const regions = new ParameterWithLabel(this, "Regions", {
+      label: "Region(s)",
+      type: "CommaDelimitedList",
+      description:
+        "Comma-separated List of regions in which resources should be scheduled. Leave blank for current region only.",
+      default: "",
     });
 
     const kmsKeyArns = new ParameterWithLabel(this, "KmsKeyArns", {
@@ -67,35 +91,128 @@ export class SpokeStack extends Stack {
       default: "",
     });
 
-    addParameterGroup(this, {
-      label: "Service-specific",
-      parameters: [kmsKeyArns],
+    const licenseManagerArns = new ParameterWithLabel(this, "LicenseManagerArns", {
+      label: "License Manager Arns for EC2",
+      description:
+        "comma-separated list of license manager arns to grant Instance Scheduler ec2:StartInstance permissions to provide the EC2 " +
+        " service with license manager permissions to start the instances." +
+        " This allows the scheduler to start EC2 instances with license manager configuration enabled." +
+        " Leave blank to disable." +
+        " For details on the exact policy created, refer to security section of the implementation guide" +
+        " (https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/)",
+      type: "CommaDelimitedList",
+      default: "",
     });
 
+    addParameterGroup(this, {
+      label: "Member-Account Scheduling",
+      parameters: [regions, kmsKeyArns, licenseManagerArns],
+    });
+
+    SpokeStack.sharedConfig = {
+      namespace: namespace.valueAsString,
+    };
+
     const USER_AGENT_EXTRA = `AwsSolution/${props.solutionId}/${props.solutionVersion}`;
+    const REGIONAL_EVENT_BUS_NAME = `IS-LocalEvents-${namespace.valueAsString}`;
 
     const schedulingRole = new SchedulerRole(this, "EC2SchedulerCrossAccountRole", {
-      assumedBy: new ArnPrincipal(
-        roleArnFor(hubAccountId, SchedulingRequestHandlerLambda.roleName(namespace.valueAsString)),
+      assumedBy: new CompositePrincipal(
+        new ArnPrincipal(roleArnFor(hubAccountId, SchedulingRequestHandlerLambda.roleName(namespace.valueAsString))),
+        new ArnPrincipal(roleArnFor(hubAccountId, HubResourceRegistration.roleName(namespace.valueAsString))),
+        new ArnPrincipal(roleArnFor(hubAccountId, IceErrorRetry.roleName(namespace.valueAsString))),
+        new ArnPrincipal(roleArnFor(hubAccountId, SpokeRegistrationLambda.roleName(namespace.valueAsString))),
       ),
       namespace: namespace.valueAsString,
       kmsKeys: kmsKeyArns.valueAsList,
+      licenseManagerArns: licenseManagerArns.valueAsList,
+      regionalEventBusName: REGIONAL_EVENT_BUS_NAME,
     });
+    addCfnGuardSuppression(schedulingRole, ["CFN_NO_EXPLICIT_RESOURCE_NAMES"]);
     overrideLogicalId(schedulingRole, "EC2SchedulerCrossAccountRole");
 
-    new AsgSchedulingRole(this, "AsgSchedulingRole", {
-      assumedBy: new ArnPrincipal(roleArnFor(hubAccountId, AsgHandler.roleName(namespace.valueAsString))),
-      namespace: namespace.valueAsString,
-    });
+    const schedulerRoleCfnResource = schedulingRole.node.defaultChild as CfnRole;
+    schedulerRoleCfnResource.addOverride("UpdateReplacePolicy", "Retain");
 
     const factory = props.factory ?? new PythonFunctionFactory();
 
-    new RemoteRegistrationCustomResource(this, "RemoteRegistrationCustomResource", {
+    const regionEventRulesCustomResource = new RegionEventRulesCustomResource(this, "RegionEventRulesCustomResource", {
       hubAccountId: hubAccountId,
       namespace: namespace.valueAsString,
-      shouldRegisterSpokeAccountCondition: usingAWSOrganizations.getCondition(),
       factory: factory,
+      scheduleTagKey: scheduleTagKey.valueAsString,
       USER_AGENT_EXTRA: USER_AGENT_EXTRA,
+      taggingEventBusName: HubResourceRegistration.registrationEventBusName(namespace.valueAsString),
+      version: props.solutionVersion,
+      regionalEventBusName: REGIONAL_EVENT_BUS_NAME,
+    });
+
+    const regionsCustomResource = new CustomResource(this, "CreateRegionalEventRules", {
+      serviceToken: regionEventRulesCustomResource.regionalEventsCustomResourceLambda.functionArn,
+      resourceType: "Custom::SetupRegionalEvents",
+      properties: {
+        regions: regions.valueAsList,
+      },
+    });
+    const regionsCustomResourceCfnResource = regionsCustomResource.node.defaultChild as CfnResource;
+    regionsCustomResourceCfnResource.addOverride("UpdateReplacePolicy", "Retain");
+
+    const regionRegistrationCustomResource = new RegionRegistrationCustomResource(
+      this,
+      "RegionRegistrationCustomResource",
+      {
+        hubAccountId: hubAccountId,
+        namespace: namespace.valueAsString,
+        factory: factory,
+        USER_AGENT_EXTRA: USER_AGENT_EXTRA,
+        version: props.solutionVersion,
+        targetStack: TargetStack.REMOTE,
+        hubRegisterRegionFunctionName: SpokeRegistrationLambda.getFunctionName(namespace.valueAsString),
+        hubRegisterRegionRoleName: SpokeRegistrationLambda.roleName(namespace.valueAsString),
+      },
+    );
+
+    const regionRegistration = new CustomResource(this, "RegisterRegions", {
+      serviceToken: regionRegistrationCustomResource.regionRegistrationCustomResourceProvider.serviceToken,
+      resourceType: "Custom::RegisterRegion",
+      properties: {
+        regions: regions.valueAsList,
+      },
+    });
+
+    // resource dependencies to allow de-registering event to complete before removing IAM roles and permissions.
+    const regionRegistrationCfnResource = regionRegistration.node.defaultChild as CfnResource;
+    const ec2PolicyCfnResource = schedulingRole.ec2Policy.node.defaultChild as CfnPolicy;
+    regionRegistrationCfnResource.addDependency(ec2PolicyCfnResource);
+    const rdsPolicyCfnResource = schedulingRole.rdsPolicy.node.defaultChild as CfnPolicy;
+    regionRegistrationCfnResource.addDependency(rdsPolicyCfnResource);
+
+    const asgPolicyCfnResource = schedulingRole.asgPolicy.node.defaultChild as CfnPolicy;
+    regionRegistrationCfnResource.addDependency(asgPolicyCfnResource);
+
+    const resourceTaggingPolicyCfnResource = schedulingRole.resourceTaggingPolicy.node.defaultChild as CfnPolicy;
+    regionRegistrationCfnResource.addDependency(resourceTaggingPolicyCfnResource);
+
+    regionRegistrationCfnResource.addDependency(schedulerRoleCfnResource);
+    regionRegistrationCfnResource.addDependency(
+      regionRegistrationCustomResource.spokeRegistrationUpdateSSMParamRoleCfnResource,
+    );
+    regionRegistrationCfnResource.addDependency(
+      regionRegistrationCustomResource.regionRegistrationWaitLambdaRoleCfnResource,
+    );
+    regionRegistrationCfnResource.addDependency(
+      regionRegistrationCustomResource.regionRegistrationCustomResourceLambdaRoleCfnResource,
+    );
+    regionRegistrationCfnResource.addOverride("UpdateReplacePolicy", "Retain");
+
+    new CfnOutput(this, "RegionalEventBusName", {
+      value: regionsCustomResource.getAtt("REGIONAL_BUS_NAME").toString(),
+      description: "Regional event bus name.",
+    });
+
+    new CfnOutput(this, "SchedulerRoleArn", {
+      value: schedulingRole.roleArn,
+      description: "Scheduler role ARN",
     });
   }
 }

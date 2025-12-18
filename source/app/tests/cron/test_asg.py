@@ -1,7 +1,5 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from pytest import raises
-
 from instance_scheduler.cron.asg import (
     to_asg_expr_monthdays,
     to_asg_expr_months,
@@ -17,6 +15,7 @@ from instance_scheduler.cron.parser import (
     parse_months_expr,
     parse_weekdays_expr,
 )
+from pytest import raises
 
 
 def test_to_asg_expr_months() -> None:

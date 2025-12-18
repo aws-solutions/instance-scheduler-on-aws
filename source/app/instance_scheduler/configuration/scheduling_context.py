@@ -1,61 +1,69 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 import datetime
-import time
-from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Optional, TypedDict
-from zoneinfo import ZoneInfo
+from typing import Protocol
 
-from instance_scheduler import configuration
-from instance_scheduler.configuration.instance_schedule import InstanceSchedule
+from instance_scheduler.model.store.cached_period_definition_store import (
+    CachedPeriodDefinitionStore,
+)
+from instance_scheduler.model.store.cached_resource_registry import (
+    CachedResourceRegistry,
+)
+from instance_scheduler.model.store.cached_schedule_definition_store import (
+    CachedScheduleDefinitionStore,
+)
+from instance_scheduler.observability.events.events_environment import EventsEnv
+from instance_scheduler.scheduling.asg.asg_scheduling_envionment import (
+    AsgSchedulingEnvironment,
+)
+from instance_scheduler.util.session_manager import AssumedRole
 from instance_scheduler.util.time import is_aware
 
 
-class TagTemplate(TypedDict):
-    Key: str
-    Value: str
-
-
-@dataclass(frozen=True)
-class SchedulingContext:
-    account_id: str
-    service: str
-    region: str
-    current_dt: datetime.datetime
-    default_timezone: ZoneInfo
-    schedules: Mapping[str, InstanceSchedule]
+class SchedulingEnvironment(EventsEnv, AsgSchedulingEnvironment, Protocol):
+    config_table: str
+    registry_table: str
+    hub_stack_name: str
+    schedule_tag_key: str
     scheduling_interval_minutes: int
-    started_tags: list[TagTemplate] = field(default_factory=list)
-    stopped_tags: list[TagTemplate] = field(default_factory=list)
+    asg_scheduled_rule_prefix: str
+    asg_metadata_tag_key: str
+    local_event_bus_name: str
+    global_event_bus_name: str
 
-    def __post_init__(self) -> None:
-        if not is_aware(self.current_dt):
+
+class SchedulingContext:
+    assumed_role: AssumedRole
+    current_dt: datetime.datetime
+    registry: CachedResourceRegistry
+    schedule_store: CachedScheduleDefinitionStore
+    period_store: CachedPeriodDefinitionStore
+    schedule_tag_key: str
+    hub_stack_name: str
+    asg_scheduled_rule_prefix: str
+    scheduling_interval_minutes: int
+    local_event_bus_name: str
+    global_event_bus_name: str
+
+    def __init__(
+        self,
+        assumed_role: AssumedRole,
+        current_dt: datetime.datetime,
+        env: SchedulingEnvironment,
+    ):
+        if not is_aware(current_dt):
             raise ValueError(
-                f"SchedulingContext datetime must be timezone-Aware. Received: {self.current_dt}"
+                f"SchedulingContext datetime must be timezone-Aware. Received: {current_dt}"
             )
 
-    def get_schedule(self, name: Optional[str]) -> Optional[InstanceSchedule]:
-        """
-        Get a schedule by its name
-        :param name: name of the schedule
-        :return: Schedule, None f it does not exist
-        """
-        if not name:
-            return None
-        return self.schedules[name] if name in self.schedules else None
-
-
-def get_time_from_string(timestr: Optional[str]) -> Optional[datetime.time]:
-    """
-    Standardised method to build time object instance from time string
-    :param timestr: string in format as defined in configuration.TIME_FORMAT_STRING
-    :return: time object from time string, None if the time is invalid
-    """
-    if not timestr:
-        return None
-    try:
-        tm = time.strptime(timestr, configuration.TIME_FORMAT_STRING)
-    except ValueError:
-        return None
-    return datetime.time(tm.tm_hour, tm.tm_min, 0)
+        self.assumed_role = assumed_role
+        self.current_dt = current_dt
+        self.registry = CachedResourceRegistry(env.registry_table)
+        self.schedule_store = CachedScheduleDefinitionStore(env.config_table)
+        self.period_store = CachedPeriodDefinitionStore(env.config_table)
+        self.schedule_tag_key = env.schedule_tag_key
+        self.hub_stack_name = env.hub_stack_name
+        self.asg_scheduled_rule_prefix = env.asg_scheduled_rule_prefix
+        self.scheduling_interval_minutes = env.scheduling_interval_minutes
+        self.local_event_bus_name = env.local_event_bus_name
+        self.global_event_bus_name = env.global_event_bus_name

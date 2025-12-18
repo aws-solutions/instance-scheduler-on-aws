@@ -3,13 +3,11 @@
 import { MathExpression, Metric } from "aws-cdk-lib/aws-cloudwatch";
 import { Aws, Stack } from "aws-cdk-lib";
 import { SchedulingRequestHandlerLambda } from "../lambda-functions/scheduling-request-handler";
-import { AsgHandler } from "../lambda-functions/asg-handler";
 import { SchedulingOrchestrator } from "../lambda-functions/scheduling-orchestrator";
 import { SchedulingIntervalToSeconds } from "../scheduling-interval-mappings";
 
 export interface MetricProps {
   readonly schedulingRequestHandler: SchedulingRequestHandlerLambda;
-  readonly asgHandler: AsgHandler;
   readonly orchestrator: SchedulingOrchestrator;
   readonly schedulingIntervalMinutes: number;
 }
@@ -41,8 +39,21 @@ export class Metrics {
     });
   }
 
+  TotalAsgsControlled() {
+    return new MathExpression({
+      expression: `SUM(SEARCH('{"${Metrics.metricNamespace}",Service,InstanceType,SchedulingInterval} "Service"="autoscaling" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName=ManagedInstances', 'Sum', ${this.schedulingIntervalSeconds}))`,
+    });
+  }
+
   TotalEc2HoursSaved() {
     const searchExpr = `SEARCH('{"${Metrics.metricNamespace}",Service,InstanceType,SchedulingInterval} Service="ec2" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName="StoppedInstances"', 'Sum', ${this.schedulingIntervalSeconds})`;
+    return new MathExpression({
+      expression: `SUM(${searchExpr}) * ${this.props.schedulingIntervalMinutes} / 60`,
+    });
+  }
+
+  TotalAsgHoursSaved() {
+    const searchExpr = `SEARCH('{"${Metrics.metricNamespace}",Service,InstanceType,SchedulingInterval} Service="autoscaling" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName="StoppedInstances"', 'Sum', ${this.schedulingIntervalSeconds})`;
     return new MathExpression({
       expression: `SUM(${searchExpr}) * ${this.props.schedulingIntervalMinutes} / 60`,
     });
@@ -66,6 +77,18 @@ export class Metrics {
     });
   }
 
+  AsgsControlledByType() {
+    return new MathExpression({
+      expression: `SEARCH('{"${Metrics.metricNamespace}",Service,InstanceType,SchedulingInterval} "Service"="autoscaling" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName=ManagedInstances', 'Sum', ${this.schedulingIntervalSeconds})`,
+    });
+  }
+
+  AsgsRunningByType() {
+    return new MathExpression({
+      expression: `SEARCH('{"${Metrics.metricNamespace}",Service,InstanceType,SchedulingInterval} Service="autoscaling" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName="RunningInstances"', 'Sum', ${this.schedulingIntervalSeconds})`,
+    });
+  }
+
   Ec2InstancesControlledBySchedule() {
     return new MathExpression({
       expression: `SEARCH('{"${Metrics.metricNamespace}",Service,Schedule,SchedulingInterval} Service="ec2" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName="ManagedInstances"', 'Sum', ${this.schedulingIntervalSeconds})`,
@@ -75,6 +98,24 @@ export class Metrics {
   Ec2InstancesRunningByType() {
     return new MathExpression({
       expression: `SEARCH('{"${Metrics.metricNamespace}",Service,InstanceType,SchedulingInterval} Service="ec2" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName="RunningInstances"', 'Sum', ${this.schedulingIntervalSeconds})`,
+    });
+  }
+
+  RunningEC2Instances() {
+    return new MathExpression({
+      expression: `SUM(SEARCH('{"${Metrics.metricNamespace}",Service,InstanceType,SchedulingInterval} Service="ec2" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName="RunningInstances"', 'Sum', ${this.schedulingIntervalSeconds}))`,
+    });
+  }
+
+  RunningRDSInstances() {
+    return new MathExpression({
+      expression: `SUM(SEARCH('{"${Metrics.metricNamespace}",Service,InstanceType,SchedulingInterval} Service="rds" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName="RunningInstances"', 'Sum', ${this.schedulingIntervalSeconds}))`,
+    });
+  }
+
+  RunningASGs() {
+    return new MathExpression({
+      expression: `SUM(SEARCH('{"${Metrics.metricNamespace}",Service,InstanceType,SchedulingInterval} Service="autoscaling" "SchedulingInterval"="${this.schedulingIntervalMinutes}" MetricName="RunningInstances"', 'Sum', ${this.schedulingIntervalSeconds}))`,
     });
   }
 
@@ -142,16 +183,6 @@ export class Metrics {
     });
   }
 
-  AsgHandlerLambdaErrors() {
-    return new Metric({
-      namespace: "AWS/Lambda",
-      metricName: "Errors",
-      dimensionsMap: {
-        FunctionName: this.props.asgHandler.lambdaFunction.functionName,
-      },
-    });
-  }
-
   OrchestratorLambdaDuration() {
     return new Metric({
       namespace: "AWS/Lambda",
@@ -168,16 +199,6 @@ export class Metrics {
       metricName: "Duration",
       dimensionsMap: {
         FunctionName: this.props.schedulingRequestHandler.lambdaFunction.functionName,
-      },
-    });
-  }
-
-  AsgHandlerLambdaDuration() {
-    return new Metric({
-      namespace: "AWS/Lambda",
-      metricName: "Duration",
-      dimensionsMap: {
-        FunctionName: this.props.asgHandler.lambdaFunction.functionName,
       },
     });
   }

@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from instance_scheduler.ops_metrics import GatheringFrequency
 from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 
 
@@ -24,6 +23,8 @@ class DeploymentDescriptionMetric(OpsMetric):
     regions: list[str]
     num_accounts: int
     num_schedules: int
+    num_resources: int
+    num_targets: int
     num_cfn_schedules: int
     num_one_sided_schedules: int
     approximate_lambda_payload_size_bytes: int
@@ -38,5 +39,4 @@ class DeploymentDescriptionMetric(OpsMetric):
     num_started_tags: int
     num_stopped_tags: int
     event_name: ClassVar[str] = "deployment_description"
-    collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.DAILY
-    context_version: ClassVar[int] = 2
+    context_version: ClassVar[int] = 3

@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from instance_scheduler.schedulers.instance_states import InstanceStates
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from tests.integration.helpers.ec2_helpers import get_current_state, start_ec2_instances
 from tests.integration.helpers.run_handler import simple_schedule
 from tests.integration.helpers.schedule_helpers import quick_time
@@ -40,7 +40,7 @@ def setup_retain_running_scenario(
 
 def test_instance_is_stopped_at_end_of_period_when_flag_is_not_set(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     setup_retain_running_scenario(
         ec2_instance,
@@ -55,7 +55,7 @@ def test_instance_is_stopped_at_end_of_period_when_flag_is_not_set(
 
 def test_instance_is_not_stopped_at_end_of_period_when_flag_is_set(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     setup_retain_running_scenario(
         ec2_instance,
@@ -70,7 +70,7 @@ def test_instance_is_not_stopped_at_end_of_period_when_flag_is_set(
 
 def test_retain_running_behavior_over_multiple_scheduling_cycles(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     setup_retain_running_scenario(
         ec2_instance,

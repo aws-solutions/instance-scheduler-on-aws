@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 import pytest
 from _pytest.fixtures import fixture
-
 from instance_scheduler.model.period_definition import PeriodDefinition, PeriodParams
 from instance_scheduler.model.store.in_memory_period_definition_store import (
     InMemoryPeriodDefinitionStore,

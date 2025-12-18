@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-from typing import Any, Mapping, Optional, Sequence, TypeGuard
+from typing import Any, Iterator, Mapping, Optional, Sequence, TypeGuard
 
 from instance_scheduler.model.schedule_definition import (
     ScheduleDefinition,
@@ -66,11 +66,18 @@ class InMemoryScheduleDefinitionStore(ScheduleDefinitionStore):
         cls, data: SerializedInMemoryScheduleDefinitionStore
     ) -> "InMemoryScheduleDefinitionStore":
         schedules: dict[str, ScheduleDefinition] = {}
-        for period_params in data:
-            schedule_def = ScheduleDefinition.from_schedule_params(period_params)
+        for schedule_def in cls.deserialize_to_sequence(data):
             schedules[schedule_def.name] = schedule_def
 
         return InMemoryScheduleDefinitionStore(schedules)
+
+    @classmethod
+    def deserialize_to_sequence(
+        cls, data: SerializedInMemoryScheduleDefinitionStore
+    ) -> Iterator[ScheduleDefinition]:
+        for period_params in data:
+            schedule_def = ScheduleDefinition.from_schedule_params(period_params)
+            yield schedule_def
 
     @staticmethod
     def validate_serial_data(

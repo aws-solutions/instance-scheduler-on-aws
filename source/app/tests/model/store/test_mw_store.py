@@ -5,7 +5,6 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 from _pytest.fixtures import SubRequest, fixture
-
 from instance_scheduler.model import EC2SSMMaintenanceWindow, MWStore
 from instance_scheduler.model.store.dynamo_mw_store import DynamoMWStore
 from instance_scheduler.model.store.in_memory_mw_store import InMemoryMWStore

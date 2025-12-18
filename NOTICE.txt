@@ -830,7 +830,16 @@ wordwrap under the MIT license.
 uglify-js under the BSD-2-Clause license.
 librt under the MIT license.
 typing-inspection under the MIT license.
-referencing 
+jinja2 under the 0BSD license.
+markupsafe under the 0BSD license.
+pyyaml under the MIT license.
+types-pyyaml under the Apache-2.0 license.
+werkzeug under the 0BSD license.
+jsonpath-ng under the Apache-2.0 license.
+mypy-boto3-events under the MIT license.
+mypy-boto3-sqs under the MIT license.
+ply under the 0BSD license.
+
 
 ********************
 OPEN SOURCE LICENSES

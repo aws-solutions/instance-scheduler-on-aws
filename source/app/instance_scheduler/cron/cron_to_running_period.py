@@ -26,24 +26,24 @@ like it does for monthdays. For example. suppose the expr "30-L" is used as a mo
 this can resolve to 30-30, 30-31, (both simple cases) and 30-28 (a potential wrap case). It is assumed in this last case
 that 30-L in a month with 28 days should take no action at all
 
-    However another possible scenario is an expression of 21-9/2 which might reasonably be interpreted as 
-"starting on the 21st, run every 2nd day until the 9th of the next month, but don't run on the 10th-20th". 
-In specific terms: In a month with 30 days, run on {21, 23, 25, 27, 29} in the current month and {1, 3, 5, 7, 9} 
-in the next month. However, this is NOT the normal behavior of cron because cron is typically evaluated within the context of 
+    However another possible scenario is an expression of 21-9/2 which might reasonably be interpreted as
+"starting on the 21st, run every 2nd day until the 9th of the next month, but don't run on the 10th-20th".
+In specific terms: In a month with 30 days, run on {21, 23, 25, 27, 29} in the current month and {1, 3, 5, 7, 9}
+in the next month. However, this is NOT the normal behavior of cron because cron is typically evaluated within the context of
 the current month only (meaning that wrapping accounts for the number of days in the current month, not the prev month).
-For example, in the transition between March and April, this cron would resolve to {2, 4, 6, 8, 21, 23, 25, 27, 31} 
-in March (with 31 days) followed by {1, 3, 5, 7, 9, 21, 23, 25, 27, 29} in April (with 30 days) leading to two 
+For example, in the transition between March and April, this cron would resolve to {2, 4, 6, 8, 21, 23, 25, 27, 31}
+in March (with 31 days) followed by {1, 3, 5, 7, 9, 21, 23, 25, 27, 29} in April (with 30 days) leading to two
 concurrent days being scheduled (Mar 31st and Apr 1st).
 
     We do not currently attempt to address this peculiarity and instead simply make the assertion that while days/months
 (with consistent domains of 0-6 and 1-12 respectively) do support wrapping, monthdays do NOT wrap. In addition
 If an expr specifies a start that is after the end of a given domain, the expression will resolve to an empty set of
 running values and WILL NOT WRAP. Thus a weekday expression of "7-3" would never be true because weekdays only go from
-0-6 and we will not auto-wrap this malformed expression; likewise a monthday expression of 30-L will run on the 30th/31st 
+0-6 and we will not auto-wrap this malformed expression; likewise a monthday expression of 30-L will run on the 30th/31st
 of every month when possible and will NOT run at all in months with < 30 days.
 
-    Similarly ranges that start from L and plan to wrap around (such as L-5) are not considered a legal format 
-(this being enforced by the typing of CronRange). This leaves open the option to potentially support "L-5" as 
+    Similarly ranges that start from L and plan to wrap around (such as L-5) are not considered a legal format
+(this being enforced by the typing of CronRange). This leaves open the option to potentially support "L-5" as
 "the last 5 days/months of the week/month/year" in the future.
 """  # noqa: W291
 

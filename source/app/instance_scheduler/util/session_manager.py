@@ -1,18 +1,31 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Final
+from functools import cache
+from os import environ
+from typing import TYPE_CHECKING, Any, Final, Optional
 
 import boto3
 from boto3 import Session
+from botocore.config import Config as _Config
 from botocore.exceptions import ClientError
 
-from instance_scheduler.util import get_boto_config
-
 if TYPE_CHECKING:
+    from mypy_boto3_dynamodb import DynamoDBClient
     from mypy_boto3_sts.client import STSClient
 else:
     STSClient = object
+    DynamoDBClient = object
+
+
+def get_boto_config() -> _Config:
+    """Returns a boto3 config with standard retries and `user_agent_extra`"""
+    return _Config(
+        retries={"max_attempts": 10, "mode": "standard"},
+        user_agent_extra=environ[
+            "USER_AGENT_EXTRA"
+        ],  # todo: don't access environ directly here (need better validation for USER_AGENT_EXTRA existing)
+    )
 
 
 def _sts() -> STSClient:
@@ -59,9 +72,18 @@ class AssumedRole:
     account: str
     region: str
 
-    def client(self, service_name: str) -> Any:
+    @property
+    def partition(self) -> str:
+        return self.session.get_partition_for_region(self.region)
+
+    def client(self, service_name: str, region: Optional[str] = None) -> Any:
         """simple wrapper for session.client() that includes the default config from get_boto_config"""
-        return self.session.client(service_name, config=get_boto_config())
+        if region:
+            return self.session.client(service_name, region, config=get_boto_config())
+        else:
+            return self.session.client(
+                service_name, region_name=self.region, config=get_boto_config()
+            )
 
 
 def assume_role(*, account: str, region: str, role_name: str) -> AssumedRole:
@@ -96,3 +118,23 @@ def assume_role(*, account: str, region: str, role_name: str) -> AssumedRole:
     except ClientError as ex:
         """rethrow"""
         raise ex
+
+
+@cache
+def lambda_execution_role() -> AssumedRole:
+    """
+    Get the execution role for the lambda function
+    """
+    session = boto3.Session()
+    return AssumedRole(
+        session=session,
+        account=session.client("sts").get_caller_identity()["Account"],
+        region=session.region_name,
+        role_name="",
+    )
+
+
+@cache
+def hub_dynamo_client() -> DynamoDBClient:
+    client: DynamoDBClient = lambda_execution_role().client("dynamodb")
+    return client

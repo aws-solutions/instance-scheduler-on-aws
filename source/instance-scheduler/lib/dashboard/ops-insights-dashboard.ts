@@ -1,38 +1,27 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Aspects, Aws, CfnCondition, Duration, Stack } from "aws-cdk-lib";
-import { Dashboard, PeriodOverride, TextWidget } from "aws-cdk-lib/aws-cloudwatch";
+import { Aspects, Aws, CfnCondition, Duration, Stack, Token } from "aws-cdk-lib";
+import { Color, Column, Dashboard, PeriodOverride, SingleValueWidget, TextWidget } from "aws-cdk-lib/aws-cloudwatch";
 import {
-  ControlledEC2InstancesByScheduleLineChart,
-  ControlledEC2InstancesByTypeLineChart,
-  ControlledEc2InstancesPieChart,
-  ControlledRdsInstancesByScheduleLineChart,
-  ControlledRDSInstancesByTypeLineChart,
-  ControlledRDSInstancesPieChart,
+  ControlledEc2InstancesByTypePieChart,
+  ControlledRDSInstancesByTypePieChart,
   EC2HoursSavedPieChart,
   LambdaDurationLineChart,
   LambdaErrorRateLineChart,
   RdsHoursSavedPieChart,
-  RunningEC2InstancesByScheduleLineChart,
-  RunningRdsInstancesByScheduleLineChart,
   Size,
   RunningEC2InstancesByTypeLineChart,
   RunningRDSInstancesByTypeLineChart,
-  TotalControlledEc2InstancesKPI,
-  TotalControlledRdsInstancesKPI,
-  TotalEc2HoursSavedInstancesKPI,
-  TotalRdsHoursSavedInstancesKPI,
+  RunningResourcesLineChart,
 } from "./widgets";
 import { Metrics } from "./metrics";
 import { ConditionAspect } from "../cfn";
 import { SchedulingRequestHandlerLambda } from "../lambda-functions/scheduling-request-handler";
-import { AsgHandler } from "../lambda-functions/asg-handler";
 import { SchedulingOrchestrator } from "../lambda-functions/scheduling-orchestrator";
 
 export interface OperationalInsightsDashboardProps {
   readonly enabled: CfnCondition;
   readonly schedulingRequestHandler: SchedulingRequestHandlerLambda;
-  readonly asgHandler: AsgHandler;
   readonly orchestrator: SchedulingOrchestrator;
   readonly schedulingIntervalMinutes: number;
   readonly namespace: string;
@@ -47,104 +36,141 @@ export class OperationalInsightsDashboard {
 
     const metrics = new Metrics(scope, {
       schedulingRequestHandler: props.schedulingRequestHandler,
-      asgHandler: props.asgHandler,
       orchestrator: props.orchestrator,
       schedulingIntervalMinutes: props.schedulingIntervalMinutes,
     });
 
     dashboard.addWidgets(
       new TextWidget({
-        markdown: "# EC2",
+        markdown: "# Overview",
         width: Size.FULL_WIDTH,
         height: 1,
       }),
     );
 
     dashboard.addWidgets(
-      new TotalControlledEc2InstancesKPI(metrics, {
-        width: Size.QUARTER_WIDTH,
-        height: Size.QUARTER_WIDTH,
-      }),
-      new ControlledEc2InstancesPieChart(metrics, {
-        width: Size.QUARTER_WIDTH,
-        height: Size.QUARTER_WIDTH,
-      }),
-      new TotalEc2HoursSavedInstancesKPI(metrics, {
-        width: Size.QUARTER_WIDTH,
-        height: Size.QUARTER_WIDTH,
-      }),
-      new EC2HoursSavedPieChart(metrics, {
-        width: Size.QUARTER_WIDTH,
-        height: Size.QUARTER_WIDTH,
-      }),
-    );
-
-    dashboard.addWidgets(
-      new ControlledEC2InstancesByTypeLineChart(metrics, {
-        width: Size.HALF_WIDTH,
-        height: 6,
-      }),
-      new RunningEC2InstancesByTypeLineChart(metrics, {
-        width: Size.HALF_WIDTH,
-        height: 6,
-      }),
-    );
-
-    dashboard.addWidgets(
-      new ControlledEC2InstancesByScheduleLineChart(metrics, {
-        width: Size.HALF_WIDTH,
-        height: 6,
-      }),
-      new RunningEC2InstancesByScheduleLineChart(metrics, {
-        width: Size.HALF_WIDTH,
-        height: 6,
-      }),
+      new Column(
+        new SingleValueWidget({
+          title: "Controlled EC2 Instances",
+          width: Size.QUARTER_WIDTH,
+          height: 4,
+          metrics: [
+            metrics.TotalEc2InstancesControlled().with({
+              label: "Controlled EC2 Instances",
+              color: Color.BLUE,
+            }),
+          ],
+          period: Duration.seconds(Token.asNumber(metrics.schedulingIntervalSeconds)),
+          sparkline: true,
+        }),
+        new SingleValueWidget({
+          title: "Controlled RDS Instances",
+          width: Size.QUARTER_WIDTH,
+          height: 4,
+          metrics: [
+            metrics.TotalRDSInstancesControlled().with({
+              label: "Controlled RDS Instances",
+              color: Color.RED,
+            }),
+          ],
+          period: Duration.seconds(Token.asNumber(metrics.schedulingIntervalSeconds)),
+          sparkline: true,
+        }),
+        new SingleValueWidget({
+          title: "Controlled ASGs",
+          width: Size.QUARTER_WIDTH,
+          height: 4,
+          metrics: [
+            metrics.TotalAsgsControlled().with({
+              label: "Controlled ASGs",
+              color: Color.GREEN,
+            }),
+          ],
+          period: Duration.seconds(Token.asNumber(metrics.schedulingIntervalSeconds)),
+          sparkline: true,
+        }),
+      ),
+      new Column(
+        new ControlledEc2InstancesByTypePieChart(metrics, {
+          width: Size.QUARTER_WIDTH,
+          height: Size.QUARTER_WIDTH,
+        }),
+        new ControlledRDSInstancesByTypePieChart(metrics, {
+          width: Size.QUARTER_WIDTH,
+          height: Size.QUARTER_WIDTH,
+        }),
+      ),
+      new Column(
+        new SingleValueWidget({
+          title: "EC2 Hours Saved",
+          width: Size.QUARTER_WIDTH,
+          height: 4,
+          metrics: [
+            metrics.TotalEc2HoursSaved().with({
+              label: "Hours Saved",
+              color: Color.BLUE,
+            }),
+          ],
+          setPeriodToTimeRange: true,
+        }),
+        new SingleValueWidget({
+          title: "RDS Hours Saved",
+          width: Size.QUARTER_WIDTH,
+          height: 4,
+          metrics: [
+            metrics.TotalRDSHoursSaved().with({
+              label: "Hours Saved",
+              color: Color.RED,
+            }),
+          ],
+          setPeriodToTimeRange: true,
+        }),
+        new SingleValueWidget({
+          title: "ASG Hours Saved",
+          width: Size.QUARTER_WIDTH,
+          height: 4,
+          metrics: [
+            metrics.TotalAsgHoursSaved().with({
+              label: "Hours Saved",
+              color: Color.GREEN,
+            }),
+          ],
+          setPeriodToTimeRange: true,
+        }),
+      ),
+      new Column(
+        new EC2HoursSavedPieChart(metrics, {
+          width: Size.QUARTER_WIDTH,
+          height: Size.QUARTER_WIDTH,
+        }),
+        new RdsHoursSavedPieChart(metrics, {
+          width: Size.QUARTER_WIDTH,
+          height: Size.QUARTER_WIDTH,
+        }),
+      ),
     );
 
     dashboard.addWidgets(
       new TextWidget({
-        markdown: "# RDS",
+        markdown: "# Running Resources",
         width: Size.FULL_WIDTH,
         height: 1,
       }),
     );
 
     dashboard.addWidgets(
-      new TotalControlledRdsInstancesKPI(metrics, {
-        width: Size.QUARTER_WIDTH,
-        height: Size.QUARTER_WIDTH,
-      }),
-      new ControlledRDSInstancesPieChart(metrics, {
-        width: Size.QUARTER_WIDTH,
-        height: Size.QUARTER_WIDTH,
-      }),
-      new TotalRdsHoursSavedInstancesKPI(metrics, {
-        width: Size.QUARTER_WIDTH,
-        height: Size.QUARTER_WIDTH,
-      }),
-      new RdsHoursSavedPieChart(metrics, {
-        width: Size.QUARTER_WIDTH,
-        height: Size.QUARTER_WIDTH,
+      new RunningResourcesLineChart(metrics, {
+        width: Size.FULL_WIDTH,
+        height: 6,
       }),
     );
 
     dashboard.addWidgets(
-      new ControlledRDSInstancesByTypeLineChart(metrics, {
+      new RunningEC2InstancesByTypeLineChart(metrics, {
         width: Size.HALF_WIDTH,
         height: 6,
       }),
       new RunningRDSInstancesByTypeLineChart(metrics, {
-        width: Size.HALF_WIDTH,
-        height: 6,
-      }),
-    );
-
-    dashboard.addWidgets(
-      new ControlledRdsInstancesByScheduleLineChart(metrics, {
-        width: Size.HALF_WIDTH,
-        height: 6,
-      }),
-      new RunningRdsInstancesByScheduleLineChart(metrics, {
         width: Size.HALF_WIDTH,
         height: 6,
       }),

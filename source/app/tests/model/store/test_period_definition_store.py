@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: Apache-2.0
 import pytest
 from _pytest.fixtures import SubRequest, fixture
-
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.store.dynamo_period_definition_store import (
     DynamoPeriodDefinitionStore,

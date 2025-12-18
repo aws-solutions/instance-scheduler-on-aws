@@ -32,7 +32,8 @@ main() {
     export VERSION
 
     # Get reference for all important folders
-    local project_root=$(dirname "$(cd -P -- "$(dirname "$0")" && pwd -P)")
+    local project_root
+    project_root=$(dirname "$(cd -P -- "$(dirname "$0")" && pwd -P)")
     local deployment_dir="$project_root"/deployment
     #output folders
     local global_dist_dir="$deployment_dir"/global-s3-assets

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from collections import Counter
 
-from instance_scheduler.ops_monitoring.instance_counts import (
+from instance_scheduler.observability.instance_counts import (
     InstanceCounts,
     InstanceCountsAggregator,
     ServiceInstanceCounts,

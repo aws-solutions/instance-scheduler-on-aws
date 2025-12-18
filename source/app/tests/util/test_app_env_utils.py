@@ -1,7 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 import pytest
-
 from instance_scheduler.util.app_env_utils import env_to_bool, env_to_list
 
 

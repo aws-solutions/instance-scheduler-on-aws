@@ -46,7 +46,6 @@ def test_time_format_string() -> None:
 
 
 def test_attributes() -> None:
-    assert configuration.TRACE == "trace"
     assert (
         configuration.ENABLE_SSM_MAINTENANCE_WINDOWS == "enable_ssm_maintenance_windows"
     )
