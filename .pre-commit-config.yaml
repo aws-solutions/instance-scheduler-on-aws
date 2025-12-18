@@ -1,0 +1,110 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+exclude: |
+  (?x)^(
+    ^.*\.svg$
+    # projen-generated files
+    # `git ls-files | git check-attr linguist-generated --stdin | grep "linguist-generated: set"`
+    | .*tsconfig\.json$
+    | .*jest\.config\.json$
+    | .*\.gitattributes$
+    | .*\.gitignore$
+    | ^LICENSE$
+    | .*cdk\.json$
+    | .*package-lock\.json$
+    | .*package\.json$
+    | ^solution-manifest\.yaml$
+    | .*pyproject.toml$
+    | .*__snapshots__.*$
+    | .*\.projen/.*$
+  )$
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-executables-have-shebangs
+        name: Check executables have shebangs
+      - id: fix-byte-order-marker
+        name: Fix byte order marker
+      - id: check-case-conflict
+        name: Check case conflict
+      - id: check-json
+        name: Check json
+      - id: check-yaml
+        name: Check yaml
+        args: [--allow-multiple-documents, --unsafe]
+      - id: check-toml
+        name: Check toml
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: check-added-large-files
+        name: Check for added large files
+        exclude: |
+          (?x)^(
+            ^.*/package-lock.json |
+          )$
+      - id: end-of-file-fixer
+        name: Fix end of the files
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: mixed-line-ending
+        name: Mixed line ending
+      - id: detect-private-key
+        name: Detect private keys
+      - id: detect-aws-credentials
+        name: Detect AWS Credentials
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.5
+    hooks:
+      - id: insert-license
+        name: Insert license header (typescript and javascript)
+        files: \.tsx$|\.ts$|\.js$|\.jsx$
+        args:
+          - --license-filepath
+          - ./license_header.txt
+          - --comment-style
+          - // # defaults to Python's # syntax, requires changing for typescript syntax.
+          - --detect-license-in-X-top-lines=3
+      - id: insert-license
+        name: Insert license header (python)
+        files: \.py$
+        args:
+          - --license-filepath
+          - ./license_header.txt
+          - --comment-style
+          - "#"
+          - --detect-license-in-X-top-lines=3
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 24.3.0
+    hooks:
+      - id: black
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+        # tox and pre-commit behave differently when the profile flag is passed,
+        # so .isort.cfg in the root folder overrides the profile
+        # keeping the profile flag as a reminder to try to make it work with profile only
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        args: ["--extend-ignore=E501,E203"] # line length and whitespace, handled by black
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+        name: ShellChecker
+        args: ["-x", "--severity=warning"]
+        types: [shell]
+        exclude: ^.nightswatch/.*$
+  # Local
+  - repo: local
+    hooks:
+      - id: detect-empty-files
+        name: Detect Empty Files
+        entry: scripts/detect-empty-files.sh
+        language: system
+        exclude: ^.*__init__\.py$ # __init__.py empty on purpose

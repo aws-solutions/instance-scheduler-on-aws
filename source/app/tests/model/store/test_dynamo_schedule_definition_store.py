@@ -6,7 +6,6 @@ import boto3
 import pytest
 from _pytest.fixtures import fixture
 from botocore.exceptions import ClientError
-
 from instance_scheduler.model.period_identifier import PeriodIdentifier
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
 from instance_scheduler.model.store.dynamo_schedule_definition_store import (

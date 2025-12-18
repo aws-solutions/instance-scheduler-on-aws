@@ -106,7 +106,7 @@
       "name": "e2e-tests",
       "steps": [
         {
-          "exec": "jest --config source/pipeline/jest.config.json",
+          "exec": "node --experimental-vm-modules node_modules/.bin/jest --config source/pipeline/jest.config.json",
           "receiveArgs": true
         }
       ]
@@ -357,13 +357,13 @@
       },
       "steps": [
         {
-          "exec": "npx npm-check-updates@18 --upgrade --target=minor --peer --no-deprecated --dep=dev,peer,prod,optional --filter=@cdklabs/cdk-ssm-documents,@types/jest,@types/uuid,@typescript-eslint/eslint-plugin,esbuild,eslint,eslint-config-prettier,eslint-plugin-header,eslint-plugin-import,eslint-plugin-prettier,jest,jest-extended,jest-junit,projen,ts-jest,ts-node,@aws-sdk/client-auto-scaling,@aws-sdk/client-cloudformation,@aws-sdk/client-docdb,@aws-sdk/client-dynamodb,@aws-sdk/client-ec2,@aws-sdk/client-lambda,@aws-sdk/client-neptune,@aws-sdk/client-rds,@aws-sdk/client-ssm,@aws-sdk/util-dynamodb,cdk-nag,source-map-support,uuid"
+          "exec": "npx npm-check-updates@18 --upgrade --target=minor --peer --no-deprecated --dep=dev,peer,prod,optional --filter=@types/jest,@types/uuid,@typescript-eslint/eslint-plugin,esbuild,eslint,eslint-config-prettier,eslint-plugin-header,eslint-plugin-import,eslint-plugin-prettier,jest,jest-extended,jest-junit,projen,ts-jest,ts-node,@aws-sdk/client-auto-scaling,@aws-sdk/client-cloudformation,@aws-sdk/client-docdb,@aws-sdk/client-dynamodb,@aws-sdk/client-ec2,@aws-sdk/client-lambda,@aws-sdk/client-neptune,@aws-sdk/client-rds,@aws-sdk/client-ssm,@aws-sdk/util-dynamodb,cdk-nag,source-map-support,uuid"
         },
         {
           "exec": "npm install"
         },
         {
-          "exec": "npm update @cdklabs/cdk-ssm-documents @types/jest @types/node @types/uuid @typescript-eslint/eslint-plugin aws-cdk esbuild eslint eslint-config-prettier eslint-plugin-header eslint-plugin-import eslint-plugin-prettier jest jest-extended jest-junit projen ts-jest ts-node typescript @aws-cdk/aws-lambda-python-alpha @aws-cdk/aws-neptune-alpha @aws-cdk/aws-servicecatalogappregistry-alpha @aws-sdk/client-auto-scaling @aws-sdk/client-cloudformation @aws-sdk/client-docdb @aws-sdk/client-dynamodb @aws-sdk/client-ec2 @aws-sdk/client-lambda @aws-sdk/client-neptune @aws-sdk/client-rds @aws-sdk/client-ssm @aws-sdk/util-dynamodb aws-cdk-lib cdk-nag constructs source-map-support uuid"
+          "exec": "npm update @types/jest @types/node @types/uuid @typescript-eslint/eslint-plugin aws-cdk esbuild eslint eslint-config-prettier eslint-plugin-header eslint-plugin-import eslint-plugin-prettier jest jest-extended jest-junit projen ts-jest ts-node typescript @aws-cdk/aws-lambda-python-alpha @aws-cdk/aws-neptune-alpha @aws-cdk/aws-servicecatalogappregistry-alpha @aws-sdk/client-auto-scaling @aws-sdk/client-cloudformation @aws-sdk/client-docdb @aws-sdk/client-dynamodb @aws-sdk/client-ec2 @aws-sdk/client-lambda @aws-sdk/client-neptune @aws-sdk/client-rds @aws-sdk/client-ssm @aws-sdk/util-dynamodb aws-cdk-lib cdk-nag constructs source-map-support uuid"
         },
         {
           "exec": "npx projen"

@@ -7,14 +7,15 @@ from zoneinfo import ZoneInfo
 
 
 @dataclass
-class TestSuiteEnv:
-    log_group: str = "my-log-group"
+class MockSuiteEnv:
     topic_arn: str = "arn:aws:sns:us-east-1:123456789012:my-topic-arn"
     user_agent_extra: str = "my-user-agent-extra"
     default_timezone: ZoneInfo = ZoneInfo("Asia/Tokyo")
     maintenance_window_table_name: str = "my-maintenance-window-table"
     config_table_name: str = "my-config-table-name"
     state_table_name: str = "my-state-table-name"
+    registry_table_name: str = "my-registry-table-name"
+    ice_retry_queue_url: str = ""
 
     def _to_env_dict(self) -> dict[str, str]:
         return {
@@ -22,7 +23,7 @@ class TestSuiteEnv:
             "DEFAULT_TIMEZONE": str(self.default_timezone),
         }
 
-    def __enter__(self) -> "TestSuiteEnv":
+    def __enter__(self) -> "MockSuiteEnv":
         self._patcher = patch.dict(os.environ, self._to_env_dict())
         self._patcher.__enter__()
         return self

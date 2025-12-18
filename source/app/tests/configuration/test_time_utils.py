@@ -1,7 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 import pytest
-
 from instance_scheduler.configuration.time_utils import is_valid_time_str
 
 

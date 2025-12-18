@@ -6,13 +6,12 @@ from typing import TYPE_CHECKING, Final
 from zoneinfo import ZoneInfo
 
 from dateutil.parser import isoparse
-from pytest import raises
-
 from instance_scheduler.model import (
     EC2SSMMaintenanceWindow,
     EC2SSMMaintenanceWindowValidationError,
 )
 from instance_scheduler.model.maint_win import NoNextExecutionTimeError
+from pytest import raises
 
 if TYPE_CHECKING:
     from mypy_boto3_ssm.type_defs import MaintenanceWindowIdentityTypeDef

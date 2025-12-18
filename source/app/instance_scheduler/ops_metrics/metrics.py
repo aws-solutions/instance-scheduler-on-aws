@@ -3,20 +3,17 @@
 import dataclasses
 from datetime import datetime, timezone
 from os import environ
-from typing import Final, Optional, assert_never
+from typing import Final, Optional
 from uuid import UUID
 
-from aws_lambda_powertools import Logger as PowerToolsLogger
-from urllib3 import HTTPResponse, PoolManager
-
-from instance_scheduler.ops_metrics import GatheringFrequency
+from aws_lambda_powertools import Logger
 from instance_scheduler.ops_metrics.anonymous_metric_wrapper import (
     AnonymousMetricWrapper,
 )
 from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 from instance_scheduler.util import safe_json
 from instance_scheduler.util.app_env_utils import AppEnvError, env_to_bool
-from instance_scheduler.util.logger import Logger
+from urllib3 import BaseHTTPResponse, PoolManager
 
 
 @dataclasses.dataclass
@@ -30,6 +27,7 @@ class MetricsEnvironment:
     solution_version: str
     scheduler_frequency_minutes: int
     metrics_uuid: UUID
+    hub_account_id: str
 
     @staticmethod
     def from_env() -> "MetricsEnvironment":
@@ -55,6 +53,7 @@ class MetricsEnvironment:
                 solution_version=environ["SOLUTION_VERSION"],
                 scheduler_frequency_minutes=scheduler_frequency_minutes,
                 metrics_uuid=metrics_uuid,
+                hub_account_id=environ["HUB_ACCOUNT_ID"],
             )
 
         except KeyError as err:
@@ -77,9 +76,9 @@ def get_metrics_env() -> MetricsEnvironment:
 
 
 def collect_metric(
-    metric: OpsMetric, logger: Logger | PowerToolsLogger
+    metric: OpsMetric, logger: Logger
 ) -> Optional[AnonymousMetricWrapper]:
-    if not should_collect_metric(metric):
+    if not should_collect_metric():
         return None
 
     try:
@@ -90,6 +89,7 @@ def collect_metric(
             # current required timestamp format for metrics backend (7/11/23)
             timestamp=str(datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")),
             uuid=str(metrics_env.metrics_uuid),
+            hub_account_id=get_metrics_env().hub_account_id,
             solution=get_metrics_env().solution_id,
             version=get_metrics_env().solution_version,
             event_name=metric.event_name,
@@ -105,17 +105,17 @@ def collect_metric(
             "content-length": str(len(data_json)),
         }
 
-        response: HTTPResponse = http.request(  # type: ignore[no-untyped-call]
+        response: BaseHTTPResponse = http.request(
             "POST", url, headers=headers, body=data_json
         )
         logger.debug(f"Metrics data sent, status code is {response.status}")
         return metric_wrapper
     except Exception as exc:
-        logger.warning(("Failed sending metrics data ({})".format(str(exc))))
+        logger.warning(f"Failed sending metrics data ({str(exc)})")
         return None
 
 
-def should_collect_metric(metric: OpsMetric | type[OpsMetric]) -> bool:
+def should_collect_metric() -> bool:
     try:
         env: Final = get_metrics_env()
     except AppEnvError:
@@ -125,36 +125,4 @@ def should_collect_metric(metric: OpsMetric | type[OpsMetric]) -> bool:
         # do not send metrics when not enabled
         return False
 
-    solution_uuid = env.metrics_uuid
-    interval = env.scheduler_frequency_minutes
-    current_time = datetime.now(timezone.utc)
-
-    if metric.collection_frequency is GatheringFrequency.UNLIMITED:
-        return True
-    elif metric.collection_frequency is GatheringFrequency.DAILY:
-        return _is_allowed_hour_for_metrics(
-            solution_uuid, current_time
-        ) and _is_first_call_in_current_hour(current_time, interval)
-    elif metric.collection_frequency is GatheringFrequency.WEEKLY:
-        return (
-            _is_first_day_in_week(current_time)
-            and _is_allowed_hour_for_metrics(solution_uuid, current_time)
-            and _is_first_call_in_current_hour(current_time, interval)
-        )
-    else:
-        assert_never(metric.collection_frequency)
-
-
-def _is_first_day_in_week(current_time: datetime) -> bool:
-    return current_time.weekday() == 0
-
-
-def _is_allowed_hour_for_metrics(solution_uuid: UUID, current_time: datetime) -> bool:
-    hour_to_send = solution_uuid.int % 20
-    return current_time.hour == hour_to_send
-
-
-def _is_first_call_in_current_hour(
-    current_time: datetime, scheduling_frequency: int
-) -> bool:
-    return current_time.minute < scheduling_frequency
+    return True

@@ -1,191 +1,132 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Aws, CfnCondition, Fn, RemovalPolicy, Stack } from "aws-cdk-lib";
-import { AttributeType, BillingMode, StreamViewType, Table, TableEncryption } from "aws-cdk-lib/aws-dynamodb";
-import { CfnRule, Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
+import { Aws, CfnCondition, Fn, Stack } from "aws-cdk-lib";
+import { CfnRule, EventBus, Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction as LambdaFunctionTarget } from "aws-cdk-lib/aws-events-targets";
-import { Role } from "aws-cdk-lib/aws-iam";
-import { Alias, Key } from "aws-cdk-lib/aws-kms";
+import { CfnPolicy, CfnRole, CompositePrincipal, Role } from "aws-cdk-lib/aws-iam";
 import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
-import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Topic } from "aws-cdk-lib/aws-sns";
 import { NagSuppressions } from "cdk-nag";
 import { AnonymizedMetricsEnvironment } from "./anonymized-metrics-environment";
-import { AsgScheduler } from "./asg-scheduler";
-import { cfnConditionToTrueFalse, overrideRetentionPolicies, overrideLogicalId, overrideProperty } from "./cfn";
-import { addCfnNagSuppressions } from "./cfn-nag";
+import { cfnConditionToTrueFalse } from "./cfn";
 import { OperationalInsightsDashboard } from "./dashboard/ops-insights-dashboard";
-import { AsgSchedulingRole } from "./iam/asg-scheduling-role";
 import { SchedulerRole } from "./iam/scheduler-role";
-import { AsgHandler } from "./lambda-functions/asg-handler";
 import { FunctionFactory } from "./lambda-functions/function-factory";
 import { MainLambda } from "./lambda-functions/main";
 import { MetricsUuidGenerator } from "./lambda-functions/metrics-uuid-generator";
 import { SchedulingOrchestrator } from "./lambda-functions/scheduling-orchestrator";
 import { SchedulingRequestHandlerLambda } from "./lambda-functions/scheduling-request-handler";
-import { SpokeRegistrationLambda } from "./lambda-functions/spoke-registration";
 import { SchedulingIntervalToCron } from "./scheduling-interval-mappings";
-
+import { InstanceSchedulerDataLayer } from "./instance-scheduler-data-layer";
+import { LogInsightsQueries } from "./observability/log-insights-queries";
+import { KmsKeys } from "./helpers/kms";
+import { HubResourceRegistration } from "./lambda-functions/resource-registration";
+import { IceErrorRetry } from "./lambda-functions/ice-error-retry";
+import { HeartbeatMetricReporter } from "./lambda-functions/heartbeat-metric-reporter";
+import { SnsLogSubscriber } from "./observability/log-sns-forwarding";
+import { SpokeRegistrationLambda } from "./lambda-functions/spoke-registration";
+import { RegionRegistrationCustomResource } from "./lambda-functions/region-registration";
 export interface CoreSchedulerProps {
   readonly solutionName: string;
   readonly solutionVersion: string;
   readonly solutionId: string;
   readonly memorySizeMB: number;
-  readonly asgMemorySizeMB: number;
   readonly orchestratorMemorySizeMB: number;
   readonly principals: string[];
-  readonly logRetentionDays: RetentionDays;
   readonly schedulingEnabled: CfnCondition;
   readonly schedulingIntervalMinutes: number;
   readonly namespace: string;
   readonly sendAnonymizedMetrics: CfnCondition;
-  readonly enableDebugLogging: CfnCondition;
   readonly tagKey: string;
   readonly defaultTimezone: string;
-  readonly enableEc2: CfnCondition;
-  readonly enableRds: CfnCondition;
-  readonly enableRdsClusters: CfnCondition;
-  readonly enableNeptune: CfnCondition;
-  readonly enableDocdb: CfnCondition;
   readonly enableRdsSnapshots: CfnCondition;
   readonly regions: string[];
-  readonly enableSchedulingHubAccount: CfnCondition;
   readonly enableEc2SsmMaintenanceWindows: CfnCondition;
-  readonly startTags: string;
-  readonly stopTags: string;
   readonly enableAwsOrganizations: CfnCondition;
   readonly enableOpsInsights: CfnCondition;
   readonly kmsKeyArns: string[];
+  readonly licenseManagerArns: string[];
   readonly factory: FunctionFactory;
-  readonly enableDdbDeletionProtection: CfnCondition;
-  readonly enableAsgs: CfnCondition;
-  readonly scheduledTagKey: string;
+  readonly asgMetadataTagKey: string;
   readonly rulePrefix: string;
 }
 
 export class CoreScheduler {
   public readonly cfnScheduleCustomResourceHandler: LambdaFunction;
   public readonly hubSchedulerRole: Role;
-  public readonly configTable: Table;
   public readonly topic: Topic;
   public readonly asgOrch: LambdaFunction;
+  public readonly dataLayer: InstanceSchedulerDataLayer;
+  public readonly regionalEventBusName: string;
+  public readonly globalEventBus: EventBus;
 
   constructor(scope: Stack, props: CoreSchedulerProps) {
     const USER_AGENT_EXTRA = `AwsSolution/${props.solutionId}/${props.solutionVersion}`;
+    const REGIONAL_EVENT_BUS_NAME = `IS-LocalEvents-${props.namespace}`;
+    const GLOBAL_EVENT_BUS_NAME = `IS-GlobalEvents-${props.namespace}`;
+
+    this.dataLayer = new InstanceSchedulerDataLayer(scope);
 
     const metricsUuidGenerator = new MetricsUuidGenerator(scope, {
+      dataLayer: this.dataLayer,
+      USER_AGENT_EXTRA: USER_AGENT_EXTRA,
       solutionName: props.solutionName,
-      logRetentionDays: props.logRetentionDays,
-      USER_AGENT_EXTRA,
       STACK_ID: Aws.STACK_ID,
       UUID_KEY: `/Solutions/${props.solutionName}/UUID/`,
       factory: props.factory,
     });
 
-    const key = new Key(scope, "InstanceSchedulerEncryptionKey", {
-      description: "Key for SNS",
-      enabled: true,
-      enableKeyRotation: true,
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
-    overrideRetentionPolicies(key, Fn.conditionIf(props.enableDdbDeletionProtection.logicalId, "Retain", "Delete"));
-    overrideLogicalId(key, "InstanceSchedulerEncryptionKey");
-
-    const keyAlias = new Alias(scope, "InstanceSchedulerEncryptionKeyAlias", {
-      aliasName: `alias/${Aws.STACK_NAME}-instance-scheduler-encryption-key`,
-      targetKey: key,
-    });
-
-    overrideLogicalId(keyAlias, "InstanceSchedulerEncryptionKeyAlias");
-
-    this.topic = new Topic(scope, "InstanceSchedulerSnsTopic", {
-      masterKey: key,
-    });
-    overrideLogicalId(this.topic, "InstanceSchedulerSnsTopic");
-
-    const schedulerLogGroup = new LogGroup(scope, "SchedulerLogGroup", {
-      logGroupName: Aws.STACK_NAME + "-logs",
-      removalPolicy: RemovalPolicy.DESTROY,
-      retention: props.logRetentionDays,
-    });
-    overrideLogicalId(schedulerLogGroup, "SchedulerLogGroup");
-    // todo: this may not be true anymore
-    addCfnNagSuppressions(schedulerLogGroup, {
-      id: "W84",
-      reason:
-        "CloudWatch log groups only have transactional data from the Lambda function, this template has to be supported in gov cloud which doesn't yet have the feature to provide kms key id to cloudwatch log group.",
-    });
-
-    const stateTable = new Table(scope, "StateTable", {
-      partitionKey: { name: "service", type: AttributeType.STRING },
-      sortKey: { name: "account-region", type: AttributeType.STRING },
-      billingMode: BillingMode.PAY_PER_REQUEST,
-      pointInTimeRecovery: true,
-      encryption: TableEncryption.CUSTOMER_MANAGED,
-      encryptionKey: key,
-    });
-    overrideLogicalId(stateTable, "StateTable");
-    overrideRetentionPolicies(
-      stateTable,
-      Fn.conditionIf(props.enableDdbDeletionProtection.logicalId, "Retain", "Delete"),
-    );
-    overrideProperty(
-      stateTable,
-      "DeletionProtectionEnabled",
-      Fn.conditionIf(props.enableDdbDeletionProtection.logicalId, "True", "False"),
-    );
-
-    this.configTable = new Table(scope, "ConfigTable", {
-      sortKey: { name: "name", type: AttributeType.STRING },
-      partitionKey: { name: "type", type: AttributeType.STRING },
-      billingMode: BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.DESTROY,
-      pointInTimeRecovery: true,
-      encryption: TableEncryption.CUSTOMER_MANAGED,
-      encryptionKey: key,
-      stream: StreamViewType.KEYS_ONLY,
-    });
-    overrideLogicalId(this.configTable, "ConfigTable");
-    overrideRetentionPolicies(
-      this.configTable,
-      Fn.conditionIf(props.enableDdbDeletionProtection.logicalId, "Retain", "Delete"),
-    );
-    overrideProperty(
-      this.configTable,
-      "DeletionProtectionEnabled",
-      Fn.conditionIf(props.enableDdbDeletionProtection.logicalId, "True", "False"),
-    );
-
-    const mwTable = new Table(scope, "MaintenanceWindowTable", {
-      partitionKey: { name: "account-region", type: AttributeType.STRING },
-      sortKey: { name: "name-id", type: AttributeType.STRING },
-      billingMode: BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.DESTROY,
-      pointInTimeRecovery: true,
-      encryption: TableEncryption.CUSTOMER_MANAGED,
-      encryptionKey: key,
-    });
-    overrideLogicalId(mwTable, "MaintenanceWindowTable");
-    overrideRetentionPolicies(mwTable, Fn.conditionIf(props.enableDdbDeletionProtection.logicalId, "Retain", "Delete"));
-    overrideProperty(
-      mwTable,
-      "DeletionProtectionEnabled",
-      Fn.conditionIf(props.enableDdbDeletionProtection.logicalId, "True", "False"),
-    );
-
-    new SpokeRegistrationLambda(scope, {
-      snsErrorReportingTopic: this.topic,
-      scheduleLogGroup: schedulerLogGroup,
-      logRetentionDays: props.logRetentionDays,
+    this.topic = new SnsLogSubscriber(scope, "SnsReporting", {
       USER_AGENT_EXTRA: USER_AGENT_EXTRA,
-      configTable: this.configTable,
+      factory: props.factory,
+    }).snsTopic;
+
+    this.globalEventBus = new EventBus(scope, "globalEvents", {
+      eventBusName: GLOBAL_EVENT_BUS_NAME,
+    });
+
+    const spokeRegistrationLambda = new SpokeRegistrationLambda(scope, {
+      dataLayer: this.dataLayer,
+      USER_AGENT_EXTRA: USER_AGENT_EXTRA,
       solutionVersion: props.solutionVersion,
-      enableDebugLogging: props.enableDebugLogging,
       principals: props.principals,
       namespace: props.namespace,
+      scheduleTagKey: props.tagKey,
+      schedulingIntervalMinutes: props.schedulingIntervalMinutes,
       enableAwsOrganizations: props.enableAwsOrganizations,
+      asgRulePrefix: props.rulePrefix,
+      asgMetadataTagKey: props.asgMetadataTagKey,
+      localEventBusName: REGIONAL_EVENT_BUS_NAME,
+      globalEventBus: this.globalEventBus,
       factory: props.factory,
+      ssmParamUpdateRoleName: RegionRegistrationCustomResource.ssmParamUpdateRoleName(props.namespace),
+      ssmParamPathName: RegionRegistrationCustomResource.ssmParamPathName(props.namespace),
     });
+
+    const resourceRegistration = new HubResourceRegistration(scope, "ResourceRegistration", {
+      namespace: props.namespace,
+      scheduleTagKey: props.tagKey,
+      factory: props.factory,
+      organizationsMode: props.enableAwsOrganizations,
+      principals: props.principals,
+      configTable: this.dataLayer.configTable,
+      registryTable: this.dataLayer.registry,
+      stackId: Aws.STACK_ID,
+      stackName: Aws.STACK_NAME,
+      schedulerRoleName: SchedulerRole.roleName(props.namespace),
+      USER_AGENT_EXTRA: USER_AGENT_EXTRA,
+      schedulingIntervalMinutes: props.schedulingIntervalMinutes,
+      asgScheduledRulesPrefix: props.rulePrefix,
+      asgMetadataTagKey: props.asgMetadataTagKey,
+      solutionVersion: props.solutionVersion,
+      regions: props.regions,
+      regionalEventBusName: REGIONAL_EVENT_BUS_NAME,
+      spokeRegistrationLambda: spokeRegistrationLambda.lambdaFunction,
+      spokeRegistrationLambdaRoleName: SpokeRegistrationLambda.roleName(props.namespace),
+      globalEventBus: this.globalEventBus,
+    });
+
+    this.regionalEventBusName = resourceRegistration.regionalEventBusName;
 
     const metricsEnv: AnonymizedMetricsEnvironment = {
       METRICS_URL: "https://metrics.awssolutionsbuilder.com/generic",
@@ -194,119 +135,92 @@ export class CoreScheduler {
       SOLUTION_VERSION: props.solutionVersion,
       SCHEDULING_INTERVAL_MINUTES: props.schedulingIntervalMinutes.toString(),
       METRICS_UUID: metricsUuidGenerator.metricsUuid,
+      HUB_ACCOUNT_ID: Aws.ACCOUNT_ID,
     };
 
     const mainFunction = new MainLambda(scope, {
+      dataLayer: this.dataLayer,
       USER_AGENT_EXTRA: USER_AGENT_EXTRA,
       DEFAULT_TIMEZONE: props.defaultTimezone,
-      configTable: this.configTable,
-      schedulerLogGroup: schedulerLogGroup,
       snsErrorReportingTopic: this.topic,
       principals: props.principals,
-      logRetentionDays: props.logRetentionDays,
-      enableDebugLogging: props.enableDebugLogging,
       enableAwsOrganizations: props.enableAwsOrganizations,
       factory: props.factory,
       metricsEnv: metricsEnv,
     });
 
+    //ICE Retry lambda
+    const iceErrorRetry = new IceErrorRetry(scope, "IceErrorRetry", {
+      description: "Handles ICE error retry events, version " + props.solutionVersion,
+      dataLayer: this.dataLayer,
+      namespace: props.namespace,
+      userAgentExtra: USER_AGENT_EXTRA,
+      metricsEnv,
+      schedulerRoleName: SchedulerRole.roleName(props.namespace),
+      stackId: Aws.STACK_ID,
+      stackName: Aws.STACK_NAME,
+      enableOpsMonitoring: props.enableOpsInsights,
+      solutionName: props.solutionName,
+      factory: props.factory,
+      tagKey: props.tagKey,
+      schedulingIntervalMinutes: props.schedulingIntervalMinutes,
+      asgScheduledRulesPrefix: props.rulePrefix,
+      asgMetadataTagKey: props.asgMetadataTagKey,
+      regionalEventBusName: REGIONAL_EVENT_BUS_NAME,
+      globalEventBus: this.globalEventBus,
+    });
+
     const schedulingRequestHandler = new SchedulingRequestHandlerLambda(scope, {
+      dataLayer: this.dataLayer,
       description: "Handles scheduling requests for Instance Scheduler on AWS, version " + props.solutionVersion,
       namespace: props.namespace,
-      logRetentionDays: props.logRetentionDays,
       memorySizeMB: props.memorySizeMB,
       schedulerRoleName: SchedulerRole.roleName(props.namespace),
       DEFAULT_TIMEZONE: props.defaultTimezone,
+      STACK_ID: Aws.STACK_ID,
       STACK_NAME: Aws.STACK_NAME,
-      scheduleLogGroup: schedulerLogGroup,
-      snsErrorReportingTopic: this.topic,
+      iceErrorRetryQueue: iceErrorRetry.iceRetryQueue,
+      asgScheduledRulesPrefix: props.rulePrefix,
+      asgMetadataTagKey: props.asgMetadataTagKey,
       USER_AGENT_EXTRA: USER_AGENT_EXTRA,
-      configTable: this.configTable,
-      stateTable: stateTable,
-      maintWindowTable: mwTable,
-      startTags: props.startTags,
-      stopTags: props.stopTags,
-      enableRds: props.enableRds,
-      enableRdsClusters: props.enableRdsClusters,
-      enableNeptune: props.enableNeptune,
-      enableDocdb: props.enableDocdb,
       enableRdsSnapshots: props.enableRdsSnapshots,
       enableOpsMonitoring: props.enableOpsInsights,
-      enableDebugLogging: props.enableDebugLogging,
       enableEc2SsmMaintenanceWindows: props.enableEc2SsmMaintenanceWindows,
       tagKey: props.tagKey,
       schedulingIntervalMinutes: props.schedulingIntervalMinutes,
       metricsEnv: metricsEnv,
       solutionName: props.solutionName,
+      regionalEventBusName: REGIONAL_EVENT_BUS_NAME,
+      globalEventBus: this.globalEventBus,
       factory: props.factory,
     });
 
     const orchestratorLambda = new SchedulingOrchestrator(scope, {
       description: "scheduling orchestrator for Instance Scheduler on AWS, version " + props.solutionVersion,
-      logRetentionDays: props.logRetentionDays,
+      dataLayer: this.dataLayer,
       memorySizeMB: props.orchestratorMemorySizeMB,
       schedulingRequestHandlerLambda: schedulingRequestHandler.lambdaFunction,
-      enableDebugLogging: props.enableDebugLogging,
-      configTable: this.configTable,
-      snsErrorReportingTopic: this.topic,
-      snsKmsKey: key,
-      scheduleLogGroup: schedulerLogGroup,
       USER_AGENT_EXTRA: USER_AGENT_EXTRA,
-      enableSchedulingHubAccount: props.enableSchedulingHubAccount,
-      enableEc2: props.enableEc2,
-      enableRds: props.enableRds,
-      enableRdsClusters: props.enableRdsClusters,
-      enableNeptune: props.enableNeptune,
-      enableDocdb: props.enableDocdb,
-      enableAsgs: props.enableAsgs,
-      regions: props.regions,
+      factory: props.factory,
+    });
+
+    new HeartbeatMetricReporter(scope, {
+      description: "metrics gatherer for Instance Scheduler on AWS, version " + props.solutionVersion,
+      dataLayer: this.dataLayer,
+      memorySizeMB: 256,
+      snsErrorReportingTopic: this.topic,
+      snsKmsKey: KmsKeys.get(scope),
+      USER_AGENT_EXTRA: USER_AGENT_EXTRA,
+      metricsEnv: metricsEnv,
+      factory: props.factory,
+      schedulingEnabled: props.schedulingEnabled,
+      solutionVersion: props.solutionVersion,
       defaultTimezone: props.defaultTimezone,
       enableRdsSnapshots: props.enableRdsSnapshots,
       enableAwsOrganizations: props.enableAwsOrganizations,
       enableEc2SsmMaintenanceWindows: props.enableEc2SsmMaintenanceWindows,
-      opsDashboardEnabled: props.enableOpsInsights,
-      startTags: props.startTags,
-      stopTags: props.stopTags,
-      metricsEnv: metricsEnv,
-      factory: props.factory,
+      enableOpsInsights: props.enableOpsInsights,
     });
-
-    const asgHandler = new AsgHandler(scope, {
-      namespace: props.namespace,
-      logRetentionDays: props.logRetentionDays,
-      memorySizeMB: props.asgMemorySizeMB,
-      configTable: this.configTable,
-      snsErrorReportingTopic: this.topic,
-      encryptionKey: key,
-      enableDebugLogging: props.enableDebugLogging,
-      metricsEnv,
-      tagKey: props.tagKey,
-      asgSchedulingRoleName: AsgSchedulingRole.roleName(props.namespace),
-      scheduledTagKey: props.scheduledTagKey,
-      rulePrefix: props.rulePrefix,
-      USER_AGENT_EXTRA,
-      DEFAULT_TIMEZONE: props.defaultTimezone,
-      factory: props.factory,
-    });
-
-    const asgScheduler = new AsgScheduler(scope, "ASGScheduler", {
-      USER_AGENT_EXTRA,
-      asgHandler,
-      orchestratorMemorySizeMB: props.orchestratorMemorySizeMB,
-      configTable: this.configTable,
-      enableAsgs: props.enableAsgs,
-      enableDebugLogging: props.enableDebugLogging,
-      enableSchedulingHubAccount: props.enableSchedulingHubAccount,
-      encryptionKey: key,
-      factory: props.factory,
-      logRetentionDays: props.logRetentionDays,
-      metricsEnv,
-      namespace: props.namespace,
-      regions: props.regions,
-      snsErrorReportingTopic: this.topic,
-      solutionVersion: props.solutionVersion,
-    });
-    this.asgOrch = asgScheduler.asgOrchestratorLambdaFunction;
 
     const schedulingIntervalToCron = new SchedulingIntervalToCron(scope, "CronExpressionsForSchedulingIntervals", {});
 
@@ -324,19 +238,31 @@ export class CoreScheduler {
     });
 
     //local scheduling roles
-    this.hubSchedulerRole = new SchedulerRole(scope, "SchedulerRole", {
-      assumedBy: schedulingRequestHandler.lambdaFunction.grantPrincipal,
+    const schedulerRole = new SchedulerRole(scope, "SchedulerRole", {
+      assumedBy: new CompositePrincipal(
+        schedulingRequestHandler.lambdaFunction.grantPrincipal,
+        resourceRegistration.registrationLambda.grantPrincipal,
+        iceErrorRetry.retryIceErrorLambda.grantPrincipal,
+        spokeRegistrationLambda.lambdaFunction.grantPrincipal,
+      ),
       namespace: props.namespace,
       kmsKeys: props.kmsKeyArns,
+      licenseManagerArns: props.licenseManagerArns,
+      regionalEventBusName: REGIONAL_EVENT_BUS_NAME,
     });
+    this.hubSchedulerRole = schedulerRole;
 
     new OperationalInsightsDashboard(scope, {
       enabled: props.enableOpsInsights,
       schedulingRequestHandler: schedulingRequestHandler,
-      asgHandler: asgHandler,
       orchestrator: orchestratorLambda,
       schedulingIntervalMinutes: props.schedulingIntervalMinutes,
       namespace: props.namespace,
+    });
+
+    new LogInsightsQueries(scope, "LogInsightsQueries", {
+      namespace: props.namespace,
+      dataLayer: this.dataLayer,
     });
 
     const cfnSchedulerRule = schedulerRule.node.defaultChild as CfnRule;
@@ -346,6 +272,20 @@ export class CoreScheduler {
     );
 
     this.cfnScheduleCustomResourceHandler = mainFunction.lambdaFunction;
+
+    const ec2PolicyCfnResource = schedulerRole.ec2Policy.node.defaultChild as CfnPolicy;
+    resourceRegistration.regionRegistrationCfnResource.addDependency(ec2PolicyCfnResource);
+    const rdsPolicyCfnResource = schedulerRole.rdsPolicy.node.defaultChild as CfnPolicy;
+    resourceRegistration.regionRegistrationCfnResource.addDependency(rdsPolicyCfnResource);
+
+    const asgPolicyCfnResource = schedulerRole.asgPolicy.node.defaultChild as CfnPolicy;
+    resourceRegistration.regionRegistrationCfnResource.addDependency(asgPolicyCfnResource);
+
+    const resourceTaggingPolicyCfnResource = schedulerRole.resourceTaggingPolicy.node.defaultChild as CfnPolicy;
+    resourceRegistration.regionRegistrationCfnResource.addDependency(resourceTaggingPolicyCfnResource);
+
+    const schedulerRoleCfnResource = schedulerRole.node.defaultChild as CfnRole;
+    resourceRegistration.regionRegistrationCfnResource.addDependency(schedulerRoleCfnResource);
 
     NagSuppressions.addStackSuppressions(Stack.of(scope), [
       {

@@ -17,15 +17,6 @@ test("InstanceSchedulerStack snapshot test", () => {
   expect(hubStackJson).toMatchSnapshot();
 });
 
-test("Hub stack has expected defaults for started and stopped tags", () => {
-  expect(hubStack.findParameters("StartedTags")["StartedTags"]["Default"]).toBe(
-    "InstanceScheduler-LastAction=Started By {scheduler} {year}-{month}-{day} {hour}:{minute} {timezone}",
-  );
-  expect(hubStack.findParameters("StoppedTags")["StoppedTags"]["Default"]).toBe(
-    "InstanceScheduler-LastAction=Stopped By {scheduler} {year}-{month}-{day} {hour}:{minute} {timezone}",
-  );
-});
-
 type CfnParameterGroup = { Label: { default: string }; Parameters: string[] };
 
 describe("hub template", function () {

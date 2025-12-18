@@ -6,14 +6,13 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
-
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from instance_scheduler.maint_win.ssm_mw_client import SSMMWClient
 from instance_scheduler.model import (
     EC2SSMMaintenanceWindow,
     EC2SSMMaintenanceWindowStore,
     MWStore,
 )
-from instance_scheduler.schedulers.instance_states import InstanceStates
 from tests.integration.helpers.ec2_helpers import get_current_state, stop_ec2_instances
 from tests.integration.helpers.run_handler import simple_schedule
 from tests.test_utils.mock_scheduling_request_environment import (
@@ -39,7 +38,7 @@ def invoke_scheduling_request_handler_with_maintenance_windows(
 
 def test_maint_window_is_enforced(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
     maint_win_store: EC2SSMMaintenanceWindowStore,
 ) -> None:
     # maintenance window is active (exists in maint window table)
@@ -80,7 +79,7 @@ def test_maint_window_is_enforced(
 
 def test_inactive_maintenance_windows_have_no_effect(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
     mw_store: MWStore,
 ) -> None:
     # multiple maintenance windows (none are active)
@@ -114,7 +113,7 @@ def test_inactive_maintenance_windows_have_no_effect(
 def test_multiple_maintenance_windows_one_active(
     active_window_name: str,
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
     maint_win_store: EC2SSMMaintenanceWindowStore,
 ) -> None:
     # maintenance window is active (exists in maint window table)
@@ -158,7 +157,7 @@ def test_multiple_maintenance_windows_one_active(
 
 def test_all_maintenance_windows_sharing_non_unique_names_are_used(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
     mw_store: MWStore,
 ) -> None:
     non_unique_window_name = "non-unique-window-name"

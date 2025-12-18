@@ -4,7 +4,6 @@ from datetime import datetime
 
 import pytest
 from freezegun import freeze_time
-
 from instance_scheduler.model.period_definition import (
     InvalidPeriodDefinition,
     PeriodDefinition,

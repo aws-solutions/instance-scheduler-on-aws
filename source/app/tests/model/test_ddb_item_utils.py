@@ -3,8 +3,6 @@
 from typing import Optional
 
 import pytest
-from mypy_boto3_dynamodb.type_defs import AttributeValueTypeDef
-
 from instance_scheduler.model.ddb_item_utils import (
     OptionalAttributeValue,
     optionally,
@@ -13,6 +11,7 @@ from instance_scheduler.model.ddb_item_utils import (
     skip_if_empty,
     skip_if_none,
 )
+from mypy_boto3_dynamodb.type_defs import AttributeValueTypeDef
 
 
 def test_optional_attribute_value_type_matches_boto_type() -> None:

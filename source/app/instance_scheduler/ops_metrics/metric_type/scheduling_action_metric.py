@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from instance_scheduler.ops_metrics import GatheringFrequency
 from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 
 
@@ -12,7 +11,7 @@ class ActionTaken:
     instances: int
     action: str  # Literal["started", "stopped", "resized"]
     service: str  # Literal["ec2", "rds"]
-    instanceType: str
+    instanceType: str  # NOSONAR -- camelCase for backwards compatibility
 
 
 @dataclass(frozen=True)
@@ -24,5 +23,4 @@ class SchedulingActionMetric(OpsMetric):
     duration_seconds: float
     actions: list[ActionTaken]
     event_name: ClassVar[str] = "scheduling_action"
-    collection_frequency: ClassVar[GatheringFrequency] = GatheringFrequency.UNLIMITED
-    context_version: ClassVar[int] = 1
+    context_version: ClassVar[int] = 2

@@ -3,7 +3,6 @@
 from datetime import datetime, timezone
 
 import pytest
-
 from instance_scheduler.cron.cron_recurrence_expression import CronRecurrenceExpression
 from instance_scheduler.cron.cron_to_running_period import (
     IntDomain,

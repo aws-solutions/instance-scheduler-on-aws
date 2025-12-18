@@ -205,3 +205,55 @@ def validate_number_item(  # NOSONAR -- (duplicate-returns) function is expected
             f'{key}["N"] must be a string, found {type(value["N"])}'
         )
     return True
+
+
+def validate_boolean_item(  # NOSONAR -- (duplicate-returns) function is expected to return true or throw an error per the TypeGuard spec
+    untyped_dict: Mapping[str, Any], key: str, required: bool = True
+) -> TypeGuard[Mapping[str, Any]]:
+    """
+    :param untyped_dict: a mapping of strings to unknown values
+    :param key: the key to check
+    :param required: if true, an error will be thrown if the value is missing, if false, no error will be thrown
+    :return: true if the value stored at {key} is a boolean item. a ValidationException will be raised otherwise
+    """
+    value = untyped_dict.get(key, None)
+    if value is None:
+        if required:
+            raise ValidationException(f"required key {key} is missing")
+        else:
+            return True
+    if type(value) is not dict:
+        raise ValidationException(f"{key} must be a dict, found {type(value)}")
+    if "BOOL" not in value:
+        raise ValidationException(f'{key} must have attribute "BOOL", found {value}')
+    if type(value["BOOL"]) is not bool:
+        raise ValidationException(
+            f'{key}["BOOL"] must be a boolean, found {type(value["BOOL"])}'
+        )
+    return True
+
+
+def validate_map_item(  # NOSONAR -- (duplicate-returns) function is expected to return true or throw an error per the TypeGuard spec
+    untyped_dict: Mapping[str, Any], key: str, required: bool = True
+) -> TypeGuard[Mapping[str, Any]]:
+    """
+    :param untyped_dict: a mapping of strings to unknown values
+    :param key: the key to check
+    :param required: if true, an error will be thrown if the value is missing, if false, no error will be thrown
+    :return: true if the value stored at {key} is a map item. a ValidationException will be raised otherwise
+    """
+    value = untyped_dict.get(key, None)
+    if value is None:
+        if required:
+            raise ValidationException(f"required key {key} is missing")
+        else:
+            return True
+    if type(value) is not dict:
+        raise ValidationException(f"{key} must be a dict, found {type(value)}")
+    if "M" not in value:
+        raise ValidationException(f'{key} must have attribute "M", found {value}')
+    if type(value["M"]) is not dict:
+        raise ValidationException(
+            f'{key}["M"] must be a dict, found {type(value["M"])}'
+        )
+    return True

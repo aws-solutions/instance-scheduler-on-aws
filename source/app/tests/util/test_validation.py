@@ -3,7 +3,6 @@
 from typing import Any
 
 import pytest
-
 from instance_scheduler.util.validation import (
     ValidationException,
     require_int,

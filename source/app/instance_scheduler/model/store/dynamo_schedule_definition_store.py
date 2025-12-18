@@ -5,18 +5,17 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Final, Optional, Sequence
 
 from botocore.exceptions import ClientError
-
 from instance_scheduler.model.schedule_definition import (
     InvalidScheduleDefinition,
     ScheduleDefinition,
 )
 from instance_scheduler.model.store.ddb_transact_write import WriteTransaction
-from instance_scheduler.model.store.dynamo_client import hub_dynamo_client
 from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleAlreadyExistsException,
     ScheduleDefinitionStore,
     UnknownScheduleException,
 )
+from instance_scheduler.util.session_manager import hub_dynamo_client
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.type_defs import TransactWriteItemTypeDef

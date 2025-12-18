@@ -1,109 +1,234 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-import pytest
-from _pytest.fixtures import fixture
+import json
 
-from instance_scheduler.handler.spoke_registration import (
-    SpokeRegistrationEnvironment,
-    SpokeRegistrationHandler,
-    SpokeRequest,
-    validate_spoke_request,
+from instance_scheduler.model.store.resource_registry import ResourceRegistry
+from instance_scheduler.model.store.schedule_definition_store import (
+    ScheduleDefinitionStore,
 )
-from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
-from instance_scheduler.util.validation import ValidationException
-from tests.logger import MockLogger
-
-
-def registration_request(account_id: str) -> SpokeRequest:
-    return {
-        "account": account_id,
-        "operation": "Register",
-    }
-
-
-def deregistration_request(account_id: str) -> SpokeRequest:
-    return {
-        "account": account_id,
-        "operation": "Deregister",
-    }
-
-
-@fixture
-def spoke_registration_env(config_table: str) -> SpokeRegistrationEnvironment:
-    return SpokeRegistrationEnvironment(
-        config_table_name=config_table,
-        enable_debug_logging=True,
-        log_group="log_group",
-        topic_arn="topic_arn",
-        user_agent_extra="user_agent_extra",
-    )
-
-
-def test_registration_request_adds_account(
-    config_item_store: DdbConfigItemStore,
-    spoke_registration_env: SpokeRegistrationEnvironment,
-) -> None:
-    account_id = "111122223333"
-    handler = SpokeRegistrationHandler(
-        registration_request(account_id), spoke_registration_env, MockLogger()
-    )
-
-    result = handler.handle_request()
-
-    assert result == f"Registered spoke account {account_id}"
-    assert config_item_store.get().remote_account_ids == [account_id]
-
-
-def test_deletion_request_removes_account(
-    config_item_store: DdbConfigItemStore,
-    spoke_registration_env: SpokeRegistrationEnvironment,
-) -> None:
-    account_id = "111122223333"
-    config_item_store.register_spoke_accounts({account_id})
-    handler = SpokeRegistrationHandler(
-        deregistration_request(account_id), spoke_registration_env, MockLogger()
-    )
-
-    result = handler.handle_request()
-
-    assert result == f"Deregistered spoke account {account_id}"
-    assert config_item_store.get().remote_account_ids == []
-
-
-def test_deletion_request_does_not_fail_if_account_does_not_exist(
-    config_item_store: DdbConfigItemStore,
-    spoke_registration_env: SpokeRegistrationEnvironment,
-) -> None:
-    account_id = "111122223333"
-    handler = SpokeRegistrationHandler(
-        deregistration_request(account_id), spoke_registration_env, MockLogger()
-    )
-
-    result = handler.handle_request()
-
-    assert result == f"Deregistered spoke account {account_id}"
-    assert config_item_store.get().remote_account_ids == []
-
-
-@pytest.mark.parametrize(
-    "operation",
-    ["Register", "Deregister"],
+from instance_scheduler.scheduling.asg.asg_size import AsgSize
+from tests.context import MockLambdaContext
+from tests.integration.helpers.asg_helpers import create_asg
+from tests.integration.helpers.boto_client_helpers import assume_mocked_role
+from tests.integration.helpers.ec2_helpers import create_ec2_instances
+from tests.integration.helpers.event_helpers import extract_events, mock_events_client
+from tests.integration.helpers.rds_helpers import (
+    create_rds_clusters,
+    create_rds_instances,
 )
-def test_validate_spoke_request_success(operation: str) -> None:
-    spoke_registration_request = {"account": "111111111111", "operation": operation}
-    validate_spoke_request(spoke_registration_request)
+from tests.test_utils.mock_spoke_registration_environment import (
+    MockSpokeRegistrationEnvironment,
+)
+from tests.test_utils.unordered_list import UnorderedList
 
 
-def test_validate_spoke_request_invalid_account() -> None:
-    with pytest.raises(ValidationException):
-        spoke_registration_request = {"account": None, "operation": "Register"}
-        validate_spoke_request(spoke_registration_request)
+def test_registration_request_adds_resources_to_registry(
+    resource_registry: ResourceRegistry,
+    registry_table: str,
+    local_event_bus: str,
+    global_event_bus: str,
+) -> None:
+    with MockSpokeRegistrationEnvironment().patch_env():
+        from instance_scheduler.handler.spoke_registration import lambda_handler
 
+        # Create test resources
+        create_ec2_instances(2, "test-schedule")
+        create_rds_instances(1, "test-schedule")
+        create_rds_clusters(1, "test-schedule")
 
-def test_validate_spoke_request_invalid_operation() -> None:
-    with pytest.raises(ValidationException):
-        spoke_registration_request = {
-            "account": "111111111111",
-            "operation": "INVALID_OPERATION",
+        event = {
+            "account": "123456789012",
+            "region": "us-east-1",
+            "operation": "Register",
         }
-        validate_spoke_request(spoke_registration_request)
+
+        lambda_handler(event, MockLambdaContext())
+
+        # Verify resources were added to registry
+        registered_resources = list(
+            resource_registry.find_by_scheduling_target(
+                "123456789012", "us-east-1", "ec2"
+            )
+        )
+        assert len(registered_resources) == 2
+
+        registered_rds = list(
+            resource_registry.find_by_scheduling_target(
+                "123456789012", "us-east-1", "rds"
+            )
+        )
+        assert len(registered_rds) == 2
+
+
+def test_registration_sends_registration_events(
+    resource_registry: ResourceRegistry,
+    registry_table: str,
+    schedule_store: ScheduleDefinitionStore,
+) -> None:
+    spoke_region = "us-east-2"
+
+    with MockSpokeRegistrationEnvironment().patch_env(), mock_events_client() as hub_events_client, mock_events_client(
+        spoke_region
+    ) as spoke_events_client:
+        from instance_scheduler.handler.spoke_registration import lambda_handler
+
+        # Create test resources
+        (ec2_inst,) = create_ec2_instances(1, "test-schedule", region=spoke_region)
+        (rds_db,) = create_rds_instances(1, "test-schedule", region=spoke_region)
+        (rds_cluster,) = create_rds_clusters(1, "test-schedule", region=spoke_region)
+        asg = create_asg(
+            "test-asg",
+            AsgSize(1, 2, 3),
+            "test-schedule",
+            role=assume_mocked_role(region=spoke_region),
+        )
+
+        event = {
+            "account": "123456789012",
+            "region": "us-east-2",
+            "operation": "Register",
+        }
+
+        lambda_handler(event, MockLambdaContext())
+
+        hub_events = extract_events(hub_events_client)
+
+        assert hub_events == UnorderedList(
+            [
+                {
+                    "Source": "instance-scheduler",
+                    "DetailType": "Resource Registered",
+                    "Resources": [
+                        f"arn:aws:ec2:us-east-2:123456789012:instance/{ec2_inst}"
+                    ],
+                    "Detail": json.dumps(
+                        {
+                            "account": "123456789012",
+                            "region": "us-east-2",
+                            "service": "ec2",
+                            "resource_id": ec2_inst,
+                            "schedule": "test-schedule",
+                        }
+                    ),
+                    "EventBusName": "global-events",
+                },
+                {
+                    "Source": "instance-scheduler",
+                    "DetailType": "Resource Registered",
+                    "Resources": [f"arn:aws:rds:us-east-2:123456789012:db:{rds_db}"],
+                    "Detail": json.dumps(
+                        {
+                            "account": "123456789012",
+                            "region": "us-east-2",
+                            "service": "rds",
+                            "resource_id": rds_db,
+                            "schedule": "test-schedule",
+                        }
+                    ),
+                    "EventBusName": "global-events",
+                },
+                {
+                    "Source": "instance-scheduler",
+                    "DetailType": "Resource Registered",
+                    "Resources": [
+                        f"arn:aws:rds:us-east-2:123456789012:cluster:{rds_cluster}"
+                    ],
+                    "Detail": json.dumps(
+                        {
+                            "account": "123456789012",
+                            "region": "us-east-2",
+                            "service": "rds",
+                            "resource_id": rds_cluster,
+                            "schedule": "test-schedule",
+                        }
+                    ),
+                    "EventBusName": "global-events",
+                },
+                {
+                    "Source": "instance-scheduler",
+                    "DetailType": "Resource Registered",
+                    "Resources": [asg.arn],
+                    "Detail": json.dumps(
+                        {
+                            "account": "123456789012",
+                            "region": "us-east-2",
+                            "service": "autoscaling",
+                            "resource_id": asg.resource_id,
+                            "schedule": "test-schedule",
+                        }
+                    ),
+                    "EventBusName": "global-events",
+                },
+            ]
+        )
+
+        spoke_events = extract_events(spoke_events_client)
+
+        assert spoke_events == UnorderedList(
+            [
+                {
+                    "Source": "instance-scheduler",
+                    "DetailType": "Resource Registered",
+                    "Resources": [
+                        f"arn:aws:ec2:us-east-2:123456789012:instance/{ec2_inst}"
+                    ],
+                    "Detail": json.dumps(
+                        {
+                            "account": "123456789012",
+                            "region": "us-east-2",
+                            "service": "ec2",
+                            "resource_id": ec2_inst,
+                            "schedule": "test-schedule",
+                        }
+                    ),
+                    "EventBusName": "local-events",
+                },
+                {
+                    "Source": "instance-scheduler",
+                    "DetailType": "Resource Registered",
+                    "Resources": [f"arn:aws:rds:us-east-2:123456789012:db:{rds_db}"],
+                    "Detail": json.dumps(
+                        {
+                            "account": "123456789012",
+                            "region": "us-east-2",
+                            "service": "rds",
+                            "resource_id": rds_db,
+                            "schedule": "test-schedule",
+                        }
+                    ),
+                    "EventBusName": "local-events",
+                },
+                {
+                    "Source": "instance-scheduler",
+                    "DetailType": "Resource Registered",
+                    "Resources": [
+                        f"arn:aws:rds:us-east-2:123456789012:cluster:{rds_cluster}"
+                    ],
+                    "Detail": json.dumps(
+                        {
+                            "account": "123456789012",
+                            "region": "us-east-2",
+                            "service": "rds",
+                            "resource_id": rds_cluster,
+                            "schedule": "test-schedule",
+                        }
+                    ),
+                    "EventBusName": "local-events",
+                },
+                {
+                    "Source": "instance-scheduler",
+                    "DetailType": "Resource Registered",
+                    "Resources": [asg.arn],
+                    "Detail": json.dumps(
+                        {
+                            "account": "123456789012",
+                            "region": "us-east-2",
+                            "service": "autoscaling",
+                            "resource_id": asg.resource_id,
+                            "schedule": "test-schedule",
+                        }
+                    ),
+                    "EventBusName": "local-events",
+                },
+            ]
+        )

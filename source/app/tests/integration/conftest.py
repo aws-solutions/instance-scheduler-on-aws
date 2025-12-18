@@ -4,11 +4,16 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 import boto3
+from instance_scheduler.scheduling.asg.asg_runtime_info import AsgRuntimeInfo
+from instance_scheduler.scheduling.asg.asg_size import AsgSize
+from instance_scheduler.scheduling.resource_registration import register_asg_resources
+from instance_scheduler.util.session_manager import lambda_execution_role
 from pytest import fixture
-
-from instance_scheduler.schedulers.instance_states import InstanceStates
-from tests.logger import MockLogger
-from tests.test_utils.testsuite_env import TestSuiteEnv
+from tests.integration.helpers.asg_helpers import create_asg
+from tests.test_utils.mock_resource_registration_environment import (
+    MockResourceRegistrationEnvironment,
+)
+from tests.test_utils.testsuite_env import MockSuiteEnv
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb import DynamoDBClient
@@ -20,11 +25,6 @@ else:
     EC2Client = object
     RDSClient = object
     CreateDBInstanceResultTypeDef = object
-
-
-@fixture(autouse=True)
-def auto_setup_log_group(mock_log_group: None) -> None:
-    """noop"""
 
 
 @fixture(autouse=True)
@@ -42,6 +42,15 @@ def ec2_instance(moto_backend: None, ami: str) -> Iterator[str]:
         Resources=[instance_id], Tags=[{"Key": "Schedule", "Value": "test-schedule"}]
     )
     yield instance_id
+
+
+@fixture
+def asg(registry_table: str) -> Iterator[AsgRuntimeInfo]:
+    asg_def = create_asg("test-asg", AsgSize(1, 3, 5), "test-schedule")
+    register_asg_resources(
+        [asg_def], lambda_execution_role(), MockResourceRegistrationEnvironment()
+    )
+    yield asg_def
 
 
 @fixture
@@ -85,7 +94,7 @@ def rds_cluster(moto_backend: None) -> Iterator[str]:
 
 
 @fixture
-def state_table(moto_backend: None, test_suite_env: TestSuiteEnv) -> str:
+def state_table(moto_backend: None, test_suite_env: MockSuiteEnv) -> str:
     state_table_name = test_suite_env.state_table_name
     dynamo_client: DynamoDBClient = boto3.client("dynamodb")
     dynamo_client.create_table(
@@ -101,17 +110,3 @@ def state_table(moto_backend: None, test_suite_env: TestSuiteEnv) -> str:
         BillingMode="PAY_PER_REQUEST",
     )
     return state_table_name
-
-
-@fixture
-def ec2_instance_states(state_table: str) -> InstanceStates:
-    instance_states = InstanceStates(state_table, "ec2", MockLogger())
-    instance_states.load(account="123456789012", region="us-east-1")
-    return instance_states
-
-
-@fixture
-def rds_instance_states(state_table: str) -> InstanceStates:
-    instance_states = InstanceStates(state_table, "rds", MockLogger())
-    instance_states.load(account="123456789012", region="us-east-1")
-    return instance_states

@@ -28,7 +28,7 @@ from instance_scheduler.util.custom_resource import CustomResourceRequest
 from tests.context import MockLambdaContext
 from tests.test_utils.any_nonempty_string import AnyNonEmptyString
 from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
-from tests.test_utils.testsuite_env import TestSuiteEnv
+from tests.test_utils.testsuite_env import MockSuiteEnv
 from tests.test_utils.unordered_list import UnorderedList
 
 stack_arn = "arn:aws:cloudformation:us-west-2:123456789012:stack/teststack/51af3dc0-da77-11e4-872e-1234567db123"
@@ -74,7 +74,7 @@ def test_minimalist_cfn_schedule_creation(
     mocked_cfn_callback: MagicMock,
     schedule_store: ScheduleDefinitionStore,
     period_store: PeriodDefinitionStore,
-    test_suite_env: TestSuiteEnv,
+    test_suite_env: MockSuiteEnv,
 ) -> None:
     event = new_create_request(
         {
@@ -114,7 +114,7 @@ def test_cfn_schedule_with_legacy_maint_win_str_type(
     mocked_cfn_callback: MagicMock,
     schedule_store: ScheduleDefinitionStore,
     period_store: PeriodDefinitionStore,
-    test_suite_env: TestSuiteEnv,
+    test_suite_env: MockSuiteEnv,
 ) -> None:
     event = new_create_request(
         {

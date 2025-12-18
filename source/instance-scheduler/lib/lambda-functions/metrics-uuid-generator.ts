@@ -1,16 +1,16 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Aws, CustomResource, Duration, RemovalPolicy } from "aws-cdk-lib";
+import { Aws, CustomResource, Duration } from "aws-cdk-lib";
 import { Effect, Policy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { NagSuppressions } from "cdk-nag";
 import { Construct } from "constructs";
-import { addCfnNagSuppressions } from "../cfn-nag";
 import { FunctionFactory } from "./function-factory";
+import { InstanceSchedulerDataLayer } from "../instance-scheduler-data-layer";
+import { ISLogGroups } from "../observability/log-groups";
 
 export interface MetricsUuidGeneratorProps {
   readonly solutionName: string;
-  readonly logRetentionDays: RetentionDays;
+  readonly dataLayer: InstanceSchedulerDataLayer;
   readonly USER_AGENT_EXTRA: string;
   readonly UUID_KEY: string;
   readonly STACK_ID: string;
@@ -29,21 +29,16 @@ export class MetricsUuidGenerator {
     const lambdaResourceProvider = props.factory.createFunction(scope, "MetricsUuidGenerator", {
       description: "Custom Resource Provider used to generate unique UUIDs for solution deployments",
       index: "instance_scheduler/handler/metrics_uuid_custom_resource.py",
-      handler: "handle_metrics_uuid_request",
+      handler: "lambda_handler",
       memorySize: 128,
       role: role,
       timeout: Duration.minutes(1),
+      logGroup: ISLogGroups.adminLogGroup(scope),
       environment: {
         USER_AGENT_EXTRA: props.USER_AGENT_EXTRA,
         UUID_KEY: props.UUID_KEY,
         STACK_ID: props.STACK_ID,
       },
-    });
-
-    const lambdaDefaultLogGroup = new LogGroup(scope, "MetricsUuidHandlerLogGroup", {
-      logGroupName: `/aws/lambda/${lambdaResourceProvider.functionName}`,
-      removalPolicy: RemovalPolicy.RETAIN,
-      retention: props.logRetentionDays,
     });
 
     if (!lambdaResourceProvider.role) {
@@ -54,7 +49,7 @@ export class MetricsUuidGenerator {
       roles: [lambdaResourceProvider.role],
     });
 
-    lambdaDefaultLogGroup.grantWrite(metricsUuidPolicy);
+    ISLogGroups.adminLogGroup(scope).grantWrite(metricsUuidPolicy);
     metricsUuidPolicy.addStatements(
       new PolicyStatement({
         actions: ["ssm:GetParameters", "ssm:GetParameter", "ssm:GetParameterHistory"],
@@ -80,11 +75,6 @@ export class MetricsUuidGenerator {
       throw Error("Unable to find default policy on lambda role");
     }
 
-    addCfnNagSuppressions(defaultPolicy, {
-      id: "W12",
-      reason: "Wildcard required for xray",
-    });
-
     NagSuppressions.addResourceSuppressions(defaultPolicy, [
       {
         id: "AwsSolutions-IAM5",
@@ -102,27 +92,5 @@ export class MetricsUuidGenerator {
         reason: "backwards compatibility (<=1.5.3) -- ability to read metrics UUID from ssm parameter",
       },
     ]);
-
-    addCfnNagSuppressions(
-      lambdaResourceProvider,
-      {
-        id: "W89",
-        reason: "This Lambda function does not need to access any resource provisioned within a VPC.",
-      },
-      {
-        id: "W58",
-        reason: "This Lambda function has permission provided to write to CloudWatch logs using the iam roles.",
-      },
-      {
-        id: "W92",
-        reason: "Lambda function is a custom resource. Concurrent calls are very limited.",
-      },
-    );
-
-    addCfnNagSuppressions(lambdaDefaultLogGroup, {
-      id: "W84",
-      reason:
-        "This template has to be supported in gov cloud which doesn't yet have the feature to provide kms key id to cloudwatch log group",
-    });
   }
 }

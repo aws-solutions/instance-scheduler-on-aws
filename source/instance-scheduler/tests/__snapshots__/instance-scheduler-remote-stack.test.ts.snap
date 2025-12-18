@@ -20,12 +20,33 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         },
       ],
     },
-    "UsingAWSOrganizationsCondition": {
-      "Fn::Equals": [
+    "EC2SchedulerCrossAccountRolelmConditionAspect0C779AA4": {
+      "Fn::Not": [
         {
-          "Ref": "UsingAWSOrganizations",
+          "Fn::Equals": [
+            {
+              "Fn::Select": [
+                0,
+                {
+                  "Ref": "LicenseManagerArns",
+                },
+              ],
+            },
+            "",
+          ],
         },
-        "Yes",
+      ],
+    },
+    "isHubStackDeployment": {
+      "Fn::Equals": [
+        "HUB",
+        "REMOTE",
+      ],
+    },
+    "isNotHubStackDeployment": {
+      "Fn::Equals": [
+        "REMOTE",
+        "REMOTE",
       ],
     },
   },
@@ -34,20 +55,23 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "ParameterGroups": [
         {
           "Label": {
-            "default": "Account structure",
+            "default": "Infrastructure",
           },
           "Parameters": [
-            "InstanceSchedulerAccount",
-            "UsingAWSOrganizations",
             "Namespace",
+            "UsingAWSOrganizations",
+            "InstanceSchedulerAccount",
+            "ScheduleTagKey",
           ],
         },
         {
           "Label": {
-            "default": "Service-specific",
+            "default": "Member-Account Scheduling",
           },
           "Parameters": [
+            "Regions",
             "KmsKeyArns",
+            "LicenseManagerArns",
           ],
         },
       ],
@@ -58,12 +82,41 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         "KmsKeyArns": {
           "default": "Kms Key Arns for EC2",
         },
+        "LicenseManagerArns": {
+          "default": "License Manager Arns for EC2",
+        },
         "Namespace": {
           "default": "Namespace",
+        },
+        "Regions": {
+          "default": "Region(s)",
+        },
+        "ScheduleTagKey": {
+          "default": "Schedule tag key",
         },
         "UsingAWSOrganizations": {
           "default": "Use AWS Organizations",
         },
+      },
+    },
+  },
+  "Outputs": {
+    "RegionalEventBusName": {
+      "Description": "Regional event bus name.",
+      "Value": {
+        "Fn::GetAtt": [
+          "CreateRegionalEventRules",
+          "REGIONAL_BUS_NAME",
+        ],
+      },
+    },
+    "SchedulerRoleArn": {
+      "Description": "Scheduler role ARN",
+      "Value": {
+        "Fn::GetAtt": [
+          "EC2SchedulerCrossAccountRole",
+          "Arn",
+        ],
       },
     },
   },
@@ -84,9 +137,26 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "Description": "comma-separated list of kms arns to grant Instance Scheduler kms:CreateGrant permissions to provide the EC2  service with Decrypt permissions for encrypted EBS volumes. This allows the scheduler to start EC2 instances with attached encrypted EBS volumes. provide just (*) to give limited access to all kms keys, leave blank to disable. For details on the exact policy created, refer to security section of the implementation guide (https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/)",
       "Type": "CommaDelimitedList",
     },
+    "LicenseManagerArns": {
+      "Default": "",
+      "Description": "comma-separated list of license manager arns to grant Instance Scheduler ec2:StartInstance permissions to provide the EC2  service with license manager permissions to start the instances. This allows the scheduler to start EC2 instances with license manager configuration enabled. Leave blank to disable. For details on the exact policy created, refer to security section of the implementation guide (https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/)",
+      "Type": "CommaDelimitedList",
+    },
     "Namespace": {
       "Default": "default",
       "Description": "Unique identifier used to differentiate between multiple solution deployments. Must be set to the same value as the Hub stack. Must be non-empty for Organizations deployments.",
+      "Type": "String",
+    },
+    "Regions": {
+      "Default": "",
+      "Description": "Comma-separated List of regions in which resources should be scheduled. Leave blank for current region only.",
+      "Type": "CommaDelimitedList",
+    },
+    "ScheduleTagKey": {
+      "Default": "Schedule",
+      "Description": "The tag key Instance Scheduler will read to determine the schedule for a resource. Must be set to the same value as the Hub stack. ",
+      "MaxLength": 127,
+      "MinLength": 1,
       "Type": "String",
     },
     "UsingAWSOrganizations": {
@@ -100,93 +170,135 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
     },
   },
   "Resources": {
-    "AsgSchedulingRoleASGSchedulingPermissions6DEABC8F": {
+    "AdministrationLogsC5F47471": {
+      "DeletionPolicy": "Retain",
       "Metadata": {
-        "cdk_nag": {
-          "rules_to_suppress": [
-            {
-              "applies_to": [
-                "Resource::*",
-              ],
-              "id": "AwsSolutions-IAM5",
-              "reason": "Required permissions to describe AutoScaling Groups",
-            },
-            {
-              "applies_to": [
-                "Resource::arn:<AWS::Partition>:autoscaling:*:<AWS::AccountId>:autoScalingGroup:*:autoScalingGroupName/*",
-              ],
-              "id": "AwsSolutions-IAM5",
-              "reason": "Required permissions to modify scheduled scaling actions on AutoScaling Groups",
-            },
-          ],
-        },
-        "cfn_nag": {
-          "rules_to_suppress": [
-            {
-              "id": "W12",
-              "reason": "DescribeAutoScalingGroups and autoscaling:DescribeScheduledActions actions require wildcard permissions",
-            },
+        "guard": {
+          "SuppressedRules": [
+            "CW_LOGGROUP_RETENTION_PERIOD_CHECK",
+            "CLOUDWATCH_LOG_GROUP_ENCRYPTED",
           ],
         },
       },
       "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "autoscaling:BatchPutScheduledUpdateGroupAction",
-                "autoscaling:BatchDeleteScheduledAction",
-                "autoscaling:CreateOrUpdateTags",
-              ],
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:",
-                    {
-                      "Ref": "AWS::Partition",
-                    },
-                    ":autoscaling:*:",
-                    {
-                      "Ref": "AWS::AccountId",
-                    },
-                    ":autoScalingGroup:*:autoScalingGroupName/*",
-                  ],
-                ],
+        "LogGroupName": {
+          "Fn::Join": [
+            "",
+            [
+              "stack-",
+              {
+                "Ref": "Namespace",
               },
-            },
-            {
-              "Action": [
-                "autoscaling:DescribeAutoScalingGroups",
-                "autoscaling:DescribeScheduledActions",
-              ],
-              "Effect": "Allow",
-              "Resource": "*",
-            },
+              "-administrative-logs",
+            ],
           ],
-          "Version": "2012-10-17",
         },
-        "PolicyName": "AsgSchedulingRoleASGSchedulingPermissions6DEABC8F",
-        "Roles": [
-          {
-            "Ref": "AsgSchedulingRoleF04B8CC9",
-          },
-        ],
+        "RetentionInDays": 365,
       },
-      "Type": "AWS::IAM::Policy",
+      "Type": "AWS::Logs::LogGroup",
+      "UpdateReplacePolicy": "Retain",
     },
-    "AsgSchedulingRoleF04B8CC9": {
-      "Metadata": {
-        "cfn_nag": {
-          "rules_to_suppress": [
-            {
-              "id": "W28",
-              "reason": "The role name is defined to allow cross account access from the hub account.",
-            },
+    "CreateRegionalEventRules": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CreateRegionalEventRulesLambda4F6A2D62",
+            "Arn",
           ],
         },
+        "regions": {
+          "Ref": "Regions",
+        },
       },
+      "Type": "Custom::SetupRegionalEvents",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "CreateRegionalEventRulesLambda4F6A2D62": {
+      "DependsOn": [
+        "CreateRegionalEventRulesLambdaRoleDefaultPolicy80005665",
+        "CreateRegionalEventRulesLambdaRole1BE94A3C",
+      ],
+      "Properties": {
+        "Code": "Omitted to remove snapshot dependency on code hash",
+        "Description": "Custom Resource for creating regional event rules for tagging resources.",
+        "Environment": {
+          "Variables": {
+            "EVENT_RULE_PREFIX": "IS-Tagging",
+            "POWERTOOLS_SERVICE_NAME": "instance-scheduler",
+            "REGIONAL_EVENT_BUS_NAME": {
+              "Fn::Join": [
+                "",
+                [
+                  "IS-LocalEvents-",
+                  {
+                    "Ref": "Namespace",
+                  },
+                ],
+              ],
+            },
+            "SCHEDULE_TAG_KEY": {
+              "Ref": "ScheduleTagKey",
+            },
+            "TAGGING_EVENT_BUS_ARN": {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:",
+                  {
+                    "Ref": "AWS::Partition",
+                  },
+                  ":events:",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  ":",
+                  {
+                    "Ref": "InstanceSchedulerAccount",
+                  },
+                  ":event-bus/",
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "-RegistrationEvents",
+                ],
+              ],
+            },
+            "TAGGING_EVENT_RULE_ROLE_ARN": {
+              "Fn::GetAtt": [
+                "HubTagEventForwardingRole5BEE3911",
+                "Arn",
+              ],
+            },
+            "USER_AGENT_EXTRA": "AwsSolution/my-solution-id/v9.9.9",
+            "VERSION": "v9.9.9",
+          },
+        },
+        "Handler": "lambda_handler",
+        "LoggingConfig": {
+          "ApplicationLogLevel": "INFO",
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "AdministrationLogsC5F47471",
+          },
+          "SystemLogLevel": "INFO",
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "CreateRegionalEventRulesLambdaRole1BE94A3C",
+            "Arn",
+          ],
+        },
+        "Runtime": "python3.11",
+        "Timeout": 900,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CreateRegionalEventRulesLambdaRole1BE94A3C": {
       "Properties": {
         "AssumeRolePolicyDocument": {
           "Statement": [
@@ -194,53 +306,768 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
               "Action": "sts:AssumeRole",
               "Effect": "Allow",
               "Principal": {
-                "AWS": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "arn:",
-                      {
-                        "Ref": "AWS::Partition",
-                      },
-                      ":iam::",
-                      {
-                        "Ref": "InstanceSchedulerAccount",
-                      },
-                      ":role/",
-                      {
-                        "Ref": "Namespace",
-                      },
-                      "-AsgRequestHandler-Role",
-                    ],
-                  ],
-                },
+                "Service": "lambda.amazonaws.com",
               },
             },
           ],
           "Version": "2012-10-17",
         },
-        "RoleName": {
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CreateRegionalEventRulesLambdaRoleDefaultPolicy80005665": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CreateRegionalEventRulesLambdaRoleDefaultPolicy80005665",
+        "Roles": [
+          {
+            "Ref": "CreateRegionalEventRulesLambdaRole1BE94A3C",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CreateRegionalEventRulesPolicyBA8F60E9": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "events:DeleteRule",
+                "events:PutTargets",
+                "events:PutRule",
+                "events:RemoveTargets",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:events:*:",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":rule/IS-Tagging*",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": [
+                "events:CreateEventBus",
+                "events:DeleteEventBus",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:events:*:",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":event-bus/IS-LocalEvents-",
+                    {
+                      "Ref": "Namespace",
+                    },
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": [
+                "events:ListRules",
+                "events:DescribeRule",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "HubTagEventForwardingRole5BEE3911",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "AdministrationLogsC5F47471",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CreateRegionalEventRulesPolicyBA8F60E9",
+        "Roles": [
+          {
+            "Ref": "CreateRegionalEventRulesLambdaRole1BE94A3C",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CustomResourceProviderframeworkisComplete2713CDE6": {
+      "DependsOn": [
+        "CustomResourceProviderframeworkisCompleteServiceRoleDefaultPolicy289A380C",
+        "CustomResourceProviderframeworkisCompleteServiceRole88C5CC94",
+      ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
+      "Properties": {
+        "Code": "Omitted to remove snapshot dependency on code hash",
+        "Description": "AWS CDK resource provider framework - isComplete (stack/CustomResourceProvider)",
+        "Environment": {
+          "Variables": {
+            "USER_IS_COMPLETE_FUNCTION_ARN": {
+              "Fn::GetAtt": [
+                "RegionRegistrationWaitLambda671C2191",
+                "Arn",
+              ],
+            },
+            "USER_ON_EVENT_FUNCTION_ARN": {
+              "Fn::GetAtt": [
+                "RegionRegistrationCustomResourceLambda632460E5",
+                "Arn",
+              ],
+            },
+          },
+        },
+        "Handler": "framework.isComplete",
+        "LoggingConfig": {
+          "ApplicationLogLevel": "FATAL",
+          "LogFormat": "JSON",
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomResourceProviderframeworkisCompleteServiceRole88C5CC94",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomResourceProviderframeworkisCompleteServiceRole88C5CC94": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CustomResourceProviderframeworkisCompleteServiceRoleDefaultPolicy289A380C": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "RegionRegistrationCustomResourceLambda632460E5",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "RegionRegistrationCustomResourceLambda632460E5",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "lambda:GetFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "RegionRegistrationCustomResourceLambda632460E5",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "RegionRegistrationWaitLambda671C2191",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "RegionRegistrationWaitLambda671C2191",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "lambda:GetFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "RegionRegistrationWaitLambda671C2191",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CustomResourceProviderframeworkisCompleteServiceRoleDefaultPolicy289A380C",
+        "Roles": [
+          {
+            "Ref": "CustomResourceProviderframeworkisCompleteServiceRole88C5CC94",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CustomResourceProviderframeworkonEvent0AA4376C": {
+      "DependsOn": [
+        "CustomResourceProviderframeworkonEventServiceRoleDefaultPolicy93CD1647",
+        "CustomResourceProviderframeworkonEventServiceRole7EBC5835",
+      ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
+      "Properties": {
+        "Code": "Omitted to remove snapshot dependency on code hash",
+        "Description": "AWS CDK resource provider framework - onEvent (stack/CustomResourceProvider)",
+        "Environment": {
+          "Variables": {
+            "USER_IS_COMPLETE_FUNCTION_ARN": {
+              "Fn::GetAtt": [
+                "RegionRegistrationWaitLambda671C2191",
+                "Arn",
+              ],
+            },
+            "USER_ON_EVENT_FUNCTION_ARN": {
+              "Fn::GetAtt": [
+                "RegionRegistrationCustomResourceLambda632460E5",
+                "Arn",
+              ],
+            },
+            "WAITER_STATE_MACHINE_ARN": {
+              "Ref": "CustomResourceProviderwaiterstatemachineA1F4877C",
+            },
+          },
+        },
+        "Handler": "framework.onEvent",
+        "LoggingConfig": {
+          "ApplicationLogLevel": "FATAL",
+          "LogFormat": "JSON",
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomResourceProviderframeworkonEventServiceRole7EBC5835",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomResourceProviderframeworkonEventServiceRole7EBC5835": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CustomResourceProviderframeworkonEventServiceRoleDefaultPolicy93CD1647": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "RegionRegistrationCustomResourceLambda632460E5",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "RegionRegistrationCustomResourceLambda632460E5",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "lambda:GetFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "RegionRegistrationCustomResourceLambda632460E5",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "RegionRegistrationWaitLambda671C2191",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "RegionRegistrationWaitLambda671C2191",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "lambda:GetFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "RegionRegistrationWaitLambda671C2191",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "states:StartExecution",
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "CustomResourceProviderwaiterstatemachineA1F4877C",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CustomResourceProviderframeworkonEventServiceRoleDefaultPolicy93CD1647",
+        "Roles": [
+          {
+            "Ref": "CustomResourceProviderframeworkonEventServiceRole7EBC5835",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CustomResourceProviderframeworkonTimeout39980DF9": {
+      "DependsOn": [
+        "CustomResourceProviderframeworkonTimeoutServiceRoleDefaultPolicy0C25C854",
+        "CustomResourceProviderframeworkonTimeoutServiceRole50C6F805",
+      ],
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "LAMBDA_INSIDE_VPC",
+            "LAMBDA_CONCURRENCY_CHECK",
+          ],
+        },
+      },
+      "Properties": {
+        "Code": "Omitted to remove snapshot dependency on code hash",
+        "Description": "AWS CDK resource provider framework - onTimeout (stack/CustomResourceProvider)",
+        "Environment": {
+          "Variables": {
+            "USER_IS_COMPLETE_FUNCTION_ARN": {
+              "Fn::GetAtt": [
+                "RegionRegistrationWaitLambda671C2191",
+                "Arn",
+              ],
+            },
+            "USER_ON_EVENT_FUNCTION_ARN": {
+              "Fn::GetAtt": [
+                "RegionRegistrationCustomResourceLambda632460E5",
+                "Arn",
+              ],
+            },
+          },
+        },
+        "Handler": "framework.onTimeout",
+        "LoggingConfig": {
+          "ApplicationLogLevel": "FATAL",
+          "LogFormat": "JSON",
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "CustomResourceProviderframeworkonTimeoutServiceRole50C6F805",
+            "Arn",
+          ],
+        },
+        "Runtime": "nodejs22.x",
+        "Timeout": 900,
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "CustomResourceProviderframeworkonTimeoutServiceRole50C6F805": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "ManagedPolicyArns": [
+          {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition",
+                },
+                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+              ],
+            ],
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "CustomResourceProviderframeworkonTimeoutServiceRoleDefaultPolicy0C25C854": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "RegionRegistrationCustomResourceLambda632460E5",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "RegionRegistrationCustomResourceLambda632460E5",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "lambda:GetFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "RegionRegistrationCustomResourceLambda632460E5",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "RegionRegistrationWaitLambda671C2191",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "RegionRegistrationWaitLambda671C2191",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "lambda:GetFunction",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "RegionRegistrationWaitLambda671C2191",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CustomResourceProviderframeworkonTimeoutServiceRoleDefaultPolicy0C25C854",
+        "Roles": [
+          {
+            "Ref": "CustomResourceProviderframeworkonTimeoutServiceRole50C6F805",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "CustomResourceProviderwaiterstatemachineA1F4877C": {
+      "DependsOn": [
+        "CustomResourceProviderwaiterstatemachineRoleDefaultPolicy37566898",
+        "CustomResourceProviderwaiterstatemachineRole09462DF6",
+      ],
+      "Properties": {
+        "DefinitionString": {
           "Fn::Join": [
             "",
             [
+              "{"StartAt":"framework-isComplete-task","States":{"framework-isComplete-task":{"End":true,"Retry":[{"ErrorEquals":["States.ALL"],"IntervalSeconds":30,"MaxAttempts":40,"BackoffRate":1}],"Catch":[{"ErrorEquals":["States.ALL"],"Next":"framework-onTimeout-task"}],"Type":"Task","Resource":"",
               {
-                "Ref": "Namespace",
+                "Fn::GetAtt": [
+                  "CustomResourceProviderframeworkisComplete2713CDE6",
+                  "Arn",
+                ],
               },
-              "-ASG-Scheduling-Role",
+              ""},"framework-onTimeout-task":{"End":true,"Type":"Task","Resource":"",
+              {
+                "Fn::GetAtt": [
+                  "CustomResourceProviderframeworkonTimeout39980DF9",
+                  "Arn",
+                ],
+              },
+              ""}}}",
             ],
           ],
+        },
+        "RoleArn": {
+          "Fn::GetAtt": [
+            "CustomResourceProviderwaiterstatemachineRole09462DF6",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::StepFunctions::StateMachine",
+    },
+    "CustomResourceProviderwaiterstatemachineRole09462DF6": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "states.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
         },
       },
       "Type": "AWS::IAM::Role",
     },
+    "CustomResourceProviderwaiterstatemachineRoleDefaultPolicy37566898": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CustomResourceProviderframeworkisComplete2713CDE6",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "CustomResourceProviderframeworkisComplete2713CDE6",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+            {
+              "Action": "lambda:InvokeFunction",
+              "Effect": "Allow",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CustomResourceProviderframeworkonTimeout39980DF9",
+                    "Arn",
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      {
+                        "Fn::GetAtt": [
+                          "CustomResourceProviderframeworkonTimeout39980DF9",
+                          "Arn",
+                        ],
+                      },
+                      ":*",
+                    ],
+                  ],
+                },
+              ],
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "CustomResourceProviderwaiterstatemachineRoleDefaultPolicy37566898",
+        "Roles": [
+          {
+            "Ref": "CustomResourceProviderwaiterstatemachineRole09462DF6",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
     "EC2SchedulerCrossAccountRole": {
       "Metadata": {
-        "cfn_nag": {
-          "rules_to_suppress": [
-            {
-              "id": "W28",
-              "reason": "The role name is defined to allow cross account access from the hub account.",
-            },
+        "guard": {
+          "SuppressedRules": [
+            "CFN_NO_EXPLICIT_RESOURCE_NAMES",
+            "CFN_NO_EXPLICIT_RESOURCE_NAMES",
           ],
         },
       },
@@ -273,6 +1100,84 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                 },
               },
             },
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "InstanceSchedulerAccount",
+                      },
+                      ":role/",
+                      {
+                        "Ref": "Namespace",
+                      },
+                      "-ResourceRegistrationHandler-Role",
+                    ],
+                  ],
+                },
+              },
+            },
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "InstanceSchedulerAccount",
+                      },
+                      ":role/",
+                      {
+                        "Ref": "Namespace",
+                      },
+                      "-IceErrorRetryHandler-Role",
+                    ],
+                  ],
+                },
+              },
+            },
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "InstanceSchedulerAccount",
+                      },
+                      ":role/",
+                      {
+                        "Ref": "Namespace",
+                      },
+                      "-SpokeRegistrationHandler-Role",
+                    ],
+                  ],
+                },
+              },
+            },
           ],
           "Version": "2012-10-17",
         },
@@ -289,6 +1194,115 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         },
       },
       "Type": "AWS::IAM::Role",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "EC2SchedulerCrossAccountRoleASGSchedulingPermissionsAE9E3D48": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "applies_to": [
+                "Resource::*",
+              ],
+              "id": "AwsSolutions-IAM5",
+              "reason": "Required permissions to describe AutoScaling Groups",
+            },
+            {
+              "applies_to": [
+                "Resource::arn:<AWS::Partition>:autoscaling:*:<AWS::AccountId>:autoScalingGroup:*:autoScalingGroupName/*",
+              ],
+              "id": "AwsSolutions-IAM5",
+              "reason": "Required permissions to modify scheduled scaling actions on AutoScaling Groups",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "autoscaling:BatchPutScheduledUpdateGroupAction",
+                "autoscaling:BatchDeleteScheduledAction",
+                "autoscaling:CreateOrUpdateTags",
+                "autoscaling:DeleteTags",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":autoscaling:*:",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":autoScalingGroup:*:autoScalingGroupName/*",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": [
+                "autoscaling:DescribeAutoScalingGroups",
+                "autoscaling:DescribeScheduledActions",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "EC2SchedulerCrossAccountRoleASGSchedulingPermissionsAE9E3D48",
+        "Roles": [
+          {
+            "Ref": "EC2SchedulerCrossAccountRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "EC2SchedulerCrossAccountRoleEc2SchedulingPermissions35C26E2F": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "ec2:DescribeInstances",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "ec2:StartInstances",
+                "ec2:StopInstances",
+                "ec2:CreateTags",
+                "ec2:DeleteTags",
+                "ec2:ModifyInstanceAttribute",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
+              },
+            },
+            {
+              "Action": "ssm:DescribeMaintenanceWindows",
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "EC2SchedulerCrossAccountRoleEc2SchedulingPermissions35C26E2F",
+        "Roles": [
+          {
+            "Ref": "EC2SchedulerCrossAccountRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
     "EC2SchedulerCrossAccountRoleKmsPermissions93DB5FB5": {
       "Condition": "EC2SchedulerCrossAccountRolekmsAccessCondition6C83D407",
@@ -347,58 +1361,34 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
-    "EC2SchedulerCrossAccountRoleSchedulingPermissions3E73CF8A": {
-      "Metadata": {
-        "cdk_nag": {
-          "rules_to_suppress": [
-            {
-              "applies_to": [
-                "Resource::arn:<AWS::Partition>:rds:*:<AWS::AccountId>:db:*",
-                "Resource::arn:<AWS::Partition>:rds:*:<AWS::AccountId>:cluster:*",
-                "Resource::arn:<AWS::Partition>:ec2:*:<AWS::AccountId>:instance/*",
-                "Resource::arn:<AWS::Partition>:rds:*:<AWS::AccountId>:snapshot:*",
-                "Resource::*",
-              ],
-              "id": "AwsSolutions-IAM5",
-              "reason": "required scheduling permissions",
-            },
-          ],
-        },
-        "cfn_nag": {
-          "rules_to_suppress": [
-            {
-              "id": "W12",
-              "reason": "required scheduling permissions",
-            },
-          ],
-        },
-      },
+    "EC2SchedulerCrossAccountRoleLicenceManagerPermissions660BB08E": {
+      "Condition": "EC2SchedulerCrossAccountRolelmConditionAspect0C779AA4",
       "Properties": {
         "PolicyDocument": {
           "Statement": [
             {
-              "Action": "ec2:DescribeInstances",
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-            {
-              "Action": [
-                "ec2:StartInstances",
-                "ec2:StopInstances",
-                "ec2:CreateTags",
-                "ec2:DeleteTags",
-                "ec2:ModifyInstanceAttribute",
-              ],
+              "Action": "ec2:StartInstances",
               "Effect": "Allow",
               "Resource": {
-                "Fn::Sub": "arn:\${AWS::Partition}:ec2:*:\${AWS::AccountId}:instance/*",
+                "Ref": "LicenseManagerArns",
               },
             },
-            {
-              "Action": "ssm:DescribeMaintenanceWindows",
-              "Effect": "Allow",
-              "Resource": "*",
-            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "EC2SchedulerCrossAccountRoleLicenceManagerPermissions660BB08E",
+        "Roles": [
+          {
+            "Ref": "EC2SchedulerCrossAccountRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "EC2SchedulerCrossAccountRoleRdsSchedulingPermissions18D04034": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
             {
               "Action": [
                 "rds:DescribeDBClusters",
@@ -450,7 +1440,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "EC2SchedulerCrossAccountRoleSchedulingPermissions3E73CF8A",
+        "PolicyName": "EC2SchedulerCrossAccountRoleRdsSchedulingPermissions18D04034",
         "Roles": [
           {
             "Ref": "EC2SchedulerCrossAccountRole",
@@ -459,52 +1449,144 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
-    "RegisterSpokeAccountCustomResourceLambda8BF25EDC": {
-      "Condition": "UsingAWSOrganizationsCondition",
-      "DependsOn": [
-        "RegisterSpokeAccountCustomResourceLambdaRoleDefaultPolicy3599775F",
-        "RegisterSpokeAccountCustomResourceLambdaRoleDD724340",
-      ],
-      "Metadata": {
-        "cdk_nag": {
-          "rules_to_suppress": [
+    "EC2SchedulerCrossAccountRoleRegionalEventBusPermissionsCE7D7CD4": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
             {
-              "id": "AwsSolutions-L1",
-              "reason": "Python 3.11 is the newest available runtime. This finding is a false positive.",
+              "Action": "events:PutEvents",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:events:*:",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":event-bus/IS-LocalEvents-",
+                    {
+                      "Ref": "Namespace",
+                    },
+                  ],
+                ],
+              },
             },
           ],
+          "Version": "2012-10-17",
         },
-        "cfn_nag": {
-          "rules_to_suppress": [
+        "PolicyName": "EC2SchedulerCrossAccountRoleRegionalEventBusPermissionsCE7D7CD4",
+        "Roles": [
+          {
+            "Ref": "EC2SchedulerCrossAccountRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "EC2SchedulerCrossAccountRoleResourceGroupsTaggingPermissions5A354A85": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
             {
-              "id": "W89",
-              "reason": "This Lambda function does not need to access any resource provisioned within a VPC.",
-            },
-            {
-              "id": "W58",
-              "reason": "This Lambda function has permission provided to write to CloudWatch logs using the iam roles.",
-            },
-            {
-              "id": "W92",
-              "reason": "Lambda function is a custom resource. Concurrent calls are very limited.",
+              "Action": [
+                "tag:TagResources",
+                "tag:UntagResources",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
             },
           ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "EC2SchedulerCrossAccountRoleResourceGroupsTaggingPermissions5A354A85",
+        "Roles": [
+          {
+            "Ref": "EC2SchedulerCrossAccountRole",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "HubTagEventForwardingRole5BEE3911": {
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "events.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
         },
       },
+      "Type": "AWS::IAM::Role",
+    },
+    "HubTagEventForwardingRoleDefaultPolicy5747D549": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "events:PutEvents",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":events:",
+                    {
+                      "Ref": "AWS::Region",
+                    },
+                    ":",
+                    {
+                      "Ref": "InstanceSchedulerAccount",
+                    },
+                    ":event-bus/",
+                    {
+                      "Ref": "Namespace",
+                    },
+                    "-RegistrationEvents",
+                  ],
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "HubTagEventForwardingRoleDefaultPolicy5747D549",
+        "Roles": [
+          {
+            "Ref": "HubTagEventForwardingRole5BEE3911",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "RegionRegistrationCustomResourceLambda632460E5": {
+      "DependsOn": [
+        "RegionRegistrationLambdaRoleDefaultPolicy7AA4928B",
+        "RegionRegistrationLambdaRoleED66DE1B",
+      ],
       "Properties": {
         "Code": "Omitted to remove snapshot dependency on code hash",
-        "Description": "Custom Resource Provider used for spoke account self registration via aws organization",
+        "Description": "Custom Resource Provider used for region registration",
         "Environment": {
           "Variables": {
-            "HUB_REGISTRATION_LAMBDA_ARN": {
+            "HUB_ACCOUNT_ID": {
+              "Ref": "InstanceSchedulerAccount",
+            },
+            "HUB_REGISTRATION_FUNCTION_ARN": {
               "Fn::Join": [
                 "",
                 [
-                  "arn:",
-                  {
-                    "Ref": "AWS::Partition",
-                  },
-                  ":lambda:",
+                  "arn:aws:lambda:",
                   {
                     "Ref": "AWS::Region",
                   },
@@ -520,27 +1602,598 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                 ],
               ],
             },
+            "HUB_REGISTRATION_ROLE_NAME": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "-SpokeRegistrationInvokeFunction-Role",
+                ],
+              ],
+            },
+            "POWERTOOLS_SERVICE_NAME": "instance-scheduler",
+            "SSM_PARAM_PATH": {
+              "Fn::Join": [
+                "",
+                [
+                  "/IS/",
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "/regions",
+                ],
+              ],
+            },
+            "STACK_ID": {
+              "Ref": "AWS::StackId",
+            },
             "USER_AGENT_EXTRA": "AwsSolution/my-solution-id/v9.9.9",
           },
         },
-        "Handler": "handle_remote_registration_request",
-        "MemorySize": 128,
+        "Handler": "lambda_handler",
+        "LoggingConfig": {
+          "ApplicationLogLevel": "INFO",
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "AdministrationLogsC5F47471",
+          },
+          "SystemLogLevel": "INFO",
+        },
+        "MemorySize": 512,
         "Role": {
           "Fn::GetAtt": [
-            "RegisterSpokeAccountCustomResourceLambdaRoleDD724340",
+            "RegionRegistrationLambdaRoleED66DE1B",
             "Arn",
           ],
         },
         "Runtime": "python3.11",
-        "Timeout": 60,
+        "Timeout": 900,
         "TracingConfig": {
           "Mode": "Active",
         },
       },
       "Type": "AWS::Lambda::Function",
     },
-    "RegisterSpokeAccountCustomResourceLambdaPolicyAE6C7E85": {
-      "Condition": "UsingAWSOrganizationsCondition",
+    "RegionRegistrationCustomResourceLambdaPolicy6FEA993C": {
+      "Condition": "isNotHubStackDeployment",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":iam::",
+                    {
+                      "Ref": "InstanceSchedulerAccount",
+                    },
+                    ":role/",
+                    {
+                      "Ref": "Namespace",
+                    },
+                    "-SpokeRegistrationInvokeFunction-Role",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "AdministrationLogsC5F47471",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "RegionRegistrationCustomResourceLambdaPolicy6FEA993C",
+        "Roles": [
+          {
+            "Ref": "RegionRegistrationLambdaRoleED66DE1B",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "RegionRegistrationLambdaRoleDefaultPolicy7AA4928B": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "RegionRegistrationLambdaRoleDefaultPolicy7AA4928B",
+        "Roles": [
+          {
+            "Ref": "RegionRegistrationLambdaRoleED66DE1B",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "RegionRegistrationLambdaRoleED66DE1B": {
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CFN_NO_EXPLICIT_RESOURCE_NAMES",
+            "IAM_NO_INLINE_POLICY_CHECK",
+            "IAM_POLICYDOCUMENT_NO_WILDCARD_RESOURCE",
+          ],
+        },
+      },
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "ssm:GetParametersByPath",
+                    "ssm:GetParameters",
+                    "ssm:GetParameter",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:ssm:*:",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":parameter/IS/",
+                        {
+                          "Ref": "Namespace",
+                        },
+                        "/regions/*",
+                      ],
+                    ],
+                  },
+                },
+                {
+                  "Action": "ssm:DescribeParameters",
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+                {
+                  "Action": [
+                    "ssm:PutParameter",
+                    "ssm:DeleteParameter",
+                    "ssm:DeleteParameters",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:ssm:*:",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":parameter/IS/",
+                        {
+                          "Ref": "Namespace",
+                        },
+                        "/regions/*",
+                      ],
+                    ],
+                  },
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "SpokeRegistrationUpdateSSMParamPolicy",
+          },
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "Namespace",
+              },
+              "-InvokeHubFunctionRemoteRole",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "RegionRegistrationWaitLambda671C2191": {
+      "DependsOn": [
+        "RegionRegistrationWaitingLambdaRoleDefaultPolicy8BBEB5F7",
+        "RegionRegistrationWaitingLambdaRole96F8D082",
+      ],
+      "Properties": {
+        "Code": "Omitted to remove snapshot dependency on code hash",
+        "Description": "Custom Resource lambda to wait and confirm region registrations.",
+        "Environment": {
+          "Variables": {
+            "HUB_ACCOUNT_ID": {
+              "Ref": "InstanceSchedulerAccount",
+            },
+            "HUB_REGISTRATION_FUNCTION_ARN": {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:aws:lambda:",
+                  {
+                    "Ref": "AWS::Region",
+                  },
+                  ":",
+                  {
+                    "Ref": "InstanceSchedulerAccount",
+                  },
+                  ":function:InstanceScheduler-",
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "-SpokeRegistration",
+                ],
+              ],
+            },
+            "HUB_REGISTRATION_ROLE_NAME": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "-SpokeRegistrationInvokeFunction-Role",
+                ],
+              ],
+            },
+            "POWERTOOLS_SERVICE_NAME": "instance-scheduler",
+            "SSM_PARAM_PATH": {
+              "Fn::Join": [
+                "",
+                [
+                  "/IS/",
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "/regions",
+                ],
+              ],
+            },
+            "STACK_ID": {
+              "Ref": "AWS::StackId",
+            },
+            "USER_AGENT_EXTRA": "AwsSolution/my-solution-id/v9.9.9",
+          },
+        },
+        "Handler": "lambda_handler",
+        "LoggingConfig": {
+          "ApplicationLogLevel": "INFO",
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "AdministrationLogsC5F47471",
+          },
+          "SystemLogLevel": "INFO",
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "RegionRegistrationWaitingLambdaRole96F8D082",
+            "Arn",
+          ],
+        },
+        "Runtime": "python3.11",
+        "Timeout": 900,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "RegionRegistrationWaitingLambdaRole96F8D082": {
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "IAM_NO_INLINE_POLICY_CHECK",
+            "IAM_POLICYDOCUMENT_NO_WILDCARD_RESOURCE",
+          ],
+        },
+      },
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "ssm:GetParametersByPath",
+                    "ssm:GetParameters",
+                    "ssm:GetParameter",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:ssm:*:",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":parameter/IS/",
+                        {
+                          "Ref": "Namespace",
+                        },
+                        "/regions/*",
+                      ],
+                    ],
+                  },
+                },
+                {
+                  "Action": "ssm:DescribeParameters",
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+                {
+                  "Action": [
+                    "ssm:PutParameter",
+                    "ssm:DeleteParameter",
+                    "ssm:DeleteParameters",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:ssm:*:",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":parameter/IS/",
+                        {
+                          "Ref": "Namespace",
+                        },
+                        "/regions/*",
+                      ],
+                    ],
+                  },
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "RegionRegistrationWaitLambdaPolicy",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "RegionRegistrationWaitingLambdaRoleDefaultPolicy8BBEB5F7": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "AdministrationLogsC5F47471",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "RegionRegistrationWaitingLambdaRoleDefaultPolicy8BBEB5F7",
+        "Roles": [
+          {
+            "Ref": "RegionRegistrationWaitingLambdaRole96F8D082",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
+    },
+    "RegisterRegions": {
+      "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "EC2SchedulerCrossAccountRoleASGSchedulingPermissionsAE9E3D48",
+        "EC2SchedulerCrossAccountRoleEc2SchedulingPermissions35C26E2F",
+        "EC2SchedulerCrossAccountRoleRdsSchedulingPermissions18D04034",
+        "EC2SchedulerCrossAccountRole",
+        "EC2SchedulerCrossAccountRoleResourceGroupsTaggingPermissions5A354A85",
+        "RegionRegistrationLambdaRoleED66DE1B",
+        "RegionRegistrationWaitingLambdaRole96F8D082",
+        "SpokeRegistrationUpdateSSMParamRole3F15A1F5",
+      ],
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomResourceProviderframeworkonEvent0AA4376C",
+            "Arn",
+          ],
+        },
+        "regions": {
+          "Ref": "Regions",
+        },
+      },
+      "Type": "Custom::RegisterRegion",
+      "UpdateReplacePolicy": "Retain",
+    },
+    "SpokeRegistrationUpdateSSMParamRole3F15A1F5": {
+      "Condition": "isNotHubStackDeployment",
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CFN_NO_EXPLICIT_RESOURCE_NAMES",
+            "IAM_NO_INLINE_POLICY_CHECK",
+            "IAM_POLICYDOCUMENT_NO_WILDCARD_RESOURCE",
+          ],
+        },
+      },
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":iam::",
+                      {
+                        "Ref": "InstanceSchedulerAccount",
+                      },
+                      ":role/",
+                      {
+                        "Ref": "Namespace",
+                      },
+                      "-SpokeRegistrationHandler-Role",
+                    ],
+                  ],
+                },
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Policies": [
+          {
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Action": [
+                    "ssm:GetParametersByPath",
+                    "ssm:GetParameters",
+                    "ssm:GetParameter",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:ssm:*:",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":parameter/IS/",
+                        {
+                          "Ref": "Namespace",
+                        },
+                        "/regions/*",
+                      ],
+                    ],
+                  },
+                },
+                {
+                  "Action": "ssm:DescribeParameters",
+                  "Effect": "Allow",
+                  "Resource": "*",
+                },
+                {
+                  "Action": [
+                    "ssm:PutParameter",
+                    "ssm:DeleteParameter",
+                    "ssm:DeleteParameters",
+                  ],
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "arn:aws:ssm:*:",
+                        {
+                          "Ref": "AWS::AccountId",
+                        },
+                        ":parameter/IS/",
+                        {
+                          "Ref": "Namespace",
+                        },
+                        "/regions/*",
+                      ],
+                    ],
+                  },
+                },
+              ],
+              "Version": "2012-10-17",
+            },
+            "PolicyName": "SpokeRegistrationUpdateSSMParamPolicy",
+          },
+        ],
+        "RoleName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "Namespace",
+              },
+              "-SpokeRegistrationUpdateSSMParamRole",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "hubLambdaInvokePolicyE6640037": {
+      "Condition": "isHubStackDeployment",
       "Properties": {
         "PolicyDocument": {
           "Statement": [
@@ -551,11 +2204,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                 "Fn::Join": [
                   "",
                   [
-                    "arn:",
-                    {
-                      "Ref": "AWS::Partition",
-                    },
-                    ":lambda:",
+                    "arn:aws:lambda:",
                     {
                       "Ref": "AWS::Region",
                     },
@@ -572,148 +2221,17 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                 ],
               },
             },
-            {
-              "Action": [
-                "logs:CreateLogStream",
-                "logs:PutLogEvents",
-              ],
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "SpokeRegistrationLogGroup7EBCC472",
-                  "Arn",
-                ],
-              },
-            },
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "RegisterSpokeAccountCustomResourceLambdaPolicyAE6C7E85",
+        "PolicyName": "hubLambdaInvokePolicyE6640037",
         "Roles": [
           {
-            "Ref": "RegisterSpokeAccountCustomResourceLambdaRoleDD724340",
+            "Ref": "RegionRegistrationLambdaRoleED66DE1B",
           },
         ],
       },
       "Type": "AWS::IAM::Policy",
-    },
-    "RegisterSpokeAccountCustomResourceLambdaPolicyWaiter": {
-      "Condition": "UsingAWSOrganizationsCondition",
-      "DependsOn": [
-        "RegisterSpokeAccountCustomResourceLambdaPolicyAE6C7E85",
-      ],
-      "Type": "AWS::CloudFormation::WaitConditionHandle",
-    },
-    "RegisterSpokeAccountCustomResourceLambdaRoleDD724340": {
-      "Condition": "UsingAWSOrganizationsCondition",
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "lambda.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "RegisterSpokeAccountCustomResourceLambdaRoleDefaultPolicy3599775F": {
-      "Condition": "UsingAWSOrganizationsCondition",
-      "Metadata": {
-        "cdk_nag": {
-          "rules_to_suppress": [
-            {
-              "applies_to": [
-                "Resource::*",
-              ],
-              "id": "AwsSolutions-IAM5",
-              "reason": "required for xray",
-            },
-          ],
-        },
-        "cfn_nag": {
-          "rules_to_suppress": [
-            {
-              "id": "W12",
-              "reason": "Wildcard required for xray",
-            },
-          ],
-        },
-      },
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "xray:PutTraceSegments",
-                "xray:PutTelemetryRecords",
-              ],
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "RegisterSpokeAccountCustomResourceLambdaRoleDefaultPolicy3599775F",
-        "Roles": [
-          {
-            "Ref": "RegisterSpokeAccountCustomResourceLambdaRoleDD724340",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
-    },
-    "RemoteRegistrationCustomResource": {
-      "Condition": "UsingAWSOrganizationsCondition",
-      "DeletionPolicy": "Delete",
-      "DependsOn": [
-        "RegisterSpokeAccountCustomResourceLambdaPolicyWaiter",
-      ],
-      "Properties": {
-        "ServiceToken": {
-          "Fn::GetAtt": [
-            "RegisterSpokeAccountCustomResourceLambda8BF25EDC",
-            "Arn",
-          ],
-        },
-      },
-      "Type": "Custom::RegisterSpokeAccount",
-      "UpdateReplacePolicy": "Delete",
-    },
-    "SpokeRegistrationLogGroup7EBCC472": {
-      "Condition": "UsingAWSOrganizationsCondition",
-      "DeletionPolicy": "Retain",
-      "Metadata": {
-        "cfn_nag": {
-          "rules_to_suppress": [
-            {
-              "id": "W84",
-              "reason": "This template has to be supported in gov cloud which doesn't yet have the feature to provide kms key id to cloudwatch log group",
-            },
-          ],
-        },
-      },
-      "Properties": {
-        "LogGroupName": {
-          "Fn::Join": [
-            "",
-            [
-              "/aws/lambda/",
-              {
-                "Ref": "RegisterSpokeAccountCustomResourceLambda8BF25EDC",
-              },
-            ],
-          ],
-        },
-        "RetentionInDays": 365,
-      },
-      "Type": "AWS::Logs::LogGroup",
-      "UpdateReplacePolicy": "Retain",
     },
   },
   "Rules": {

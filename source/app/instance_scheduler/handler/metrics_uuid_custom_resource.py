@@ -1,19 +1,21 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 import uuid
-from typing import TYPE_CHECKING, Any, Mapping, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, Final, Mapping, Optional, TypedDict
 
-import boto3
 from botocore.exceptions import ClientError
-
 from instance_scheduler.handler.environments.metrics_uuid_environment import (
     MetricsUuidEnvironment,
 )
-from instance_scheduler.util import get_boto_config
+from instance_scheduler.observability.powertools_logging import (
+    powertools_logger,
+    should_log_events,
+)
 from instance_scheduler.util.custom_resource import (
     CustomResource,
     CustomResourceResponse,
 )
+from instance_scheduler.util.session_manager import lambda_execution_role
 
 if TYPE_CHECKING:
     from aws_lambda_powertools.utilities.typing import LambdaContext
@@ -27,9 +29,11 @@ class CreateUuidRequest(TypedDict):
     pass  # empty dict, no values are provided
 
 
-def handle_metrics_uuid_request(
-    event: Mapping[str, Any], context: LambdaContext
-) -> Any:
+logger: Final = powertools_logger()
+
+
+@logger.inject_lambda_context(log_event=should_log_events(logger))
+def lambda_handler(event: Mapping[str, Any], context: LambdaContext) -> Any:
     handler = MetricsUuidCustomResource(
         event, context, MetricsUuidEnvironment.from_env()
     )
@@ -66,7 +70,7 @@ class MetricsUuidCustomResource(CustomResource[CreateUuidRequest]):
     def _get_metrics_uuid_from_ssm_if_exists(self) -> Optional[uuid.UUID]:
         stack_id = self._env.stack_id[-36:]
         uuid_key = self._env.uuid_key + str(stack_id)
-        ssm: SSMClient = boto3.client("ssm", config=get_boto_config())
+        ssm: SSMClient = lambda_execution_role().client("ssm")
         try:
             ssm_response = ssm.get_parameter(Name=uuid_key)
             uuid_parameter = ssm_response.get("Parameter", {}).get("Value")

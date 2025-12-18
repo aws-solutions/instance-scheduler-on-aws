@@ -9,13 +9,11 @@ from zoneinfo import ZoneInfo
 import pytest
 from _pytest.fixtures import fixture
 from freezegun import freeze_time
-from mypy_boto3_ec2.literals import InstanceTypeType
-
-from instance_scheduler.ops_metrics import GatheringFrequency
-from instance_scheduler.ops_metrics.metric_type.insights_metric import InsightsMetric
-from instance_scheduler.ops_monitoring.cw_ops_insights import (
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
+from instance_scheduler.observability.cw_ops_insights import (
     CloudWatchOperationalInsights,
 )
+from mypy_boto3_ec2.literals import InstanceTypeType
 from tests.integration.helpers.ec2_helpers import (
     create_ec2_instances,
     start_ec2_instances,
@@ -63,10 +61,6 @@ def get_sent_ops_insight_metric_json(metrics_endpoint: MagicMock) -> Any:
     if not desired_metric:
         raise MetricNotFound("metric not found")
     return desired_metric
-
-
-def test_op_metric_is_sent_unlimited() -> None:
-    assert InsightsMetric.collection_frequency == GatheringFrequency.UNLIMITED
 
 
 @pytest.mark.skip("insights metrics are currently disabled")
@@ -283,7 +277,7 @@ def test_aws_metrics_still_sent_when_internal_metrics_are_disabled(
 
 @freeze_time(datetime(2023, 6, 12, 12, 0, 0, tzinfo=ZoneInfo("UTC")))
 def test_aws_metrics_not_sent_when_aws_metrics_disabled(
-    state_table: str,
+    scheduling_context: SchedulingContext,
     mock_metrics_endpoint: MagicMock,
     mocked_put_metric_data: MagicMock,
 ) -> None:

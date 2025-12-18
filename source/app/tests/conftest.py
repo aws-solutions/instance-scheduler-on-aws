@@ -3,12 +3,12 @@
 from collections.abc import Iterator
 from os import environ
 from typing import TYPE_CHECKING, Final, Optional
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import boto3
-from moto import mock_aws
-from pytest import fixture
-
+from instance_scheduler.configuration.scheduling_context import (
+    SchedulingContext,
+)
 from instance_scheduler.model import EC2SSMMaintenanceWindowStore, MWStore
 from instance_scheduler.model.ddb_config_item import DdbConfigItem
 from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
@@ -16,30 +16,45 @@ from instance_scheduler.model.store.dynamo_mw_store import DynamoMWStore
 from instance_scheduler.model.store.dynamo_period_definition_store import (
     DynamoPeriodDefinitionStore,
 )
+from instance_scheduler.model.store.dynamo_resource_registry import (
+    DynamoResourceRegistry,
+)
 from instance_scheduler.model.store.dynamo_schedule_definition_store import (
     DynamoScheduleDefinitionStore,
 )
 from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
+from instance_scheduler.model.store.resource_registry import ResourceRegistry
 from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleDefinitionStore,
 )
 from instance_scheduler.ops_metrics.metrics import MetricsEnvironment
-from instance_scheduler.util.session_manager import AssumedRole
+from instance_scheduler.util.session_manager import AssumedRole, lambda_execution_role
+from moto import mock_aws
+from pytest import fixture
 from tests import DEFAULT_REGION
+from tests.integration.helpers.event_helpers import (
+    create_global_event_bus,
+    create_local_event_bus,
+    mock_events_client,
+)
+from tests.integration.helpers.schedule_helpers import quick_time
 from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
-from tests.test_utils.testsuite_env import TestSuiteEnv
+from tests.test_utils.mock_scheduling_request_environment import (
+    MockSchedulingRequestEnvironment,
+)
+from tests.test_utils.testsuite_env import MockSuiteEnv
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient
     from mypy_boto3_ec2.client import EC2Client
     from mypy_boto3_ec2.type_defs import FilterTypeDef
-    from mypy_boto3_logs.client import CloudWatchLogsClient
     from mypy_boto3_sns.client import SNSClient
 else:
     DynamoDBClient = object
     EC2Client = object
     CloudWatchLogsClient = object
     SNSClient = object
+    SQSClient = object
 
 
 @fixture(autouse=True)
@@ -56,8 +71,8 @@ def aws_credentials() -> Iterator[None]:
 
 
 @fixture(autouse=True)
-def test_suite_env(aws_credentials: None) -> Iterator[TestSuiteEnv]:
-    with TestSuiteEnv() as env:
+def test_suite_env(aws_credentials: None) -> Iterator[MockSuiteEnv]:
+    with MockSuiteEnv() as env:
         yield env
 
 
@@ -107,7 +122,7 @@ def ami(moto_backend: None) -> Iterator[str]:
 @fixture
 def dynamodb_client(moto_backend: None) -> Iterator[DynamoDBClient]:
     """DDB Mock Client"""
-    connection = boto3.client("dynamodb", region_name="us-east-1")
+    connection = boto3.client("dynamodb")
     yield connection
 
 
@@ -133,7 +148,29 @@ def period_store(config_table: str) -> PeriodDefinitionStore:
 
 
 @fixture
-def config_table(test_suite_env: TestSuiteEnv, moto_backend: None) -> Iterator[str]:
+def resource_registry(registry_table: str) -> ResourceRegistry:
+    return DynamoResourceRegistry(registry_table)
+
+
+@fixture
+def registry_table(test_suite_env: MockSuiteEnv, moto_backend: None) -> Iterator[str]:
+    boto3.client("dynamodb").create_table(
+        AttributeDefinitions=[
+            {"AttributeName": "account", "AttributeType": "S"},
+            {"AttributeName": "sk", "AttributeType": "S"},
+        ],
+        TableName=test_suite_env.registry_table_name,
+        KeySchema=[
+            {"AttributeName": "account", "KeyType": "HASH"},
+            {"AttributeName": "sk", "KeyType": "RANGE"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    yield test_suite_env.registry_table_name
+
+
+@fixture
+def config_table(test_suite_env: MockSuiteEnv, moto_backend: None) -> Iterator[str]:
     boto3.client("dynamodb").create_table(
         AttributeDefinitions=[
             {"AttributeName": "name", "AttributeType": "S"},
@@ -150,7 +187,7 @@ def config_table(test_suite_env: TestSuiteEnv, moto_backend: None) -> Iterator[s
 
 
 @fixture
-def maint_win_table(test_suite_env: TestSuiteEnv, moto_backend: None) -> Iterator[str]:
+def maint_win_table(test_suite_env: MockSuiteEnv, moto_backend: None) -> Iterator[str]:
     table_name: Final = test_suite_env.maintenance_window_table_name
     ddb: Final[DynamoDBClient] = boto3.client("dynamodb")
     ddb.create_table(
@@ -168,6 +205,21 @@ def maint_win_table(test_suite_env: TestSuiteEnv, moto_backend: None) -> Iterato
     yield table_name
 
 
+@fixture
+def scheduling_context(
+    config_table: str,
+    registry_table: str,
+    hub_role: AssumedRole,
+    local_event_bus: str,
+    global_event_bus: str,
+) -> SchedulingContext:
+    return SchedulingContext(
+        assumed_role=hub_role,
+        current_dt=quick_time(10, 0, 0),
+        env=MockSchedulingRequestEnvironment(),
+    )
+
+
 @fixture()
 def maint_win_store(maint_win_table: str) -> EC2SSMMaintenanceWindowStore:
     return EC2SSMMaintenanceWindowStore(maint_win_table)
@@ -179,12 +231,22 @@ def mw_store(maint_win_table: str) -> MWStore:
 
 
 @fixture
-def mock_log_group(moto_backend: None, test_suite_env: TestSuiteEnv) -> None:
-    logs: CloudWatchLogsClient = boto3.client("logs")
-    logs.create_log_group(logGroupName=test_suite_env.log_group)
+def mock_sns_errors_topic(moto_backend: None, test_suite_env: MockSuiteEnv) -> None:
+    sns: SNSClient = boto3.client("sns")
+    sns.create_topic(Name=test_suite_env.topic_arn.split(":")[-1])
 
 
 @fixture
-def mock_sns_errors_topic(moto_backend: None, test_suite_env: TestSuiteEnv) -> None:
-    sns: SNSClient = boto3.client("sns")
-    sns.create_topic(Name=test_suite_env.topic_arn.split(":")[-1])
+def global_event_bus(moto_backend: None) -> str:
+    return create_global_event_bus(lambda_execution_role())
+
+
+@fixture
+def local_event_bus(moto_backend: None) -> str:
+    return create_local_event_bus(lambda_execution_role())
+
+
+@fixture
+def mock_hub_events_client(moto_backend: None) -> Iterator[MagicMock]:
+    with mock_events_client("us-east-1") as events_mock:
+        yield events_mock

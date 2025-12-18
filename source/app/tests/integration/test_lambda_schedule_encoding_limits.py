@@ -13,8 +13,6 @@ from typing import Iterator
 from unittest.mock import MagicMock, patch
 
 from _pytest.fixtures import fixture
-
-from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from instance_scheduler.handler import scheduling_orchestrator
 from instance_scheduler.handler.scheduling_orchestrator import (
     OrchestrationRequest,
@@ -22,13 +20,12 @@ from instance_scheduler.handler.scheduling_orchestrator import (
 )
 from instance_scheduler.handler.scheduling_request import (
     SchedulingRequest,
-    SchedulingRequestHandler,
     validate_scheduler_request,
 )
+from instance_scheduler.model.managed_instance import RegisteredEc2Instance
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.period_identifier import PeriodIdentifier
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
-from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
 from instance_scheduler.model.store.in_memory_period_definition_store import (
     InMemoryPeriodDefinitionStore,
 )
@@ -36,9 +33,12 @@ from instance_scheduler.model.store.in_memory_schedule_definition_store import (
     InMemoryScheduleDefinitionStore,
 )
 from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
+from instance_scheduler.model.store.resource_registry import ResourceRegistry
 from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleDefinitionStore,
 )
+from instance_scheduler.scheduling.states import InstanceState
+from instance_scheduler.util.arn import ARN
 from tests.context import MockLambdaContext
 from tests.handler.test_scheduling_orchestration_handler import (
     scheduling_request_from_lambda_invoke,
@@ -64,13 +64,19 @@ def mocked_lambda_invoke() -> Iterator[MagicMock]:
 
 def test_schedules_and_periods_are_encoded_into_payload(
     mocked_lambda_invoke: MagicMock,
+    resource_registry: ResourceRegistry,
     schedule_store: ScheduleDefinitionStore,
     period_store: PeriodDefinitionStore,
-    config_item_store: DdbConfigItemStore,
+    registry_table: str,
 ) -> None:
     schedule_store.put(
         ScheduleDefinition(
             name="my_schedule", periods=[PeriodIdentifier.of("my_period")]
+        )
+    )
+    schedule_store.put(
+        ScheduleDefinition(
+            name="unused_schedule", periods=[PeriodIdentifier.of("unused_period")]
         )
     )
     period_store.put(
@@ -83,15 +89,30 @@ def test_schedules_and_periods_are_encoded_into_payload(
             months={"jan"},
         )
     )
+    period_store.put(
+        PeriodDefinition(
+            name="unused_period",
+            begintime="22:00",
+            endtime="23:00",
+        )
+    )
+
+    resource_registry.put(
+        RegisteredEc2Instance(
+            account="123456789012",
+            region="us-east-1",
+            resource_id="i-1",
+            arn=ARN("arn:aws:ec2:us-east-1:123456789012:instance/i-1"),
+            schedule="my_schedule",
+            name="test-instance",
+            stored_state=InstanceState.RUNNING,
+        )
+    )
 
     SchedulingOrchestratorHandler(
         event=mock_event_bridge_event,
         context=MockLambdaContext(),
-        env=MockOrchestratorEnvironment(
-            schedule_regions=[],
-            enable_ec2_service=True,
-            enable_schedule_hub_account=True,
-        ),
+        env=MockOrchestratorEnvironment(registry_table=registry_table),
         logger=MockLogger(),
     ).handle_request()
 
@@ -116,24 +137,49 @@ def test_schedules_and_periods_are_encoded_into_payload(
         scheduling_request["periods"]
     )
 
-    assert schedule_store.find_all() == encoded_schedules.find_all()
-    assert period_store.find_all() == encoded_periods.find_all()
+    # Only the schedule used by registered instances should be encoded
+    assert "my_schedule" in encoded_schedules.find_all()
+    assert "my_period" in encoded_periods.find_all()
+    # Unused schedules/periods should NOT be encoded
+    assert "unused_schedule" not in encoded_schedules.find_all()
+    assert "unused_period" not in encoded_periods.find_all()
 
 
 @patch.object(SchedulingOrchestratorHandler, "lambda_client")
 def test_strips_schedules_when_payload_is_too_large(
-    lambda_client: MagicMock, config_item_store: DdbConfigItemStore
+    lambda_client: MagicMock,
+    resource_registry: ResourceRegistry,
+    schedule_store: ScheduleDefinitionStore,
+    period_store: PeriodDefinitionStore,
+    registry_table: str,
 ) -> None:
+    schedule_store.put(
+        ScheduleDefinition(
+            name="test-schedule", periods=[PeriodIdentifier("test-period")]
+        )
+    )
+    period_store.put(
+        PeriodDefinition(name="test-period", begintime="09:00", endtime="17:00")
+    )
+
+    resource_registry.put(
+        RegisteredEc2Instance(
+            account="123456789012",
+            region="us-east-1",
+            resource_id="i-1",
+            arn=ARN("arn:aws:ec2:us-east-1:123456789012:instance/i-1"),
+            schedule="test-schedule",
+            name="test-instance",
+            stored_state=InstanceState.RUNNING,
+        )
+    )
+
     scheduling_orchestrator.LAMBDA_PAYLOAD_CAPACITY_BYTES = 0
     with patch.object(lambda_client, "invoke") as invoke_func:
         cloudwatch_handler = SchedulingOrchestratorHandler(
             event=mock_event_bridge_event,
             context=MockLambdaContext(),
-            env=MockOrchestratorEnvironment(
-                schedule_regions=[],
-                enable_ec2_service=True,
-                enable_schedule_hub_account=True,
-            ),
+            env=MockOrchestratorEnvironment(registry_table=registry_table),
             logger=MockLogger(),
         )
         cloudwatch_handler.handle_request()
@@ -147,19 +193,18 @@ def test_strips_schedules_when_payload_is_too_large(
         assert "periods" not in scheduling_request
 
 
-@patch("instance_scheduler.handler.scheduling_request.InstanceScheduler")
 def test_scheduling_request_handler_reloads_schedules_when_not_provided(
-    mock_scheduler: MagicMock,
     schedule_store: ScheduleDefinitionStore,
     period_store: PeriodDefinitionStore,
 ) -> None:
+    from instance_scheduler.handler.scheduling_request import build_scheduling_context
+
     # setup
     schedule_store.put(
         ScheduleDefinition(
             name="fetched_schedule", periods=[PeriodIdentifier.of("my_period")]
         )
     )
-
     period_store.put(PeriodDefinition(name="my_period", begintime="10:00"))
 
     request = SchedulingRequest(
@@ -173,13 +218,13 @@ def test_scheduling_request_handler_reloads_schedules_when_not_provided(
         dispatch_time=quick_time(10, 0, 0).isoformat(),
     )
 
-    # run handler
-    scheduling_handler = SchedulingRequestHandler(
-        request, MockLambdaContext(), MockSchedulingRequestEnvironment(), MockLogger()
-    )
-    scheduling_handler.handle_request()
+    # Test build_scheduling_context directly
+    with MockSchedulingRequestEnvironment().patch_env():
+        context = build_scheduling_context(request, MockSchedulingRequestEnvironment())
 
-    # assert that when the schedules are not provided in the request they are still loaded from dynamo
-    assert mock_scheduler.call_count == 1
-    context_passed_to_scheduler: SchedulingContext = mock_scheduler.call_args.args[1]
-    assert context_passed_to_scheduler.get_schedule("fetched_schedule") is not None
+    # Verify the schedule was loaded from DynamoDB into the cached store
+    fetched_schedule = context.schedule_store.find_by_name("fetched_schedule")
+    assert fetched_schedule is not None
+    assert fetched_schedule.name == "fetched_schedule"
+    assert fetched_schedule is not None
+    assert fetched_schedule.name == "fetched_schedule"

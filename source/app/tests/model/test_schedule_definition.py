@@ -3,8 +3,6 @@
 from datetime import time
 
 import pytest
-from mypy_boto3_dynamodb.type_defs import AttributeValueTypeDef
-
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
 from instance_scheduler.configuration.running_period import RunningPeriod
 from instance_scheduler.configuration.running_period_dict_element import (
@@ -17,7 +15,8 @@ from instance_scheduler.model.schedule_definition import (
     ScheduleDefinition,
 )
 from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
-from tests.test_utils.testsuite_env import TestSuiteEnv
+from mypy_boto3_dynamodb.type_defs import AttributeValueTypeDef
+from tests.test_utils.testsuite_env import MockSuiteEnv
 
 
 def test_default_schedule_flags_match_expected(
@@ -34,7 +33,7 @@ def test_default_schedule_flags_match_expected(
 
 
 def test_schedule_definition_defaults_match_instance_schedule_defaults(
-    period_store: PeriodDefinitionStore, test_suite_env: TestSuiteEnv
+    period_store: PeriodDefinitionStore, test_suite_env: MockSuiteEnv
 ) -> None:
     """
     InstanceSchedule and ScheduleDefinition each define their defaults separately, but these need to match
@@ -56,7 +55,7 @@ def test_schedule_definition_defaults_match_instance_schedule_defaults(
 
 @pytest.mark.parametrize("tz_str", ["", None])
 def test_timezone_uses_default_timezone_when_not_provided(
-    tz_str: str, test_suite_env: TestSuiteEnv, period_store: PeriodDefinitionStore
+    tz_str: str, test_suite_env: MockSuiteEnv, period_store: PeriodDefinitionStore
 ) -> None:
     schedule_def = ScheduleDefinition(
         name="test-schedule", timezone=tz_str, override_status="running"
@@ -69,7 +68,7 @@ def test_timezone_uses_default_timezone_when_not_provided(
 
 def test_to_schedule_when_period_exists(
     config_table: str,
-    test_suite_env: TestSuiteEnv,
+    test_suite_env: MockSuiteEnv,
     period_store: PeriodDefinitionStore,
 ) -> None:
     period_store.put(PeriodDefinition(name="period", begintime="05:00"))

@@ -5,19 +5,17 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun import freeze_time
-
 from instance_scheduler.configuration.running_period import RunningPeriod
 from instance_scheduler.configuration.running_period_dict_element import (
     RunningPeriodDictElement,
 )
+from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from instance_scheduler.handler.scheduling_request import (
     SchedulingRequest,
-    SchedulingRequestHandler,
+    handle_scheduling_request,
 )
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.store.ddb_config_item_store import DdbConfigItemStore
-from instance_scheduler.schedulers.instance_states import InstanceStates
-from instance_scheduler.schedulers.states import InstanceState
 from tests.context import MockLambdaContext
 from tests.integration.helpers.ec2_helpers import (
     create_ec2_instances,
@@ -25,7 +23,6 @@ from tests.integration.helpers.ec2_helpers import (
     stop_ec2_instances,
 )
 from tests.integration.helpers.run_handler import multi_period_schedule, simple_schedule
-from tests.logger import MockLogger
 from tests.test_utils.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
@@ -52,16 +49,13 @@ def test_passing_tz_unaware_dt_to_scheduling_request_handler_throws_error(
         "dispatch_time": "2023-05-12 14:55:10.600619",
     }
 
-    with pytest.raises(ValueError):
-        handler = SchedulingRequestHandler(
-            event, MockLambdaContext(), MockSchedulingRequestEnvironment(), MockLogger()
-        )
-        handler.handle_request()
+    with pytest.raises(ValueError), MockSchedulingRequestEnvironment().patch_env():
+        handle_scheduling_request(event, MockLambdaContext())
 
 
 @freeze_time(datetime(2023, 8, 13, 0, 0, 0, tzinfo=ZoneInfo("Australia/Sydney")))
 def test_weekday_boundaries_respect_schedule_timezone(
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
 ) -> None:
     """
     This is a real-world scenario that used to fail in 1.3.0:
@@ -90,8 +84,6 @@ def test_weekday_boundaries_respect_schedule_timezone(
         (instance,) = create_ec2_instances(1, schedule_name="test-schedule")
         # instance is stopped and last desired state is stopped
         stop_ec2_instances(instance)
-        ec2_instance_states.set_instance_state(instance, InstanceState.STOPPED)
-        ec2_instance_states.save()
 
         aus_time = datetime(2023, 8, 13, 0, 0, 0, tzinfo=ZoneInfo("Australia/Sydney"))
         context.run_scheduling_request_handler(dt=aus_time)
@@ -114,12 +106,10 @@ def test_weekday_boundaries_respect_schedule_timezone(
 )
 def test_time_zones(
     ec2_instance: str,
-    ec2_instance_states: InstanceStates,
+    scheduling_context: SchedulingContext,
     tz: str,
     expected: str,
 ) -> None:
-    ec2_instance_states.set_instance_state(ec2_instance, InstanceState.RUNNING)
-    ec2_instance_states.save()
 
     with simple_schedule(begintime="0:00", endtime="12:00", timezone=tz) as context:
         # run at 12:00 utc (should be translated to schedule time)

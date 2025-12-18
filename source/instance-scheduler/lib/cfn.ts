@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { Aws, CfnCondition, CfnParameter, CfnParameterProps, CfnResource, Fn, IAspect, Stack } from "aws-cdk-lib";
+import { ApplicationLogLevel } from "aws-cdk-lib/aws-lambda";
 import { Construct, IConstruct } from "constructs";
 
 export const UniqueStackIdPart = Fn.select(2, Fn.split("/", `${Aws.STACK_ID}`));
@@ -61,8 +62,16 @@ export function trueCondition(scope: Construct, id: string): CfnCondition {
   return new CfnCondition(scope, id, { expression: Fn.conditionEquals(true, true) });
 }
 
+export function cfnConditionToValue(condition: CfnCondition, valueIfTrue: string, valueIfFalse: string): string {
+  return Fn.conditionIf(condition.logicalId, valueIfTrue, valueIfFalse).toString();
+}
+
+export function cfnConditionToLogLevel(condition: CfnCondition): string {
+  return Fn.conditionIf(condition.logicalId, ApplicationLogLevel.DEBUG, ApplicationLogLevel.INFO).toString();
+}
+
 export function cfnConditionToTrueFalse(condition: CfnCondition): string {
-  return Fn.conditionIf(condition.logicalId, "True", "False").toString();
+  return cfnConditionToValue(condition, "True", "False");
 }
 
 const cfnInterfaceKey = "AWS::CloudFormation::Interface";

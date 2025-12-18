@@ -7,8 +7,7 @@ from mypy_boto3_rds.type_defs import (
     CreateDBClusterResultTypeDef,
     CreateDBInstanceResultTypeDef,
 )
-
-from tests.integration.helpers.boto_client_helpers import client_in_account_region
+from tests.integration.helpers.boto_client_helpers import assume_mocked_role
 
 if TYPE_CHECKING:
     from mypy_boto3_rds import RDSClient
@@ -33,7 +32,7 @@ def stop_rds_instances(
     account: str = "123456789012",
     region: str = "us-east-1",
 ) -> None:
-    rds: RDSClient = client_in_account_region("rds", account, region)
+    rds: RDSClient = assume_mocked_role(account, region).client("rds")
     for rds_instance in instance_ids:
         rds.stop_db_instance(DBInstanceIdentifier=rds_instance)
 
@@ -48,9 +47,9 @@ def create_rds_instances(
     id_prefix: str = "test-rds-instance",
     preferred_maintenance_window: str = "mon:01:00-mon:01:30",
 ) -> tuple[str, ...]:
-    rds_client: RDSClient = client_in_account_region("rds", account, region)
+    rds_client: RDSClient = assume_mocked_role(account, region).client("rds")
 
-    ids: list[str] = list()
+    ids: list[str] = []
     for i in range(count):
         instance_id = f"{id_prefix}-{i}"
         result: CreateDBInstanceResultTypeDef = rds_client.create_db_instance(
@@ -79,9 +78,9 @@ def create_rds_clusters(
     engine: str = "postgres",
     id_prefix: str = "test-rds-instance",
 ) -> tuple[str, ...]:
-    rds_client: RDSClient = client_in_account_region("rds", account, region)
+    rds_client: RDSClient = assume_mocked_role(account, region).client("rds")
 
-    ids: list[str] = list()
+    ids: list[str] = []
     for i in range(count):
         instance_id = f"{id_prefix}-{i}"
         result: CreateDBClusterResultTypeDef = rds_client.create_db_cluster(
@@ -106,7 +105,7 @@ def start_rds_instances(
     account: str = "123456789012",
     region: str = "us-east-1",
 ) -> None:
-    rds: RDSClient = client_in_account_region("rds", account, region)
+    rds: RDSClient = assume_mocked_role(account, region).client("rds")
     for rds_instance in instance_ids:
         rds.start_db_instance(DBInstanceIdentifier=rds_instance)
 
@@ -116,7 +115,7 @@ def stop_rds_clusters(
     account: str = "123456789012",
     region: str = "us-east-1",
 ) -> None:
-    rds: RDSClient = client_in_account_region("rds", account, region)
+    rds: RDSClient = assume_mocked_role(account, region).client("rds")
     for rds_cluster in cluster_ids:
         rds.stop_db_cluster(DBClusterIdentifier=rds_cluster)
 
@@ -126,6 +125,6 @@ def start_rds_clusters(
     account: str = "123456789012",
     region: str = "us-east-1",
 ) -> None:
-    rds: RDSClient = client_in_account_region("rds", account, region)
+    rds: RDSClient = assume_mocked_role(account, region).client("rds")
     for rds_cluster in cluster_ids:
         rds.start_db_cluster(DBClusterIdentifier=rds_cluster)
