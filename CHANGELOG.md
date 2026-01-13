@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.1.1] -- 2025-1-13
+
+### Added
+- IS-Error tag now includes time of when the error was last updated
+
+### Changed
+- Short-circuit configuration errors (Unknown Schedule, Unsupported Resource, Incompatible Schedule) no longer reported 
+to event-bus as scheduling errors
+
+### Security
+- Updated urllib3 to mitigate CVE-2026-21441
+- Updated Werkzeug to mitigate CVE-2026-21860
+
 ## [3.1.0] -- 2025-12-18
 ### Added
 - Added Support for License Manager controlled EC2 instances

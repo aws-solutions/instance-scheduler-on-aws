@@ -212,7 +212,7 @@ def attempt_ice_resize(
                 return SchedulingResult.client_exception(decision, error)
 
     # all types failed, insufficient capacity
-    return SchedulingResult.error(
+    return SchedulingResult.shortcircuit_error(
         resource=ec2_instance,
         error_code=ErrorCode.START_FAILED,
         error_message=f"Insufficient Capacity for types {str.join(',', prioritized_types)}",

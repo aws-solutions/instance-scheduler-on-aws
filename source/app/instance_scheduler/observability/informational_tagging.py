@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from itertools import batched
 from typing import Any, Iterable, Optional, Self, Union
 
-from instance_scheduler.observability.error_codes import ErrorCode
 from instance_scheduler.observability.powertools_logging import powertools_logger
 from instance_scheduler.observability.tag_keys import (
     InformationalTagKey,
@@ -104,7 +103,7 @@ class InfoTaggingContext:
         self,
         resources: Iterable[RuntimeInfo],
         last_action: Optional[str] = None,
-        error_code: Optional[ErrorCode] = None,
+        error_code: Optional[str] = None,
         error_message: Optional[str] = None,
         additional_tags: Optional[dict[str, str]] = None,
     ) -> None:
@@ -128,9 +127,7 @@ class InfoTaggingContext:
                         k: v[:256]
                         for k, v in {
                             InformationalTagKey.MANAGED_BY.value: self.hub_stack_arn,
-                            InformationalTagKey.ERROR.value: (
-                                error_code.value if error_code else None
-                            ),
+                            InformationalTagKey.ERROR.value: error_code,
                             InformationalTagKey.ERROR_MESSAGE.value: error_message,
                             InformationalTagKey.LAST_ACTION.value: last_action,
                             **(additional_tags or {}),
@@ -145,6 +142,10 @@ class InfoTaggingContext:
         self.push(resource_arn, TagDeleteRequest(tag_keys))
 
 
+def format_current_time() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
 def apply_informational_tags_for_results(
     assumed_role: AssumedRole,
     results: Iterable[SchedulingResult[ManagedInstance]],
@@ -152,13 +153,13 @@ def apply_informational_tags_for_results(
 ) -> None:
     with InfoTaggingContext(assumed_role, hub_stack_arn) as context:
         # calculate current time once to ensure tags all use the same time for batching
-        current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        current_time = format_current_time()
 
         for result in results:
             if result.error_code:
                 context.push_info_tag_update(
                     [result.instance.runtime_info],
-                    error_code=result.error_code,
+                    error_code=f"{result.error_code.value} ({current_time})",
                     error_message=result.error_message,
                 )
             else:

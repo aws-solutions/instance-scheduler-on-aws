@@ -119,7 +119,7 @@ class SchedulingResult(Generic[T]):
         )
 
     @classmethod
-    def error(
+    def shortcircuit_error(
         cls,
         resource: T,
         error_code: ErrorCode,
@@ -130,7 +130,7 @@ class SchedulingResult(Generic[T]):
             instance=resource,
             requested_action=None,
             request_reason=None,
-            action_taken=SchedulingAction.ERROR,
+            action_taken=None,
             error_code=error_code,
             error_message=error_message,
             updated_registry_info=updated_registry_info or resource.registry_info,
