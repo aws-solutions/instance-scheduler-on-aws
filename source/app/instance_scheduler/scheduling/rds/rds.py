@@ -155,7 +155,7 @@ class RdsService:
 
             is_supported, reason = managed_instance.runtime_info.check_if_is_supported()
             if not is_supported:
-                yield SchedulingResult.error(
+                yield SchedulingResult.shortcircuit_error(
                     resource=managed_instance,
                     error_code=ErrorCode.UNSUPPORTED_RESOURCE,
                     error_message=reason,
@@ -163,7 +163,7 @@ class RdsService:
                 continue
 
             if schedule is None:
-                yield SchedulingResult.error(
+                yield SchedulingResult.shortcircuit_error(
                     resource=managed_instance,
                     error_code=ErrorCode.UNKNOWN_SCHEDULE,
                 )

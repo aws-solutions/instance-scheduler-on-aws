@@ -174,7 +174,7 @@ class AsgService:
             group.registry_info.schedule
         )
         if not schedule:
-            return SchedulingResult.error(
+            return SchedulingResult.shortcircuit_error(
                 resource=group, error_code=ErrorCode.UNKNOWN_SCHEDULE
             )
 

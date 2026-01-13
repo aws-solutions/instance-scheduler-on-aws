@@ -30,6 +30,7 @@ from instance_scheduler.observability.events.resource_registration_events import
 )
 from instance_scheduler.observability.informational_tagging import (
     InfoTaggingContext,
+    format_current_time,
 )
 from instance_scheduler.observability.powertools_logging import powertools_logger
 from instance_scheduler.observability.tag_keys import ControlTagKey
@@ -125,6 +126,7 @@ def register_rds_resources(
     env: SchedulingEnvironment,
 ) -> None:
     registry = DynamoResourceRegistry(env.registry_table)
+    current_time = format_current_time()
 
     with (
         InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
@@ -135,7 +137,7 @@ def register_rds_resources(
             if not is_supported:
                 tagging_context.push_info_tag_update(
                     [rds_resource],
-                    error_code=ErrorCode.UNSUPPORTED_RESOURCE,
+                    error_code=f"{ErrorCode.UNSUPPORTED_RESOURCE.value} ({current_time})",
                     error_message=reason,
                 )
 
@@ -185,6 +187,7 @@ def register_asg_resources(
     registry = DynamoResourceRegistry(env.registry_table)
     schedule_store = CachedScheduleDefinitionStore(env.config_table)
     period_store = CachedPeriodDefinitionStore(env.config_table)
+    current_time = format_current_time()
 
     with (
         InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
@@ -215,7 +218,7 @@ def register_asg_resources(
             if schedule is None:
                 tagging_context.push_info_tag_update(
                     [asg_resource],
-                    error_code=ErrorCode.UNKNOWN_SCHEDULE,
+                    error_code=f"{ErrorCode.UNKNOWN_SCHEDULE.value} ({current_time})",
                     error_message="Unknown Schedule",
                 )
             else:
@@ -226,7 +229,7 @@ def register_asg_resources(
                 if not is_compatible:
                     tagging_context.push_info_tag_update(
                         [asg_resource],
-                        error_code=ErrorCode.INCOMPATIBLE_SCHEDULE,
+                        error_code=f"{ErrorCode.INCOMPATIBLE_SCHEDULE.value} ({current_time})",
                         error_message=reason,
                     )
                 else:

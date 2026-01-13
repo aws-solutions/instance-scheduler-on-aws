@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
+from freezegun import freeze_time
 from instance_scheduler.configuration.scheduling_context import SchedulingContext
 from instance_scheduler.scheduling.rds import RdsService
 from instance_scheduler.util.session_manager import lambda_execution_role
@@ -372,6 +373,7 @@ def test_events_sent_when_rds_instance_stopped(
         )
 
 
+@freeze_time("2026-01-05 5:00:00")
 def test_rds_unschedulable_resource_applies_error_tags(
     rds_instance: str,
     scheduling_context: SchedulingContext,
@@ -398,5 +400,5 @@ def test_rds_unschedulable_resource_applies_error_tags(
         [f"arn:aws:rds:us-east-1:123456789012:db:{rds_instance}"],
     ).__next__()
 
-    assert rds_info.tags["IS-Error"] == "UnsupportedResource"
+    assert rds_info.tags["IS-Error"] == "UnsupportedResource (2026-01-05 05:00:00 UTC)"
     assert "read replica" in rds_info.tags["IS-ErrorMessage"]

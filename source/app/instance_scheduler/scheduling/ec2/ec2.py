@@ -215,7 +215,7 @@ class Ec2Service:
                 logger.info(
                     f"Schedule {managed_instance.registry_info.schedule} not found, skipping instance {managed_instance.registry_info.resource_id}"
                 )
-                yield SchedulingResult.error(
+                yield SchedulingResult.shortcircuit_error(
                     resource=managed_instance,
                     error_code=ErrorCode.UNKNOWN_SCHEDULE,
                 )
