@@ -1093,6 +1093,15 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         ],
       },
     },
+    "DynamoDbTableDeploymentGate": {
+      "DependsOn": [
+        "ConfigTable",
+        "MaintenanceWindowTable",
+        "ResourceRegistryC5838BF9",
+        "StateTable",
+      ],
+      "Type": "AWS::CloudFormation::WaitConditionHandle",
+    },
     "HeartbeatMetricsReporter812E35D0": {
       "DependsOn": [
         "HeartbeatMetricsReporterRoleDefaultPolicy7CE04DA3",
@@ -1249,6 +1258,63 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         ],
       },
       "Type": "AWS::IAM::Policy",
+    },
+    "IamPolicyDeploymentGate": {
+      "DependsOn": [
+        "HeartbeatMetricsReporterRoleDefaultPolicy7CE04DA3",
+        "iceErrorRetryHandlerRoleDefaultPolicy26094B45",
+        "MainLambdaRoleDefaultPolicy5347C905",
+        "MetricsGathererPermissionsPolicyAA99320A",
+        "MetricsGeneratorRoleDefaultPolicy19F5F29A",
+        "MetricsUuidPermissionsPolicyD0672406",
+        "ResourceRegistrationCreateRegionalEventRulesLambdaRoleDefaultPolicyAEEA7C27",
+        "ResourceRegistrationCreateRegionalEventRulesPolicy1531DABC",
+        "ResourceRegistrationCustomResourceProviderframeworkisCompleteServiceRoleDefaultPolicy209D7A94",
+        "ResourceRegistrationCustomResourceProviderframeworkonEventServiceRoleDefaultPolicy2620E1E1",
+        "ResourceRegistrationCustomResourceProviderframeworkonTimeoutServiceRoleDefaultPolicy1CE45C4E",
+        "ResourceRegistrationCustomResourceProviderwaiterstatemachineRoleDefaultPolicy71F426D3",
+        "ResourceRegistrationHubTagEventForwardingRoleDefaultPolicy04836F11",
+        "ResourceRegistrationRegionRegistrationLambdaRoleDefaultPolicyD77B4753",
+        "ResourceRegistrationRegionRegistrationWaitingLambdaRoleDefaultPolicy57C65D22",
+        "ResourceRegistrationResourceRegistrationLambdaRoleDefaultPolicy5CED86F8",
+        "retryIceErrorHandlerPolicy0496828B",
+        "SchedulerRoleASGSchedulingPermissions3ABCC443",
+        "SchedulerRoleEc2SchedulingPermissionsF1A25C28",
+        "SchedulerRoleRdsSchedulingPermissionsEBB3D20F",
+        "SchedulerRoleRegionalEventBusPermissionsA9062DD9",
+        "SchedulerRoleResourceGroupsTaggingPermissions24BD9721",
+        "SchedulingOrchestratorPermissionsPolicyC2148A26",
+        "SchedulingOrchestratorRoleDefaultPolicy29DE8B0D",
+        "schedulingRequestHandlerPolicy1BE05FC4",
+        "schedulingRequestHandlerRoleDefaultPolicy938ADC4A",
+        "SnsLogForwarderRoleDefaultPolicy428A754D",
+        "SpokeRegistrationPolicy600671FC",
+        "SpokeRegistrationRoleDefaultPolicy7A7A6954",
+      ],
+      "Type": "AWS::CloudFormation::WaitConditionHandle",
+    },
+    "IamRoleDeploymentGate": {
+      "DependsOn": [
+        "HeartbeatMetricsReporterRole9FB59405",
+        "iceErrorRetryHandlerRoleBB1DEADD",
+        "MainLambdaRole500DC55A",
+        "MetricsGeneratorRole83735CC4",
+        "ResourceRegistrationCreateRegionalEventRulesLambdaRole7F7A057A",
+        "ResourceRegistrationCustomResourceProviderframeworkisCompleteServiceRole425E0222",
+        "ResourceRegistrationCustomResourceProviderframeworkonEventServiceRole10EAF63B",
+        "ResourceRegistrationCustomResourceProviderframeworkonTimeoutServiceRole47835E8A",
+        "ResourceRegistrationCustomResourceProviderwaiterstatemachineRoleA2FF3178",
+        "ResourceRegistrationHubTagEventForwardingRole81ECC265",
+        "ResourceRegistrationRegionRegistrationLambdaRoleB05DE28F",
+        "ResourceRegistrationRegionRegistrationWaitingLambdaRoleD5212527",
+        "ResourceRegistrationResourceRegistrationLambdaRole536BBF3F",
+        "SchedulerRole59E73443",
+        "SchedulingOrchestratorRoleAD0FF7B1",
+        "schedulingRequestHandlerRoleD87803EB",
+        "SnsLogForwarderRole9D82E3A7",
+        "SpokeRegistrationRole0E2E4D3E",
+      ],
+      "Type": "AWS::CloudFormation::WaitConditionHandle",
     },
     "InstanceSchedulerEncryptionKey": {
       "DeletionPolicy": {
@@ -1455,6 +1521,26 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       },
       "Type": "AWS::SNS::TopicPolicy",
     },
+    "LambdaDeploymentGate": {
+      "DependsOn": [
+        "HeartbeatMetricsReporter812E35D0",
+        "iceErrorRetryHandlerLambda93DCA812",
+        "MetricsUuidGenerator172A04DB",
+        "ResourceRegistrationCreateRegionalEventRulesLambdaBADBA499",
+        "ResourceRegistrationCustomResourceProviderframeworkisComplete44F29B9D",
+        "ResourceRegistrationCustomResourceProviderframeworkonEvent294A3755",
+        "ResourceRegistrationCustomResourceProviderframeworkonTimeoutE1C8D0D4",
+        "ResourceRegistrationRegionRegistrationCustomResourceLambdaCC1DB513",
+        "ResourceRegistrationRegionRegistrationWaitLambda88C6C302",
+        "ResourceRegistrationLambda40454DE0",
+        "Main",
+        "SchedulingOrchestratorBB4C4C5A",
+        "schedulingRequestHandlerLambdaC395DC9E",
+        "SnsLogForwarder1E4F3E8B",
+        "SpokeRegistrationHandler923F17AC",
+      ],
+      "Type": "AWS::CloudFormation::WaitConditionHandle",
+    },
     "LogInsightsQueriesErrors51281C95": {
       "Properties": {
         "LogGroupNames": [
@@ -1511,7 +1597,7 @@ fields @timestamp, message
 | filter context = "registration"
 
 # Uncomment and edit the following filters to restrict queries only to specific accounts/regions/instances/schedules/actions
-#| filter instance like /Instance_id/
+#| filter resource like /arn-fragment/
 #| filter region = "region_name"
 #| filter account = "account_id"
 
@@ -2736,6 +2822,7 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
         "regions": {
           "Ref": "Regions",
         },
+        "version": "v9.9.9",
       },
       "Type": "Custom::SetupRegionalEvents",
       "UpdateReplacePolicy": "Retain",
@@ -2750,7 +2837,17 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
         "Description": "Custom Resource for creating regional event rules for tagging resources.",
         "Environment": {
           "Variables": {
-            "EVENT_RULE_PREFIX": "IS-Tagging",
+            "EVENT_RULE_PREFIX": {
+              "Fn::Join": [
+                "",
+                [
+                  "IS-Tagging-",
+                  {
+                    "Ref": "Namespace",
+                  },
+                ],
+              ],
+            },
             "POWERTOOLS_SERVICE_NAME": "instance-scheduler",
             "REGIONAL_EVENT_BUS_NAME": {
               "Fn::Join": [
@@ -2877,18 +2974,60 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "events:RemoveTargets",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:aws:events:*:",
-                    {
-                      "Ref": "AWS::AccountId",
-                    },
-                    ":rule/IS-Tagging*",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":events:*:",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":rule/IS-Tagging-",
+                      {
+                        "Ref": "Namespace",
+                      },
+                      "*",
+                    ],
                   ],
-                ],
-              },
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":events:*:",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":rule/IS-Tagging-resource-tagging",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":events:*:",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":rule/IS-Tagging-asg-tagging*",
+                    ],
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -2900,7 +3039,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "Fn::Join": [
                   "",
                   [
-                    "arn:aws:events:*:",
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":events:*:",
                     {
                       "Ref": "AWS::AccountId",
                     },
@@ -3757,7 +3900,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
               "Fn::Join": [
                 "",
                 [
-                  "arn:aws:lambda:",
+                  "arn:",
+                  {
+                    "Ref": "AWS::Partition",
+                  },
+                  ":lambda:",
                   {
                     "Ref": "AWS::Region",
                   },
@@ -3924,7 +4071,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -3953,7 +4104,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -4027,7 +4182,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
               "Fn::Join": [
                 "",
                 [
-                  "arn:aws:lambda:",
+                  "arn:",
+                  {
+                    "Ref": "AWS::Partition",
+                  },
+                  ":lambda:",
                   {
                     "Ref": "AWS::Region",
                   },
@@ -4139,7 +4298,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -4168,7 +4331,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -4230,8 +4397,10 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
     "ResourceRegistrationRegisterRegionsF3C0C449": {
       "DeletionPolicy": "Delete",
       "DependsOn": [
-        "ResourceRegistrationRegionRegistrationLambdaRoleB05DE28F",
-        "ResourceRegistrationRegionRegistrationWaitingLambdaRoleD5212527",
+        "DynamoDbTableDeploymentGate",
+        "IamPolicyDeploymentGate",
+        "IamRoleDeploymentGate",
+        "LambdaDeploymentGate",
         "SchedulerRoleASGSchedulingPermissions3ABCC443",
         "SchedulerRoleEc2SchedulingPermissionsF1A25C28",
         "SchedulerRoleRdsSchedulingPermissionsEBB3D20F",
@@ -4248,20 +4417,13 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
         "regions": {
           "Ref": "Regions",
         },
+        "version": "v9.9.9",
       },
       "Type": "Custom::RegisterRegion",
       "UpdateReplacePolicy": "Retain",
     },
     "ResourceRegistrationRegistrationEvents5615CE0B": {
       "Properties": {
-        "DeadLetterConfig": {
-          "Arn": {
-            "Fn::GetAtt": [
-              "ResourceRegistrationRegistrationEventsDLQFC1B7E66",
-              "Arn",
-            ],
-          },
-        },
         "Name": {
           "Fn::Join": [
             "",
@@ -4275,21 +4437,6 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
         },
       },
       "Type": "AWS::Events::EventBus",
-    },
-    "ResourceRegistrationRegistrationEventsDLQFC1B7E66": {
-      "DeletionPolicy": "Delete",
-      "Metadata": {
-        "guard": {
-          "SuppressedRules": [
-            "SQS_QUEUE_KMS_MASTER_KEY_ID_RULE",
-          ],
-        },
-      },
-      "Properties": {
-        "SqsManagedSseEnabled": true,
-      },
-      "Type": "AWS::SQS::Queue",
-      "UpdateReplacePolicy": "Delete",
     },
     "ResourceRegistrationRegistrationEventscdkAllowCrossAccountEventBridgeAccessDC854A6F": {
       "Properties": {
@@ -4682,7 +4829,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -4711,7 +4862,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -4815,7 +4970,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "Fn::Join": [
                   "",
                   [
-                    "arn:aws:lambda:",
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":lambda:",
                     {
                       "Ref": "AWS::Region",
                     },
@@ -5316,7 +5475,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "Fn::Join": [
                   "",
                   [
-                    "arn:aws:events:*:",
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":events:*:",
                     {
                       "Ref": "AWS::AccountId",
                     },
@@ -6006,7 +6169,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                         "Fn::Join": [
                           "",
                           [
-                            "arn:aws:iam::*:role/",
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition",
+                            },
+                            ":iam::*:role/",
                             {
                               "Ref": "Namespace",
                             },
@@ -6044,7 +6211,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                         "Fn::Join": [
                           "",
                           [
-                            "arn:aws:iam::*:role/",
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition",
+                            },
+                            ":iam::*:role/",
                             {
                               "Ref": "Namespace",
                             },
@@ -6272,7 +6443,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "Fn::Join": [
                   "",
                   [
-                    "arn:aws:ssm:*:",
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":ssm:*:",
                     {
                       "Ref": "AWS::AccountId",
                     },

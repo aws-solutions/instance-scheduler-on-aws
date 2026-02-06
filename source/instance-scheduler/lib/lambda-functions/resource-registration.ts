@@ -15,6 +15,7 @@ import { addCfnGuardSuppression } from "../helpers/cfn-guard";
 import { RegionEventRulesCustomResource } from "./region-event-rules";
 import { TargetStack } from "../stack-types";
 import { RegionRegistrationCustomResource } from "./region-registration";
+import { SequencingGates } from "../helpers/deployment-sequencing";
 
 interface ResourceRegistrationProps {
   readonly namespace: string;
@@ -84,15 +85,8 @@ export class HubResourceRegistration extends Construct {
   constructor(scope: Construct, id: string, props: ResourceRegistrationProps) {
     super(scope, id);
 
-    const registrationEventsDLQ = new Queue(this, "RegistrationEventsDLQ", {
-      encryption: QueueEncryption.SQS_MANAGED,
-    });
-
-    addCfnGuardSuppression(registrationEventsDLQ, ["SQS_QUEUE_KMS_MASTER_KEY_ID_RULE"]);
-
     const taggingEventBus = new EventBus(this, "RegistrationEvents", {
       eventBusName: registrationEventBusName(props.namespace),
-      deadLetterQueue: registrationEventsDLQ,
     });
     // Add the resource policy with conditional statement
     taggingEventBus.addToResourcePolicy(
@@ -132,6 +126,7 @@ export class HubResourceRegistration extends Construct {
       resourceType: "Custom::SetupRegionalEvents",
       properties: {
         regions: props.regions,
+        version: props.solutionVersion, // force an update when updating solution version
       },
     });
     const regionsCustomResourceCfnResource = regionsCustomResource.node.defaultChild as CfnResource;
@@ -236,17 +231,16 @@ export class HubResourceRegistration extends Construct {
       resourceType: "Custom::RegisterRegion",
       properties: {
         regions: props.regions,
+        version: props.solutionVersion, // force an update when updating solution version
       },
     });
     const regionRegistrationCfnResource = regionRegistration.node.defaultChild as CfnResource;
     this.regionRegistrationCfnResource = regionRegistrationCfnResource;
 
-    regionRegistrationCfnResource.addDependency(
-      regionRegistrationCustomResource.regionRegistrationWaitLambdaRoleCfnResource,
-    );
-    regionRegistrationCfnResource.addDependency(
-      regionRegistrationCustomResource.regionRegistrationCustomResourceLambdaRoleCfnResource,
-    );
+    regionRegistrationCfnResource.addDependency(SequencingGates.afterAllLambdas(scope));
+    regionRegistrationCfnResource.addDependency(SequencingGates.afterAllRoles(scope));
+    regionRegistrationCfnResource.addDependency(SequencingGates.afterAllPolicies(scope));
+    regionRegistrationCfnResource.addDependency(SequencingGates.afterAllTables(scope));
     regionRegistrationCfnResource.addOverride("UpdateReplacePolicy", "Retain");
   }
 }

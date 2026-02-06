@@ -52,7 +52,7 @@ export class RegionRegistrationCustomResource {
   }
 
   static functionArnFor(functionName: string, accountId: string) {
-    return `arn:aws:lambda:${Aws.REGION}:${accountId}:function:${functionName}`;
+    return `arn:${Aws.PARTITION}:lambda:${Aws.REGION}:${accountId}:function:${functionName}`;
   }
 
   constructor(scope: Construct, id: string, props: RegionRegistrationCustomResourceProps) {

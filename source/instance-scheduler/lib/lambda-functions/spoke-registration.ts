@@ -134,7 +134,7 @@ export class SpokeRegistrationLambda {
                   "aws:PrincipalOrgID": Fn.select(0, props.principals),
                 },
                 ArnLike: {
-                  "aws:PrincipalArn": `arn:aws:iam::*:role/${RegionRegistrationCustomResource.invokeFunctionRemoteRoleName(props.namespace)}`,
+                  "aws:PrincipalArn": `arn:${Aws.PARTITION}:iam::*:role/${RegionRegistrationCustomResource.invokeFunctionRemoteRoleName(props.namespace)}`,
                 },
               },
             },
@@ -151,7 +151,7 @@ export class SpokeRegistrationLambda {
               Action: "sts:AssumeRole",
               Condition: {
                 ArnLike: {
-                  "aws:PrincipalArn": `arn:aws:iam::*:role/${RegionRegistrationCustomResource.invokeFunctionRemoteRoleName(props.namespace)}`,
+                  "aws:PrincipalArn": `arn:${Aws.PARTITION}:iam::*:role/${RegionRegistrationCustomResource.invokeFunctionRemoteRoleName(props.namespace)}`,
                 },
               },
             },
@@ -175,6 +175,7 @@ export class SpokeRegistrationLambda {
     spokeAccountInvokeFunctionPolicy.attachToRole(
       Role.fromRoleArn(scope, "SpokeAccountInvokeFunctionRoleRef", spokeAccountInvokeFunctionRole.attrArn),
     );
+
     spokeAccountInvokeFunctionPolicy.node.addDependency(spokeAccountInvokeFunctionRole);
     const spokeAccountInvokeFunctionPolicyCfnPolicy = spokeAccountInvokeFunctionPolicy.node.defaultChild as CfnPolicy;
     spokeAccountInvokeFunctionPolicyCfnPolicy.cfnOptions.condition = isPrincipalsNotEmpty;

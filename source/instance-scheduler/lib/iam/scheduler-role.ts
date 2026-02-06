@@ -47,7 +47,7 @@ export class SchedulerRole extends Role {
     this.resourceTaggingPolicy.attachToRole(this);
 
     new EventBusPermissionsPolicy(this, "RegionalEventBusPermissions", {
-      eventBusArn: `arn:aws:events:*:${Aws.ACCOUNT_ID}:event-bus/${props.regionalEventBusName}`,
+      eventBusArn: `arn:${Aws.PARTITION}:events:*:${Aws.ACCOUNT_ID}:event-bus/${props.regionalEventBusName}`,
     }).attachToRole(this);
 
     //optional KMS permissions

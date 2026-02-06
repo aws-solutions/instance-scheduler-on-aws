@@ -142,9 +142,11 @@ def handle_tagging_event(event: ResourceRegistrationEvent) -> Dict[str, Any]:
 def process_rds_instance_or_skip(
     event: ResourceRegistrationEvent, resource_arn: ARN, failed_resources: list[str]
 ) -> bool:
-    if event.detail.resource_type == "snapshot":
-        logger.debug(f"event for rds snapshot. skipping...: {event.detail.service}")
-        return True
+    if event.detail.resource_type not in ["cluster", "db"]:
+        logger.debug(
+            f"event for unsupported rds resource_type. skipping...: {event.detail.resource_type}"
+        )
+        return True  # skip
 
     scheduling_role = assume_role(
         account=event.account,
@@ -163,6 +165,7 @@ def process_rds_instance_or_skip(
         rds_resource = RdsService.describe_rds_resource(scheduling_role, resource_arn)
 
         if not rds_resource:
+            # this can occur when describing cluster members...
             logger.error(f"Could not find resource for registration {resource_arn}")
             failed_resources.append(resource_arn)
             return True
@@ -258,9 +261,11 @@ def handle_asg_tagging_event(event: AsgRegistrationEvent) -> Dict[str, Any]:
     """Handle ASG CloudTrail tagging events."""
 
     # ASG tagging events are limited to just create/delete events from CloudTrail. Unfortunately
-    # this means that a tag update is reported as a delete event immediately followed by a create event
+    # a tag update is reported as a delete event immediately followed by a create event, and when
+    # an ASG is created with a schedule tag already existing on it, no tag create/delete event is sent
+    # to CloudTrail.
     # this means that our most reliable way to ensure that ASGs are correctly registered/deregistered is to
-    # describe them and rely on the current tag on the resource.
+    # describe them in response to every event and rely on tags present on the describe call.
 
     logger.append_keys(
         context=LogContext.REGISTRATION.value,
@@ -275,17 +280,15 @@ def handle_asg_tagging_event(event: AsgRegistrationEvent) -> Dict[str, Any]:
         role_name=env.scheduler_role_name,
     )
 
-    for asg_tagging_event in event.detail.requestParameters.tags:
-        if asg_tagging_event.key != env.schedule_tag_key:
+    for asg_event in event.detail.requestParameters.tags:
+        if asg_event.key != env.schedule_tag_key:
             continue  # ignore updates to non-schedule tags
 
         logger.append_keys(
-            instance=asg_tagging_event.resourceId,
+            instance=asg_event.resourceId,
         )
 
-        for asg in AsgService.describe_asgs(
-            assumed_role, [asg_tagging_event.resourceId]
-        ):
+        for asg in AsgService.describe_asgs(assumed_role, [asg_event.resourceId]):
             # the event could be a create or delete event, so we need to check if the ASG has a schedule tag
             if asg.tags.get(env.schedule_tag_key):
                 # create event

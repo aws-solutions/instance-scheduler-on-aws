@@ -1,7 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from datetime import datetime, timezone
-from typing import Any, Callable, Generic, Iterable, Self, TypeVar
+from typing import Iterable, TypeVar
 
 from instance_scheduler.configuration.scheduling_context import (
     SchedulingContext,
@@ -32,7 +32,10 @@ from instance_scheduler.observability.informational_tagging import (
     InfoTaggingContext,
     format_current_time,
 )
-from instance_scheduler.observability.powertools_logging import powertools_logger
+from instance_scheduler.observability.powertools_logging import (
+    LogContext,
+    powertools_logger,
+)
 from instance_scheduler.observability.tag_keys import ControlTagKey
 from instance_scheduler.scheduling.asg.asg_migration import (
     asg_needs_migration,
@@ -52,29 +55,6 @@ logger = powertools_logger()
 T = TypeVar("T")
 
 
-class BufferedFunction(Generic[T]):
-    def __init__(self, func: Callable[[list[T]], None], buffer_size: int):
-        self._func = func
-        self._buffer_size = buffer_size
-        self._buffer: list[T] = []
-
-    def push(self, item: T) -> None:
-        self._buffer.append(item)
-        if len(self._buffer) >= self._buffer_size:
-            self.flush()
-
-    def flush(self) -> None:
-        if self._buffer:
-            self._func(self._buffer)
-            self._buffer.clear()
-
-    def __enter__(self) -> Self:
-        return self
-
-    def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
-        self.flush()
-
-
 def register_ec2_resources(
     ec2_instances: Iterable[EC2RuntimeInfo],
     scheduling_role: AssumedRole,
@@ -85,6 +65,11 @@ def register_ec2_resources(
     with (
         InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
         EventsBuffer(scheduling_role, env) as event_buffer,
+        logger.append_context_keys(
+            context=LogContext.REGISTRATION.value,
+            account=scheduling_role.account,
+            region=scheduling_role.region,
+        ),
     ):
         for ec2_instance in ec2_instances:
             registered_instance = RegisteredEc2Instance(
@@ -104,7 +89,10 @@ def register_ec2_resources(
                     registered_instance
                 ).as_event_bus_event()
             )
-            logger.info(f"Registered EC2 instance: {registered_instance.arn}")
+            logger.info(
+                f"Registered EC2 instance: {registered_instance.arn}",
+                resource=registered_instance.arn,
+            )
 
 
 def deregister_ec2_resources(
@@ -113,11 +101,21 @@ def deregister_ec2_resources(
     env: SchedulingEnvironment,
 ) -> None:
     registry = DynamoResourceRegistry(env.registry_table)
-    with InfoTaggingContext(scheduler_role, env.hub_stack_name) as tagging_context:
+    with (
+        InfoTaggingContext(scheduler_role, env.hub_stack_name) as tagging_context,
+        logger.append_context_keys(
+            context=LogContext.REGISTRATION.value,
+            account=scheduler_role.account,
+            region=scheduler_role.region,
+        ),
+    ):
         for registered_ec2 in ec2_instances:
             registry.delete(registered_ec2.key, error_if_missing=False)
             tagging_context.push_clear_info_tags(registered_ec2.arn)
-            logger.info(f"Deregistered EC2 instance: {registered_ec2.arn}")
+            logger.info(
+                f"Deregistered EC2 instance: {registered_ec2.arn}",
+                resource=registered_ec2.arn,
+            )
 
 
 def register_rds_resources(
@@ -131,6 +129,11 @@ def register_rds_resources(
     with (
         InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
         EventsBuffer(scheduling_role, env) as event_buffer,
+        logger.append_context_keys(
+            context=LogContext.REGISTRATION.value,
+            account=scheduling_role.account,
+            region=scheduling_role.region,
+        ),
     ):
         for rds_resource in rds_resources:
             is_supported, reason = rds_resource.check_if_is_supported()
@@ -142,7 +145,8 @@ def register_rds_resources(
                 )
 
                 logger.info(
-                    f"Unable to register RDS resource {rds_resource.arn}. Unsupported Resource: {reason}"
+                    f"Unable to register RDS resource {rds_resource.arn}. Unsupported Resource: {reason}",
+                    resource=rds_resource.arn,
                 )
                 continue
 
@@ -163,7 +167,10 @@ def register_rds_resources(
                     registered_instance
                 ).as_event_bus_event()
             )
-            logger.info(f"Registered RDS resource: {registered_instance.arn}")
+            logger.info(
+                f"Registered RDS resource: {registered_instance.arn}",
+                resource=registered_instance.arn,
+            )
 
 
 def deregister_rds_resources(
@@ -172,11 +179,21 @@ def deregister_rds_resources(
     env: SchedulingEnvironment,
 ) -> None:
     registry = DynamoResourceRegistry(env.registry_table)
-    with InfoTaggingContext(scheduler_role, env.hub_stack_name) as tagging_context:
+    with (
+        InfoTaggingContext(scheduler_role, env.hub_stack_name) as tagging_context,
+        logger.append_context_keys(
+            context=LogContext.REGISTRATION.value,
+            account=scheduler_role.account,
+            region=scheduler_role.region,
+        ),
+    ):
         for registered_rds in rds_resources:
             registry.delete(registered_rds.key, error_if_missing=False)
             tagging_context.push_clear_info_tags(registered_rds.arn)
-            logger.info(f"Deregistered RDS resource: {registered_rds.arn}")
+            logger.info(
+                f"Deregistered RDS resource: {registered_rds.arn}",
+                resource=registered_rds.arn,
+            )
 
 
 def register_asg_resources(
@@ -192,6 +209,11 @@ def register_asg_resources(
     with (
         InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
         EventsBuffer(scheduling_role, env) as event_buffer,
+        logger.append_context_keys(
+            context=LogContext.REGISTRATION.value,
+            account=scheduling_role.account,
+            region=scheduling_role.region,
+        ),
     ):
         for asg_resource in asg_resources:
             if asg_needs_migration(asg_resource, env):
@@ -209,7 +231,9 @@ def register_asg_resources(
             )
 
             registry.put(registered_instance, overwrite=True)
-            logger.info(f"Registered ASG: {asg_resource.arn}")
+            logger.info(
+                f"Registered ASG: {asg_resource.arn}", resource=asg_resource.arn
+            )
 
             # schedules can be modified by the customer later, so this check happens after the ASG is registered
 
@@ -252,6 +276,7 @@ def register_asg_resources(
             )
 
 
+@logger.append_context_keys(context=LogContext.REGISTRATION.value)
 def deregister_asg_resources(
     asg_resources: Iterable[RegisteredAsgInstance],
     scheduling_role: AssumedRole,
@@ -264,9 +289,14 @@ def deregister_asg_resources(
     asg_service = AsgService(scheduling_context)
     registry = DynamoResourceRegistry(env.registry_table)
 
-    with InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context:
+    with (
+        InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
+        logger.append_context_keys(
+            account=scheduling_role.account, region=scheduling_role.region
+        ),
+    ):
         for asg in asg_resources:
             asg_service.delete_existing_scheduled_actions(asg.resource_id)
             tagging_context.push_clear_info_tags(asg.arn)
             registry.delete(asg.key, error_if_missing=False)
-            logger.info(f"Deregistered ASG: {asg.arn}")
+            logger.info(f"Deregistered ASG: {asg.arn}", resource=asg.arn)
