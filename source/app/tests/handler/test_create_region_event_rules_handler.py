@@ -52,7 +52,10 @@ def custom_resource_base_event() -> (
         "ResourceType": "Custom::SetupRegionalEvents",
         "LogicalResourceId": "CFNLogicalID",
         "PhysicalResourceId": "PhysicalID",
-        "ResourceProperties": {"regions": ["us-east-1", "us-west-2"]},
+        "ResourceProperties": {
+            "regions": ["us-east-1", "us-west-2"],
+            "version": "v3.1.2",
+        },
     }
 
 
@@ -104,7 +107,7 @@ def test_update_event_rules_success(
     event = {
         "RequestType": "Update",
         "ResourceProperties": {"regions": ["us-east-1", "us-west-2"]},
-        "OldResourceProperties": {"regions": ["us-east-1"]},
+        "OldResourceProperties": {"regions": ["us-east-1"], "version": "v3.1.2"},
         "StackId": "arn:aws:cloudformation:us-west-2:111122223333:stack/test-stack/51af3dc0-da77-11e4-872e-1234567db123",
         "RequestId": "test-request",
         "LogicalResourceId": "test-logical-id",
@@ -121,6 +124,46 @@ def test_update_event_rules_success(
     # Verify delete operations for old regions and create for new regions
     assert mocked_events_client.remove_targets.call_count == 2  # Old region cleanup
     assert mocked_events_client.delete_rule.call_count == 2  # Old region cleanup
+    assert mocked_events_client.put_rule.call_count == 4  # New regions setup
+    assert mocked_events_client.put_targets.call_count == 4  # New regions setup
+
+    mocked_cfn_callback.assert_called_once()
+    response = mocked_cfn_callback.call_args[0][0]
+    assert response["Status"] == "SUCCESS", response.get("Reason", "")
+
+
+@patch.object(CreateRegionEventRulesHandler, "_send_response")
+def test_update_event_rules_deletes_legacy_rules(
+    mocked_cfn_callback: MagicMock,
+    mocked_events_client: MagicMock,
+    mocked_environment: Mapping[str, str],
+) -> None:
+    event = {
+        "RequestType": "Update",
+        "ResourceProperties": {"regions": ["us-east-1", "us-west-2"]},
+        "OldResourceProperties": {
+            "regions": ["us-east-1"]
+        },  # no version specified, requires legacy cleanup
+        "StackId": "arn:aws:cloudformation:us-west-2:111122223333:stack/test-stack/51af3dc0-da77-11e4-872e-1234567db123",
+        "RequestId": "test-request",
+        "LogicalResourceId": "test-logical-id",
+        "ResponseURL": "test-url",
+    }
+
+    context = MockLambdaContext()
+    logger = Logger()
+    env = CreateRegionEventRulesEnvironment.from_env()
+
+    handler = CreateRegionEventRulesHandler(event, context, logger, env)
+    handler.handle_request()
+
+    # Verify delete operations for old regions and create for new regions
+    assert (
+        mocked_events_client.remove_targets.call_count == 4
+    )  # Old region cleanup + legacy
+    assert (
+        mocked_events_client.delete_rule.call_count == 4
+    )  # Old region cleanup + legacy
     assert mocked_events_client.put_rule.call_count == 4  # New regions setup
     assert mocked_events_client.put_targets.call_count == 4  # New regions setup
 

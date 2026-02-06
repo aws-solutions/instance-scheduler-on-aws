@@ -27,7 +27,7 @@ export class RegionEventRulesCustomResource {
   readonly taggingEventBusArn: string;
   constructor(scope: Construct, id: string, props: RegionEventRulesCustomResourceProps) {
     const targetEventBusArn = `arn:${Aws.PARTITION}:events:${Aws.REGION}:${props.hubAccountId}:event-bus/${props.taggingEventBusName}`;
-    const EVENT_RULE_NAME_PREFIX = "IS-Tagging";
+    const EVENT_RULE_NAME_PREFIX = `IS-Tagging-${props.namespace}`;
 
     const role = new Role(scope, "CreateRegionalEventRulesLambdaRole", {
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
@@ -76,12 +76,17 @@ export class RegionEventRulesCustomResource {
       statements: [
         new PolicyStatement({
           actions: ["events:DeleteRule", "events:PutTargets", "events:PutRule", "events:RemoveTargets"],
-          resources: [`arn:aws:events:*:${Aws.ACCOUNT_ID}:rule/${EVENT_RULE_NAME_PREFIX}*`],
+          resources: [
+            `arn:${Aws.PARTITION}:events:*:${Aws.ACCOUNT_ID}:rule/${EVENT_RULE_NAME_PREFIX}*`,
+            //allow delete of legacy rules
+            `arn:${Aws.PARTITION}:events:*:${Aws.ACCOUNT_ID}:rule/IS-Tagging-resource-tagging`,
+            `arn:${Aws.PARTITION}:events:*:${Aws.ACCOUNT_ID}:rule/IS-Tagging-asg-tagging*`,
+          ],
           effect: Effect.ALLOW,
         }),
         new PolicyStatement({
           actions: ["events:CreateEventBus", "events:DeleteEventBus"],
-          resources: [`arn:aws:events:*:${Aws.ACCOUNT_ID}:event-bus/${props.regionalEventBusName}`],
+          resources: [`arn:${Aws.PARTITION}:events:*:${Aws.ACCOUNT_ID}:event-bus/${props.regionalEventBusName}`],
           effect: Effect.ALLOW,
         }),
         new PolicyStatement({

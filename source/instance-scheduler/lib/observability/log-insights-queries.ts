@@ -43,7 +43,7 @@ fields @timestamp, message
 | filter context = "registration"
 
 # Uncomment and edit the following filters to restrict queries only to specific accounts/regions/instances/schedules/actions
-#| filter instance like /Instance_id/
+#| filter resource like /arn-fragment/
 #| filter region = "region_name"
 #| filter account = "account_id"
 

@@ -55,7 +55,6 @@ export class CoreScheduler {
   public readonly cfnScheduleCustomResourceHandler: LambdaFunction;
   public readonly hubSchedulerRole: Role;
   public readonly topic: Topic;
-  public readonly asgOrch: LambdaFunction;
   public readonly dataLayer: InstanceSchedulerDataLayer;
   public readonly regionalEventBusName: string;
   public readonly globalEventBus: EventBus;

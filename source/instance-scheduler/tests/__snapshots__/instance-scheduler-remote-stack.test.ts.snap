@@ -210,6 +210,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         "regions": {
           "Ref": "Regions",
         },
+        "version": "v9.9.9",
       },
       "Type": "Custom::SetupRegionalEvents",
       "UpdateReplacePolicy": "Retain",
@@ -224,7 +225,17 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         "Description": "Custom Resource for creating regional event rules for tagging resources.",
         "Environment": {
           "Variables": {
-            "EVENT_RULE_PREFIX": "IS-Tagging",
+            "EVENT_RULE_PREFIX": {
+              "Fn::Join": [
+                "",
+                [
+                  "IS-Tagging-",
+                  {
+                    "Ref": "Namespace",
+                  },
+                ],
+              ],
+            },
             "POWERTOOLS_SERVICE_NAME": "instance-scheduler",
             "REGIONAL_EVENT_BUS_NAME": {
               "Fn::Join": [
@@ -351,18 +362,60 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                 "events:RemoveTargets",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:aws:events:*:",
-                    {
-                      "Ref": "AWS::AccountId",
-                    },
-                    ":rule/IS-Tagging*",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":events:*:",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":rule/IS-Tagging-",
+                      {
+                        "Ref": "Namespace",
+                      },
+                      "*",
+                    ],
                   ],
-                ],
-              },
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":events:*:",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":rule/IS-Tagging-resource-tagging",
+                    ],
+                  ],
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition",
+                      },
+                      ":events:*:",
+                      {
+                        "Ref": "AWS::AccountId",
+                      },
+                      ":rule/IS-Tagging-asg-tagging*",
+                    ],
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -374,7 +427,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                 "Fn::Join": [
                   "",
                   [
-                    "arn:aws:events:*:",
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":events:*:",
                     {
                       "Ref": "AWS::AccountId",
                     },
@@ -1460,7 +1517,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                 "Fn::Join": [
                   "",
                   [
-                    "arn:aws:events:*:",
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":events:*:",
                     {
                       "Ref": "AWS::AccountId",
                     },
@@ -1569,6 +1630,50 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       },
       "Type": "AWS::IAM::Policy",
     },
+    "IamPolicyDeploymentGate": {
+      "DependsOn": [
+        "CreateRegionalEventRulesLambdaRoleDefaultPolicy80005665",
+        "CreateRegionalEventRulesPolicyBA8F60E9",
+        "CustomResourceProviderframeworkisCompleteServiceRoleDefaultPolicy289A380C",
+        "CustomResourceProviderframeworkonEventServiceRoleDefaultPolicy93CD1647",
+        "CustomResourceProviderframeworkonTimeoutServiceRoleDefaultPolicy0C25C854",
+        "CustomResourceProviderwaiterstatemachineRoleDefaultPolicy37566898",
+        "EC2SchedulerCrossAccountRoleASGSchedulingPermissionsAE9E3D48",
+        "EC2SchedulerCrossAccountRoleEc2SchedulingPermissions35C26E2F",
+        "EC2SchedulerCrossAccountRoleRdsSchedulingPermissions18D04034",
+        "EC2SchedulerCrossAccountRoleRegionalEventBusPermissionsCE7D7CD4",
+        "EC2SchedulerCrossAccountRoleResourceGroupsTaggingPermissions5A354A85",
+        "HubTagEventForwardingRoleDefaultPolicy5747D549",
+        "RegionRegistrationLambdaRoleDefaultPolicy7AA4928B",
+        "RegionRegistrationWaitingLambdaRoleDefaultPolicy8BBEB5F7",
+      ],
+      "Type": "AWS::CloudFormation::WaitConditionHandle",
+    },
+    "IamRoleDeploymentGate": {
+      "DependsOn": [
+        "CreateRegionalEventRulesLambdaRole1BE94A3C",
+        "CustomResourceProviderframeworkisCompleteServiceRole88C5CC94",
+        "CustomResourceProviderframeworkonEventServiceRole7EBC5835",
+        "CustomResourceProviderframeworkonTimeoutServiceRole50C6F805",
+        "CustomResourceProviderwaiterstatemachineRole09462DF6",
+        "EC2SchedulerCrossAccountRole",
+        "HubTagEventForwardingRole5BEE3911",
+        "RegionRegistrationLambdaRoleED66DE1B",
+        "RegionRegistrationWaitingLambdaRole96F8D082",
+      ],
+      "Type": "AWS::CloudFormation::WaitConditionHandle",
+    },
+    "LambdaDeploymentGate": {
+      "DependsOn": [
+        "CreateRegionalEventRulesLambda4F6A2D62",
+        "CustomResourceProviderframeworkisComplete2713CDE6",
+        "CustomResourceProviderframeworkonEvent0AA4376C",
+        "CustomResourceProviderframeworkonTimeout39980DF9",
+        "RegionRegistrationCustomResourceLambda632460E5",
+        "RegionRegistrationWaitLambda671C2191",
+      ],
+      "Type": "AWS::CloudFormation::WaitConditionHandle",
+    },
     "RegionRegistrationCustomResourceLambda632460E5": {
       "DependsOn": [
         "RegionRegistrationLambdaRoleDefaultPolicy7AA4928B",
@@ -1586,7 +1691,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
               "Fn::Join": [
                 "",
                 [
-                  "arn:aws:lambda:",
+                  "arn:",
+                  {
+                    "Ref": "AWS::Partition",
+                  },
+                  ":lambda:",
                   {
                     "Ref": "AWS::Region",
                   },
@@ -1772,7 +1881,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -1801,7 +1914,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -1851,7 +1968,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
               "Fn::Join": [
                 "",
                 [
-                  "arn:aws:lambda:",
+                  "arn:",
+                  {
+                    "Ref": "AWS::Partition",
+                  },
+                  ":lambda:",
                   {
                     "Ref": "AWS::Region",
                   },
@@ -1958,7 +2079,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -1987,7 +2112,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -2049,14 +2178,9 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
     "RegisterRegions": {
       "DeletionPolicy": "Delete",
       "DependsOn": [
-        "EC2SchedulerCrossAccountRoleASGSchedulingPermissionsAE9E3D48",
-        "EC2SchedulerCrossAccountRoleEc2SchedulingPermissions35C26E2F",
-        "EC2SchedulerCrossAccountRoleRdsSchedulingPermissions18D04034",
-        "EC2SchedulerCrossAccountRole",
-        "EC2SchedulerCrossAccountRoleResourceGroupsTaggingPermissions5A354A85",
-        "RegionRegistrationLambdaRoleED66DE1B",
-        "RegionRegistrationWaitingLambdaRole96F8D082",
-        "SpokeRegistrationUpdateSSMParamRole3F15A1F5",
+        "IamPolicyDeploymentGate",
+        "IamRoleDeploymentGate",
+        "LambdaDeploymentGate",
       ],
       "Properties": {
         "ServiceToken": {
@@ -2068,6 +2192,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         "regions": {
           "Ref": "Regions",
         },
+        "version": "v9.9.9",
       },
       "Type": "Custom::RegisterRegion",
       "UpdateReplacePolicy": "Retain",
@@ -2130,7 +2255,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -2159,7 +2288,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                     "Fn::Join": [
                       "",
                       [
-                        "arn:aws:ssm:*:",
+                        "arn:",
+                        {
+                          "Ref": "AWS::Partition",
+                        },
+                        ":ssm:*:",
                         {
                           "Ref": "AWS::AccountId",
                         },
@@ -2204,7 +2337,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                 "Fn::Join": [
                   "",
                   [
-                    "arn:aws:lambda:",
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":lambda:",
                     {
                       "Ref": "AWS::Region",
                     },

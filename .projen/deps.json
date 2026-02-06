@@ -77,17 +77,17 @@
     },
     {
       "name": "@aws-cdk/aws-lambda-python-alpha",
-      "version": "2.232.2-alpha.0",
+      "version": "2.237.0-alpha.0",
       "type": "runtime"
     },
     {
       "name": "@aws-cdk/aws-neptune-alpha",
-      "version": "2.232.2-alpha.0",
+      "version": "2.237.0-alpha.0",
       "type": "runtime"
     },
     {
       "name": "@aws-cdk/aws-servicecatalogappregistry-alpha",
-      "version": "2.232.2-alpha.0",
+      "version": "2.237.0-alpha.0",
       "type": "runtime"
     },
     {
@@ -132,7 +132,7 @@
     },
     {
       "name": "aws-cdk-lib",
-      "version": "2.232.2",
+      "version": "2.237.0",
       "type": "runtime"
     },
     {

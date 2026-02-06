@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import json
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Final, List, Mapping, TypedDict
+from typing import TYPE_CHECKING, Any, Final, List, Mapping, Optional, TypedDict
 
 from aws_lambda_powertools import Logger
 from botocore.exceptions import ClientError
@@ -69,6 +69,7 @@ def lambda_handler(event: Mapping[str, Any], context: LambdaContext) -> None:
 
 class CreateRegionEventRulesProperties(TypedDict):
     regions: List[str]
+    version: Optional[str]
 
 
 class CreateRegionEventRulesHandler(CustomResource[CreateRegionEventRulesProperties]):
@@ -195,6 +196,15 @@ class CreateRegionEventRulesHandler(CustomResource[CreateRegionEventRulesPropert
         # delete event bus
         self._delete_regional_event_bus(events_client)
 
+    def _delete_legacy_event_rule(self, events_client: EventBridgeClient) -> None:
+        # Delete ASG tagging event rule
+        events_client.remove_targets(Rule="IS-Tagging-asg-tagging", Ids=["1"])
+        events_client.delete_rule(Name="IS-Tagging-asg-tagging")
+
+        # Delete tagging event rule
+        events_client.remove_targets(Rule="IS-Tagging-resource-tagging", Ids=["1"])
+        events_client.delete_rule(Name="IS-Tagging-resource-tagging")
+
     def _create_event_rules(self, regions: List[str]) -> CustomResourceResponse:
         success_regions_for_rollback = []
         assumed_role = lambda_execution_role()
@@ -229,6 +239,18 @@ class CreateRegionEventRulesHandler(CustomResource[CreateRegionEventRulesPropert
                 )
                 # Continue with other regions even if one fails during cleanup
 
+    def _delete_legacy_event_rules(self, regions: List[str]) -> None:
+        assumed_role = lambda_execution_role()
+        for region in regions:
+            try:
+                events_client = assumed_role.client("events", region)
+                self._delete_legacy_event_rule(events_client)
+            except Exception as e:
+                self._logger.error(
+                    f"Failed to delete event rules in region {region}: {e}"
+                )
+                # Continue with other regions even if one fails during cleanup
+
     def _create_request(self) -> CustomResourceResponse:
         regions = self.purge_empty_strings(self.resource_properties, "regions")
         if regions:
@@ -245,6 +267,10 @@ class CreateRegionEventRulesHandler(CustomResource[CreateRegionEventRulesPropert
         old_regions = self.purge_empty_strings(self.old_resource_properties, "regions")
         if not old_regions:
             old_regions.append(lambda_execution_role().region)
+
+        if self.old_resource_properties.get("version", None) is None:
+            # updating from v3.1.0 or v3.1.1 which used a static name instead of namespaced, need to purge old rules
+            self._delete_legacy_event_rules(old_regions)
 
         self._delete_event_rules(old_regions)
         try:

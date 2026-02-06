@@ -15,7 +15,7 @@ export function getSSMParams(namespace: string): PolicyStatement {
     actions: ["ssm:GetParametersByPath", "ssm:GetParameters", "ssm:GetParameter"],
     effect: Effect.ALLOW,
     resources: [
-      `arn:aws:ssm:*:${Aws.ACCOUNT_ID}:parameter${RegionRegistrationCustomResource.ssmParamPathName(namespace)}/*`,
+      `arn:${Aws.PARTITION}:ssm:*:${Aws.ACCOUNT_ID}:parameter${RegionRegistrationCustomResource.ssmParamPathName(namespace)}/*`,
     ],
   });
 }
@@ -33,7 +33,7 @@ export function updateSSMParams(namespace: string): PolicyStatement {
     actions: ["ssm:PutParameter", "ssm:DeleteParameter", "ssm:DeleteParameters"],
     effect: Effect.ALLOW,
     resources: [
-      `arn:aws:ssm:*:${Aws.ACCOUNT_ID}:parameter${RegionRegistrationCustomResource.ssmParamPathName(namespace)}/*`,
+      `arn:${Aws.PARTITION}:ssm:*:${Aws.ACCOUNT_ID}:parameter${RegionRegistrationCustomResource.ssmParamPathName(namespace)}/*`,
     ],
   });
 }

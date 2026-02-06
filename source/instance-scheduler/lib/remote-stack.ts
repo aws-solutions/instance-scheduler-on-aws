@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { CfnOutput, CfnResource, CustomResource, Stack, StackProps } from "aws-cdk-lib";
-import { ArnPrincipal, CfnPolicy, CfnRole, CompositePrincipal } from "aws-cdk-lib/aws-iam";
+import { ArnPrincipal, CfnRole, CompositePrincipal } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import { ParameterWithLabel, YesNoParameter, YesNoType, addParameterGroup, overrideLogicalId } from "./cfn";
 import { SchedulerRole } from "./iam/scheduler-role";
@@ -15,6 +15,7 @@ import { RegionEventRulesCustomResource } from "./lambda-functions/region-event-
 import { RegionRegistrationCustomResource } from "./lambda-functions/region-registration";
 import { TargetStack } from "./stack-types";
 import { SpokeRegistrationLambda } from "./lambda-functions/spoke-registration";
+import { SequencingGates } from "./helpers/deployment-sequencing";
 
 export interface SpokeStackProps extends StackProps {
   readonly solutionId: string;
@@ -152,6 +153,7 @@ export class SpokeStack extends Stack {
       resourceType: "Custom::SetupRegionalEvents",
       properties: {
         regions: regions.valueAsList,
+        version: props.solutionVersion, // force an update when updating solution version
       },
     });
     const regionsCustomResourceCfnResource = regionsCustomResource.node.defaultChild as CfnResource;
@@ -177,32 +179,15 @@ export class SpokeStack extends Stack {
       resourceType: "Custom::RegisterRegion",
       properties: {
         regions: regions.valueAsList,
+        version: props.solutionVersion, // force an update when updating solution version
       },
     });
 
     // resource dependencies to allow de-registering event to complete before removing IAM roles and permissions.
     const regionRegistrationCfnResource = regionRegistration.node.defaultChild as CfnResource;
-    const ec2PolicyCfnResource = schedulingRole.ec2Policy.node.defaultChild as CfnPolicy;
-    regionRegistrationCfnResource.addDependency(ec2PolicyCfnResource);
-    const rdsPolicyCfnResource = schedulingRole.rdsPolicy.node.defaultChild as CfnPolicy;
-    regionRegistrationCfnResource.addDependency(rdsPolicyCfnResource);
-
-    const asgPolicyCfnResource = schedulingRole.asgPolicy.node.defaultChild as CfnPolicy;
-    regionRegistrationCfnResource.addDependency(asgPolicyCfnResource);
-
-    const resourceTaggingPolicyCfnResource = schedulingRole.resourceTaggingPolicy.node.defaultChild as CfnPolicy;
-    regionRegistrationCfnResource.addDependency(resourceTaggingPolicyCfnResource);
-
-    regionRegistrationCfnResource.addDependency(schedulerRoleCfnResource);
-    regionRegistrationCfnResource.addDependency(
-      regionRegistrationCustomResource.spokeRegistrationUpdateSSMParamRoleCfnResource,
-    );
-    regionRegistrationCfnResource.addDependency(
-      regionRegistrationCustomResource.regionRegistrationWaitLambdaRoleCfnResource,
-    );
-    regionRegistrationCfnResource.addDependency(
-      regionRegistrationCustomResource.regionRegistrationCustomResourceLambdaRoleCfnResource,
-    );
+    regionRegistrationCfnResource.addDependency(SequencingGates.afterAllLambdas(this));
+    regionRegistrationCfnResource.addDependency(SequencingGates.afterAllRoles(this));
+    regionRegistrationCfnResource.addDependency(SequencingGates.afterAllPolicies(this));
     regionRegistrationCfnResource.addOverride("UpdateReplacePolicy", "Retain");
 
     new CfnOutput(this, "RegionalEventBusName", {
