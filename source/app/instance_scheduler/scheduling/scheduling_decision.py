@@ -152,7 +152,11 @@ def make_scheduling_decision(  # NOSONAR -- cognitive complexity
                     reason="enforced is enabled",
                 )
 
-            if schedule.retain_running and stored_state == InstanceState.STOPPED:
+            if (
+                schedule.retain_running
+                and stored_state == InstanceState.STOPPED
+                and instance.runtime_info.is_running
+            ):
                 return SchedulingDecision(
                     instance=instance,
                     action=RequestedAction.DO_NOTHING,
