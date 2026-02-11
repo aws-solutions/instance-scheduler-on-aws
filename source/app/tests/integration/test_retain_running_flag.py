@@ -1,7 +1,15 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 from instance_scheduler.configuration.scheduling_context import SchedulingContext
-from tests.integration.helpers.ec2_helpers import get_current_state, start_ec2_instances
+from instance_scheduler.model.managed_instance import RegistryKey
+from instance_scheduler.model.store.resource_registry import ResourceRegistry
+from instance_scheduler.scheduling.ec2.ec2 import EC2RuntimeInfo
+from instance_scheduler.util.session_manager import lambda_execution_role
+from tests.integration.helpers.ec2_helpers import (
+    get_current_state,
+    start_ec2_instances,
+    stop_ec2_instances,
+)
 from tests.integration.helpers.run_handler import simple_schedule
 from tests.integration.helpers.schedule_helpers import quick_time
 
@@ -113,4 +121,40 @@ def test_retain_running_behavior_over_multiple_scheduling_cycles(
 
         # ----------------------------Period end--------------------------#
         context.run_scheduling_request_handler(quick_time(20, 0))
+        assert get_current_state(ec2_instance) == "stopped"
+
+
+def test_retain_running_schedules_start_and_stop_normally(
+    ec2_instance: str,
+    scheduling_context: SchedulingContext,
+    resource_registry: ResourceRegistry,
+) -> None:
+    ec2_arn = EC2RuntimeInfo.arn_for(lambda_execution_role(), ec2_instance)
+    ec2_key = RegistryKey.from_arn(ec2_arn)
+
+    stop_ec2_instances(ec2_instance)
+    with simple_schedule(
+        begintime="10:00", endtime="20:00", retain_running=True
+    ) as context:
+        context.run_scheduling_request_handler(dt=quick_time(5, 0))
+        print(resource_registry.get(ec2_key).stored_state)  # type: ignore
+
+        # start of new period (should start)
+        context.run_scheduling_request_handler(dt=quick_time(10, 0))
+        print(resource_registry.get(ec2_key).stored_state)  # type: ignore
+        assert get_current_state(ec2_instance) == "running"
+
+        # start of new period (should start)
+        context.run_scheduling_request_handler(dt=quick_time(20, 0))
+        print(resource_registry.get(ec2_key).stored_state)  # type: ignore
+        assert get_current_state(ec2_instance) == "stopped"
+
+        # start of new period (should start)
+        context.run_scheduling_request_handler(dt=quick_time(10, 0))
+        print(resource_registry.get(ec2_key).stored_state)  # type: ignore
+        assert get_current_state(ec2_instance) == "running"
+
+        # start of new period (should start)
+        context.run_scheduling_request_handler(dt=quick_time(20, 0))
+        print(resource_registry.get(ec2_key).stored_state)  # type: ignore
         assert get_current_state(ec2_instance) == "stopped"
