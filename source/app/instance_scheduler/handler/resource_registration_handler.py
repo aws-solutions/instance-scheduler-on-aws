@@ -181,6 +181,12 @@ def process_rds_instance_or_skip(
 def process_ec2_instance_or_skip(
     event: ResourceRegistrationEvent, resource_arn: ARN, failed_resources: list[str]
 ) -> bool:
+    if event.detail.resource_type not in ["instance"]:
+        logger.debug(
+            f"event for unsupported ec2 resource_type. skipping...: {event.detail.resource_type}"
+        )
+        return True  # skip
+
     if ec2_tagging_event_is_for_asg(event):
         logger.debug(f"ec2 member of asg. skipping...: {event.detail.service}")
         return True

@@ -4,9 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+
+## [v3.1.4] - 2025-02-23
+
+### Fixed
+
+- Fixed EC2 registration filters to properly ignore all non-instance resources that get tagged
+- Fixed ICE retry lambda missing environment variable error
+
+### Security
+
+- Updated fast-xml-parser to mitigate CVE-2026-26278
+- Updated Werkzeug to mitigate CVE-2026-27199
+
 ## [v3.1.3] - 2025-02-11
 
 ### Fixed
+
 - Fixed retain_running flag activating on normal start actions and overriding the
 scheduled start action.
 
