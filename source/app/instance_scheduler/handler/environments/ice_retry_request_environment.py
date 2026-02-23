@@ -11,7 +11,6 @@ from instance_scheduler.util.app_env_utils import AppEnvError
 @dataclass(frozen=True)
 class IceErrorRequestEnvironment(SchedulingEnvironment):
     user_agent_extra: str
-    topic_arn: str
     hub_stack_name: str
     config_table_name: str
     scheduler_role_name: str
@@ -33,7 +32,6 @@ class IceErrorRequestEnvironment(SchedulingEnvironment):
         try:
             return IceErrorRequestEnvironment(
                 user_agent_extra=environ["USER_AGENT_EXTRA"],
-                topic_arn=environ["ISSUES_TOPIC_ARN"],
                 config_table_name=environ["CONFIG_TABLE"],
                 scheduler_role_name=environ["SCHEDULER_ROLE_NAME"],
                 hub_stack_name=environ["STACK_NAME"],
