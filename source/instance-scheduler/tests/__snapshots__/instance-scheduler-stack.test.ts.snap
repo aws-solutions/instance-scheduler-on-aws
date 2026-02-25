@@ -2831,6 +2831,7 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
       "DependsOn": [
         "ResourceRegistrationCreateRegionalEventRulesLambdaRoleDefaultPolicyAEEA7C27",
         "ResourceRegistrationCreateRegionalEventRulesLambdaRole7F7A057A",
+        "ResourceRegistrationCreateRegionalEventRulesPolicy1531DABC",
       ],
       "Properties": {
         "Code": "Omitted to remove snapshot dependency on code hash",
