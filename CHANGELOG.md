@@ -5,7 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 
-## [v3.1.4] - 2025-02-23
+## [v3.2.0] - 2026-03-12
+
+### Fixed
+
+- Fixed additional deployment/undeployment race-case scenarios in remote template
+- Fixed RDS informational error tags not being correctly applied
+- Solution log groups now correctly named {stackName}-{namespace}-{logGroupName} instead of instance-scheduler-on-aws-{namespace}-{logGroupName}
+- Fixed TagEvent forwarding EventRules not updating when changing ScheduleTagKey parameter on stacks
+
+### Changed
+
+- Re-added support for EC2 Instance resizing using the `periodName@size` pattern in 
+schedule configurations
+
+### Security
+
+- Updated minimatch to mitigate CVE-2026-26996, CVE-2026-27903, and CVE-2026-27904
+- Updated joserfc to mitigate CVE-2026-27932
+
+
+
+## [v3.1.4] - 2026-02-23
 
 ### Fixed
 
@@ -17,14 +38,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Updated fast-xml-parser to mitigate CVE-2026-26278
 - Updated Werkzeug to mitigate CVE-2026-27199
 
-## [v3.1.3] - 2025-02-11
+## [v3.1.3] - 2026-02-11
 
 ### Fixed
 
 - Fixed retain_running flag activating on normal start actions and overriding the
 scheduled start action.
 
-## [v3.1.2] - 2025-02-06
+## [v3.1.2] - 2026-02-06
 
 ### Fixed
 
@@ -40,7 +61,7 @@ scheduled start action.
 - Updated registration logs to include `resource` context key
   containing the registered/deregistered resource's ARN
 
-## [v3.1.1] - 2025-01-13
+## [v3.1.1] - 2026-01-13
 
 ### Added
 

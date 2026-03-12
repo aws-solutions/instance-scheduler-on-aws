@@ -10,7 +10,7 @@ import { SchedulingRequestHandlerLambda } from "./lambda-functions/scheduling-re
 import { FunctionFactory, PythonFunctionFactory } from "./lambda-functions/function-factory";
 import { addCfnGuardSuppression } from "./helpers/cfn-guard";
 import { HubResourceRegistration } from "./lambda-functions/resource-registration";
-import { IceErrorRetry } from "./lambda-functions/ice-error-retry";
+import { Ec2Resizing } from "./lambda-functions/ec2-resizing";
 import { RegionEventRulesCustomResource } from "./lambda-functions/region-event-rules";
 import { RegionRegistrationCustomResource } from "./lambda-functions/region-registration";
 import { TargetStack } from "./stack-types";
@@ -121,7 +121,7 @@ export class SpokeStack extends Stack {
       assumedBy: new CompositePrincipal(
         new ArnPrincipal(roleArnFor(hubAccountId, SchedulingRequestHandlerLambda.roleName(namespace.valueAsString))),
         new ArnPrincipal(roleArnFor(hubAccountId, HubResourceRegistration.roleName(namespace.valueAsString))),
-        new ArnPrincipal(roleArnFor(hubAccountId, IceErrorRetry.roleName(namespace.valueAsString))),
+        new ArnPrincipal(roleArnFor(hubAccountId, Ec2Resizing.roleName(namespace.valueAsString))),
         new ArnPrincipal(roleArnFor(hubAccountId, SpokeRegistrationLambda.roleName(namespace.valueAsString))),
       ),
       namespace: namespace.valueAsString,
@@ -154,9 +154,15 @@ export class SpokeStack extends Stack {
       properties: {
         regions: regions.valueAsList,
         version: props.solutionVersion, // force an update when updating solution version
+        //force update when changing input props (this should prob be refactored later)
+        scheduleTagKey: scheduleTagKey.valueAsString,
+        namespace: namespace.valueAsString,
       },
     });
     const regionsCustomResourceCfnResource = regionsCustomResource.node.defaultChild as CfnResource;
+    regionsCustomResourceCfnResource.addDependency(SequencingGates.afterAllLambdas(this));
+    regionsCustomResourceCfnResource.addDependency(SequencingGates.afterAllRoles(this));
+    regionsCustomResourceCfnResource.addDependency(SequencingGates.afterAllPolicies(this));
     regionsCustomResourceCfnResource.addOverride("UpdateReplacePolicy", "Retain");
 
     const regionRegistrationCustomResource = new RegionRegistrationCustomResource(

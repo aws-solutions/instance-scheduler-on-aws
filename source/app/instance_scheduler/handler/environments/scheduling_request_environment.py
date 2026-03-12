@@ -12,7 +12,7 @@ from instance_scheduler.util.app_env_utils import AppEnvError, env_to_bool
 @dataclass(frozen=True)
 class SchedulingRequestEnvironment(SchedulingEnvironment):
     user_agent_extra: str
-    ice_retry_queue_url: Optional[str]
+    resize_request_queue_url: Optional[str]
     hub_stack_name: str
     config_table_name: str
     maintenance_window_table_name: str
@@ -59,7 +59,7 @@ class SchedulingRequestEnvironment(SchedulingEnvironment):
                 scheduling_interval_minutes=int(environ["SCHEDULING_INTERVAL_MINUTES"]),
                 config_table=environ["CONFIG_TABLE"],
                 registry_table=environ["REGISTRY_TABLE"],
-                ice_retry_queue_url=environ["ICE_RETRY_SQS_URL"],
+                resize_request_queue_url=environ["RESIZE_REQUEST_SQS_URL"],
                 asg_scheduled_rule_prefix=environ["ASG_SCHEDULED_RULES_PREFIX"],
                 asg_metadata_tag_key=environ["ASG_METADATA_TAG_KEY"],
             )

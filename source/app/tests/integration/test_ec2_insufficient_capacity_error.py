@@ -9,7 +9,9 @@ import boto3
 import pytest
 from botocore.exceptions import ClientError
 from instance_scheduler.configuration.scheduling_context import SchedulingContext
-from instance_scheduler.scheduling.ec2.ice_retry import IceRetryRequest
+from instance_scheduler.handler.environments.resize_request_environment import (
+    Ec2ResizeRequest,
+)
 from instance_scheduler.util.session_manager import lambda_execution_role
 from tests.integration.helpers.boto_client_helpers import mock_specific_client
 from tests.integration.helpers.ec2_helpers import (
@@ -18,12 +20,12 @@ from tests.integration.helpers.ec2_helpers import (
 )
 from tests.integration.helpers.run_handler import simple_schedule
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 
 
-def willRaise(ex: Exception) -> None:
+def will_raise(ex: Exception) -> None:
     raise ex
 
 
@@ -81,7 +83,7 @@ def test_insufficient_capacity_error_sends_retry_requests(
     )
 
     env = MockSchedulingRequestEnvironment(
-        ice_retry_queue_url="https://sqs.us-east-1.amazonaws.com/111122223333/test-queue"
+        resize_request_queue_url="https://sqs.us-east-1.amazonaws.com/111122223333/test-queue"
     )
 
     with (
@@ -92,9 +94,9 @@ def test_insufficient_capacity_error_sends_retry_requests(
 
         assert mock_sqs_client.send_message.called
         call_args = mock_sqs_client.send_message.call_args
-        assert call_args.kwargs["QueueUrl"] == env.ice_retry_queue_url
+        assert call_args.kwargs["QueueUrl"] == env.resize_request_queue_url
         assert call_args.kwargs["MessageBody"] == json.dumps(
-            IceRetryRequest(
+            Ec2ResizeRequest(
                 account=lambda_execution_role().account,
                 region=lambda_execution_role().region,
                 instance_id=ec2_instance,
@@ -125,7 +127,7 @@ def test_instance_using_non_preferred_type_sends_ice_request(
     )
 
     env = MockSchedulingRequestEnvironment(
-        ice_retry_queue_url="https://sqs.us-east-1.amazonaws.com/111122223333/test-queue"
+        resize_request_queue_url="https://sqs.us-east-1.amazonaws.com/111122223333/test-queue"
     )
 
     with simple_schedule(begintime="10:00", endtime="20:00") as context:
@@ -133,9 +135,9 @@ def test_instance_using_non_preferred_type_sends_ice_request(
 
         assert mock_sqs_client.send_message.called
         call_args = mock_sqs_client.send_message.call_args
-        assert call_args.kwargs["QueueUrl"] == env.ice_retry_queue_url
+        assert call_args.kwargs["QueueUrl"] == env.resize_request_queue_url
         assert call_args.kwargs["MessageBody"] == json.dumps(
-            IceRetryRequest(
+            Ec2ResizeRequest(
                 account=lambda_execution_role().account,
                 region=lambda_execution_role().region,
                 instance_id=ec2_instance,
@@ -151,7 +153,7 @@ def test_insufficient_capacity_error_does_not_send_request_if_no_preferred_types
     stop_ec2_instances(ec2_instance)
 
     env = MockSchedulingRequestEnvironment(
-        ice_retry_queue_url="https://sqs.us-east-1.amazonaws.com/111122223333/test-queue"
+        resize_request_queue_url="https://sqs.us-east-1.amazonaws.com/111122223333/test-queue"
     )
 
     with (

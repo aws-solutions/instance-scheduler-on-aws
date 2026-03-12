@@ -37,18 +37,6 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         },
       ],
     },
-    "isHubStackDeployment": {
-      "Fn::Equals": [
-        "HUB",
-        "REMOTE",
-      ],
-    },
-    "isNotHubStackDeployment": {
-      "Fn::Equals": [
-        "REMOTE",
-        "REMOTE",
-      ],
-    },
   },
   "Metadata": {
     "AWS::CloudFormation::Interface": {
@@ -185,7 +173,10 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
           "Fn::Join": [
             "",
             [
-              "stack-",
+              {
+                "Ref": "AWS::StackName",
+              },
+              "-",
               {
                 "Ref": "Namespace",
               },
@@ -200,6 +191,11 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
     },
     "CreateRegionalEventRules": {
       "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "IamPolicyDeploymentGate",
+        "IamRoleDeploymentGate",
+        "LambdaDeploymentGate",
+      ],
       "Properties": {
         "ServiceToken": {
           "Fn::GetAtt": [
@@ -207,8 +203,14 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
             "Arn",
           ],
         },
+        "namespace": {
+          "Ref": "Namespace",
+        },
         "regions": {
           "Ref": "Regions",
+        },
+        "scheduleTagKey": {
+          "Ref": "ScheduleTagKey",
         },
         "version": "v9.9.9",
       },
@@ -1203,7 +1205,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                       {
                         "Ref": "Namespace",
                       },
-                      "-IceErrorRetryHandler-Role",
+                      "-Ec2ResizeRequestHandler-Role",
                     ],
                   ],
                 },
@@ -1644,6 +1646,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         "EC2SchedulerCrossAccountRoleRegionalEventBusPermissionsCE7D7CD4",
         "EC2SchedulerCrossAccountRoleResourceGroupsTaggingPermissions5A354A85",
         "HubTagEventForwardingRoleDefaultPolicy5747D549",
+        "RegionRegistrationCustomResourceLambdaPolicy6FEA993C",
         "RegionRegistrationLambdaRoleDefaultPolicy7AA4928B",
         "RegionRegistrationWaitingLambdaRoleDefaultPolicy8BBEB5F7",
       ],
@@ -1660,6 +1663,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         "HubTagEventForwardingRole5BEE3911",
         "RegionRegistrationLambdaRoleED66DE1B",
         "RegionRegistrationWaitingLambdaRole96F8D082",
+        "SpokeRegistrationUpdateSSMParamRole3F15A1F5",
       ],
       "Type": "AWS::CloudFormation::WaitConditionHandle",
     },
@@ -1766,7 +1770,6 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "Type": "AWS::Lambda::Function",
     },
     "RegionRegistrationCustomResourceLambdaPolicy6FEA993C": {
-      "Condition": "isNotHubStackDeployment",
       "Properties": {
         "PolicyDocument": {
           "Statement": [
@@ -1794,19 +1797,6 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
                 ],
               },
             },
-            {
-              "Action": [
-                "logs:CreateLogStream",
-                "logs:PutLogEvents",
-              ],
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "AdministrationLogsC5F47471",
-                  "Arn",
-                ],
-              },
-            },
           ],
           "Version": "2012-10-17",
         },
@@ -1830,6 +1820,19 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
               ],
               "Effect": "Allow",
               "Resource": "*",
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "AdministrationLogsC5F47471",
+                  "Arn",
+                ],
+              },
             },
           ],
           "Version": "2012-10-17",
@@ -2198,7 +2201,6 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "UpdateReplacePolicy": "Retain",
     },
     "SpokeRegistrationUpdateSSMParamRole3F15A1F5": {
-      "Condition": "isNotHubStackDeployment",
       "Metadata": {
         "guard": {
           "SuppressedRules": [
@@ -2324,51 +2326,6 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
         },
       },
       "Type": "AWS::IAM::Role",
-    },
-    "hubLambdaInvokePolicyE6640037": {
-      "Condition": "isHubStackDeployment",
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": "lambda:InvokeFunction",
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:",
-                    {
-                      "Ref": "AWS::Partition",
-                    },
-                    ":lambda:",
-                    {
-                      "Ref": "AWS::Region",
-                    },
-                    ":",
-                    {
-                      "Ref": "InstanceSchedulerAccount",
-                    },
-                    ":function:InstanceScheduler-",
-                    {
-                      "Ref": "Namespace",
-                    },
-                    "-SpokeRegistration",
-                  ],
-                ],
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "hubLambdaInvokePolicyE6640037",
-        "Roles": [
-          {
-            "Ref": "RegionRegistrationLambdaRoleED66DE1B",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
     },
   },
   "Rules": {

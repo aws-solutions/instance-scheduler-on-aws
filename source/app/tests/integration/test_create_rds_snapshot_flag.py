@@ -8,7 +8,7 @@ from mypy_boto3_rds.type_defs import DBSnapshotMessageTypeDef
 from tests.integration.helpers.rds_helpers import get_rds_instance_state
 from tests.integration.helpers.run_handler import simple_schedule, target
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 

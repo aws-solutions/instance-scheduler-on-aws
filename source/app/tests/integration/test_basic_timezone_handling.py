@@ -23,7 +23,7 @@ from tests.integration.helpers.ec2_helpers import (
     stop_ec2_instances,
 )
 from tests.integration.helpers.run_handler import multi_period_schedule, simple_schedule
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 

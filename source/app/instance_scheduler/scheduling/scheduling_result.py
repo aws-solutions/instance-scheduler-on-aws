@@ -22,6 +22,8 @@ class SchedulingAction(Enum):
     START = "Started"
     STOP = "Stopped"
     HIBERNATE = "Hibernated"
+    RESIZE_REQUESTED = "ResizeRequested"
+    RESIZE = "Resized"
     CONFIGURE = "Configured"
     ERROR = "Error"
 
@@ -38,6 +40,8 @@ class SchedulingAction(Enum):
                 return SchedulingAction.DO_NOTHING
             case RequestedAction.CONFIGURE:
                 return SchedulingAction.CONFIGURE
+            case RequestedAction.RESIZE:
+                return SchedulingAction.RESIZE
             case _:
                 assert_never(requested_action)
 
@@ -47,9 +51,9 @@ class SchedulingResult(Generic[T]):
     instance: T
     updated_registry_info: RegisteredInstance
     requested_action: Optional[RequestedAction]
-    request_reason: Optional[str]
+    request_reason: Optional[str]  # reason for request
     action_taken: Optional[SchedulingAction]
-    action_info: Optional[str] = None
+    action_info: Optional[str] = None  # reason/context for action taken
     error_code: Optional[ErrorCode] = None
     error_message: Optional[str] = None
 

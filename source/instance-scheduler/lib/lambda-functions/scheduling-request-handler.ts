@@ -20,7 +20,7 @@ export interface SchedulingRequestHandlerProps {
   readonly dataLayer: InstanceSchedulerDataLayer;
   readonly namespace: string;
   readonly memorySizeMB: number;
-  readonly iceErrorRetryQueue: Queue;
+  readonly ec2ResizeRequestQueue: Queue;
   readonly metricsEnv: AnonymizedMetricsEnvironment;
   readonly tagKey: string;
   readonly schedulerRoleName: string;
@@ -67,7 +67,7 @@ export class SchedulingRequestHandlerLambda {
         MAINT_WINDOW_TABLE: props.dataLayer.mwTable.tableName,
         USER_AGENT_EXTRA: props.USER_AGENT_EXTRA,
         STACK_ID: props.STACK_ID,
-        ICE_RETRY_SQS_URL: props.iceErrorRetryQueue.queueUrl,
+        RESIZE_REQUEST_SQS_URL: props.ec2ResizeRequestQueue.queueUrl,
         SCHEDULER_ROLE_NAME: props.schedulerRoleName,
         DEFAULT_TIMEZONE: props.DEFAULT_TIMEZONE,
         SCHEDULE_TAG_KEY: props.tagKey,
@@ -95,7 +95,7 @@ export class SchedulingRequestHandlerLambda {
     props.dataLayer.stateTable.grantReadWriteData(schedulingRequestHandlerPolicy);
     props.dataLayer.registry.grantReadWriteData(schedulingRequestHandlerPolicy);
     props.dataLayer.mwTable.grantReadWriteData(schedulingRequestHandlerPolicy);
-    props.iceErrorRetryQueue.grantSendMessages(schedulingRequestHandlerPolicy);
+    props.ec2ResizeRequestQueue.grantSendMessages(schedulingRequestHandlerPolicy);
     props.globalEventBus.grantPutEventsTo(schedulingRequestHandlerPolicy);
     ISLogGroups.schedulingLogGroup(scope).grantWrite(schedulingRequestHandlerPolicy);
 

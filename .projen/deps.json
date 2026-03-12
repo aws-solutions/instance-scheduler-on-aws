@@ -15,6 +15,7 @@
     },
     {
       "name": "@typescript-eslint/eslint-plugin",
+      "version": "^8",
       "type": "build"
     },
     {
@@ -72,67 +73,27 @@
     },
     {
       "name": "typescript",
-      "version": "~5.2.x",
+      "version": "~5.x",
       "type": "build"
     },
     {
       "name": "@aws-cdk/aws-lambda-python-alpha",
-      "version": "2.239.0-alpha.0",
+      "version": "2.241.0-alpha.0",
       "type": "runtime"
     },
     {
       "name": "@aws-cdk/aws-neptune-alpha",
-      "version": "2.239.0-alpha.0",
+      "version": "2.241.0-alpha.0",
       "type": "runtime"
     },
     {
       "name": "@aws-cdk/aws-servicecatalogappregistry-alpha",
-      "version": "2.239.0-alpha.0",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/client-auto-scaling",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/client-cloudformation",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/client-docdb",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/client-dynamodb",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/client-ec2",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/client-lambda",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/client-neptune",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/client-rds",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/client-ssm",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-sdk/util-dynamodb",
+      "version": "2.241.0-alpha.0",
       "type": "runtime"
     },
     {
       "name": "aws-cdk-lib",
-      "version": "2.239.0",
+      "version": "2.241.0",
       "type": "runtime"
     },
     {

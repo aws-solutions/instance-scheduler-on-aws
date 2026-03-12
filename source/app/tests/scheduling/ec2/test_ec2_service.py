@@ -8,6 +8,7 @@ from instance_scheduler.scheduling.ec2.ec2 import (
     EC2RuntimeInfo,
     Ec2Service,
     ManagedEC2Instance,
+    ResizeDecision,
     get_tags,
 )
 from instance_scheduler.scheduling.scheduling_decision import (
@@ -17,7 +18,7 @@ from instance_scheduler.scheduling.scheduling_decision import (
 from instance_scheduler.scheduling.scheduling_result import SchedulingAction
 from instance_scheduler.scheduling.states import InstanceState
 from instance_scheduler.util.arn import ARN
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 
@@ -388,7 +389,7 @@ def test_send_ice_retry_request_with_preferred_types() -> None:
     mock_context.assumed_role.region = "us-east-1"
 
     env = MockSchedulingRequestEnvironment(
-        ice_retry_queue_url="https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+        resize_request_queue_url="https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
     )
 
     service = Ec2Service(mock_context, env)
@@ -421,12 +422,17 @@ def test_send_ice_retry_request_with_preferred_types() -> None:
     ) as mock_send:
         mock_send.return_value = "message-id-123"
 
-        service._send_ice_retry_request(
-            SchedulingDecision(
-                instance=managed_instance,
-                action=RequestedAction.START,
-                new_stored_state=InstanceState.RUNNING,
-                reason="test start",
+        list(
+            service.send_resize_requests(
+                [
+                    ResizeDecision(
+                        instance=managed_instance,
+                        action=RequestedAction.START,
+                        new_stored_state=InstanceState.RUNNING,
+                        reason="test start",
+                        size_preferences=["t3.small", "t3.medium"],
+                    )
+                ]
             )
         )
 
@@ -452,7 +458,7 @@ def test_send_ice_retry_request_no_queue_url() -> None:
     from unittest.mock import MagicMock, patch
 
     mock_context = MagicMock()
-    env = MockSchedulingRequestEnvironment(ice_retry_queue_url=None)
+    env = MockSchedulingRequestEnvironment(resize_request_queue_url=None)
 
     service = Ec2Service(mock_context, env)
 
@@ -482,12 +488,17 @@ def test_send_ice_retry_request_no_queue_url() -> None:
     with patch(
         "instance_scheduler.scheduling.ec2.ec2.send_message_to_queue"
     ) as mock_send:
-        service._send_ice_retry_request(
-            SchedulingDecision(
-                instance=managed_instance,
-                action=RequestedAction.START,
-                new_stored_state=InstanceState.RUNNING,
-                reason="test start",
+        list(
+            service.send_resize_requests(
+                [
+                    ResizeDecision(
+                        instance=managed_instance,
+                        action=RequestedAction.START,
+                        new_stored_state=InstanceState.RUNNING,
+                        reason="test start",
+                        size_preferences=["t3.small", "t3.medium"],
+                    )
+                ]
             )
         )
         mock_send.assert_not_called()
@@ -499,7 +510,7 @@ def test_send_ice_retry_request_no_preferred_types() -> None:
 
     mock_context = MagicMock()
     env = MockSchedulingRequestEnvironment(
-        ice_retry_queue_url="https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+        resize_request_queue_url="https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
     )
 
     service = Ec2Service(mock_context, env)
@@ -528,12 +539,17 @@ def test_send_ice_retry_request_no_preferred_types() -> None:
     with patch(
         "instance_scheduler.scheduling.ec2.ec2.send_message_to_queue"
     ) as mock_send:
-        service._send_ice_retry_request(
-            SchedulingDecision(
-                instance=managed_instance,
-                action=RequestedAction.START,
-                new_stored_state=InstanceState.RUNNING,
-                reason="test start",
+        list(
+            service.send_resize_requests(
+                [
+                    ResizeDecision(
+                        instance=managed_instance,
+                        action=RequestedAction.START,
+                        new_stored_state=InstanceState.RUNNING,
+                        reason="test start",
+                        size_preferences=[],  # no sizes sent
+                    )
+                ]
             )
         )
         mock_send.assert_not_called()
@@ -544,8 +560,11 @@ def test_send_ice_retry_request_empty_preferred_types() -> None:
     from unittest.mock import MagicMock, patch
 
     mock_context = MagicMock()
+    mock_context.assumed_role.account = "123456789012"
+    mock_context.assumed_role.region = "us-east-1"
+
     env = MockSchedulingRequestEnvironment(
-        ice_retry_queue_url="https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+        resize_request_queue_url="https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
     )
 
     service = Ec2Service(mock_context, env)
@@ -576,12 +595,17 @@ def test_send_ice_retry_request_empty_preferred_types() -> None:
     with patch(
         "instance_scheduler.scheduling.ec2.ec2.send_message_to_queue"
     ) as mock_send:
-        service._send_ice_retry_request(
-            SchedulingDecision(
-                instance=managed_instance,
-                action=RequestedAction.START,
-                new_stored_state=InstanceState.RUNNING,
-                reason="test start",
+        list(
+            service.send_resize_requests(
+                [
+                    ResizeDecision(
+                        instance=managed_instance,
+                        action=RequestedAction.START,
+                        new_stored_state=InstanceState.RUNNING,
+                        reason="test start",
+                        size_preferences=[],
+                    )
+                ]
             )
         )
         mock_send.assert_not_called()

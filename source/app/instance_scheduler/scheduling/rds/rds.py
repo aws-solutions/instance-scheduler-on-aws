@@ -582,8 +582,10 @@ class RdsService:
                     return SchedulingResult.client_exception(decision, ex)
 
             case (
-                RequestedAction.DO_NOTHING | RequestedAction.CONFIGURE
-            ):  # configure has no meaning in this context
+                RequestedAction.DO_NOTHING
+                | RequestedAction.CONFIGURE
+                | RequestedAction.RESIZE
+            ):  # configure/resize have no meaning in this context
                 return SchedulingResult.no_action_needed(decision)
             case _:
                 assert_never(decision.action)

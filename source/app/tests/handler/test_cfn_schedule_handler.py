@@ -27,7 +27,7 @@ from instance_scheduler.model.store.schedule_definition_store import (
 from instance_scheduler.util.custom_resource import CustomResourceRequest
 from tests.context import MockLambdaContext
 from tests.test_utils.any_nonempty_string import AnyNonEmptyString
-from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
+from tests.test_utils.mock_environs.mock_main_lambda_env import MockMainLambdaEnv
 from tests.test_utils.testsuite_env import MockSuiteEnv
 from tests.test_utils.unordered_list import UnorderedList
 

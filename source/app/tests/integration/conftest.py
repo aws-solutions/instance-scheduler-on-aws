@@ -10,7 +10,7 @@ from instance_scheduler.scheduling.resource_registration import register_asg_res
 from instance_scheduler.util.session_manager import lambda_execution_role
 from pytest import fixture
 from tests.integration.helpers.asg_helpers import create_asg
-from tests.test_utils.mock_resource_registration_environment import (
+from tests.test_utils.mock_environs.mock_resource_registration_environment import (
     MockResourceRegistrationEnvironment,
 )
 from tests.test_utils.testsuite_env import MockSuiteEnv

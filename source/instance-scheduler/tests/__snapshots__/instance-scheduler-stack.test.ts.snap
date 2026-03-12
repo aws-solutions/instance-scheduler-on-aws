@@ -39,18 +39,6 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         "Enabled",
       ],
     },
-    "ResourceRegistrationisHubStackDeploymentF267769A": {
-      "Fn::Equals": [
-        "HUB",
-        "HUB",
-      ],
-    },
-    "ResourceRegistrationisNotHubStackDeployment951A17BF": {
-      "Fn::Equals": [
-        "REMOTE",
-        "HUB",
-      ],
-    },
     "RetainDataAndLogsCondition": {
       "Fn::Equals": [
         {
@@ -1009,7 +997,10 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
           "Fn::Join": [
             "",
             [
-              "stack-",
+              {
+                "Ref": "AWS::StackName",
+              },
+              "-",
               {
                 "Ref": "Namespace",
               },
@@ -1101,6 +1092,104 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         "StateTable",
       ],
       "Type": "AWS::CloudFormation::WaitConditionHandle",
+    },
+    "Ec2ResizeRequestHandlerRoleC503C8DF": {
+      "Metadata": {
+        "guard": {
+          "SuppressedRules": [
+            "CFN_NO_EXPLICIT_RESOURCE_NAMES",
+          ],
+        },
+      },
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com",
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "RoleName": {
+          "Fn::Join": [
+            "",
+            [
+              {
+                "Ref": "Namespace",
+              },
+              "-Ec2ResizeRequestHandler-Role",
+            ],
+          ],
+        },
+      },
+      "Type": "AWS::IAM::Role",
+    },
+    "Ec2ResizeRequestHandlerRoleDefaultPolicy18BD1509": {
+      "Metadata": {
+        "cdk_nag": {
+          "rules_to_suppress": [
+            {
+              "applies_to": [
+                "Resource::*",
+              ],
+              "id": "AwsSolutions-IAM5",
+              "reason": "required for xray",
+            },
+          ],
+        },
+      },
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+              ],
+              "Effect": "Allow",
+              "Resource": "*",
+            },
+            {
+              "Action": [
+                "sqs:ReceiveMessage",
+                "sqs:ChangeMessageVisibility",
+                "sqs:GetQueueUrl",
+                "sqs:DeleteMessage",
+                "sqs:GetQueueAttributes",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "InstanceSchedulerEc2ResizeRequestQueueCF79B931",
+                  "Arn",
+                ],
+              },
+            },
+            {
+              "Action": "kms:Decrypt",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "InstanceSchedulerEncryptionKey",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "PolicyName": "Ec2ResizeRequestHandlerRoleDefaultPolicy18BD1509",
+        "Roles": [
+          {
+            "Ref": "Ec2ResizeRequestHandlerRoleC503C8DF",
+          },
+        ],
+      },
+      "Type": "AWS::IAM::Policy",
     },
     "HeartbeatMetricsReporter812E35D0": {
       "DependsOn": [
@@ -1261,23 +1350,24 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
     },
     "IamPolicyDeploymentGate": {
       "DependsOn": [
+        "Ec2ResizeRequestHandlerRoleDefaultPolicy18BD1509",
         "HeartbeatMetricsReporterRoleDefaultPolicy7CE04DA3",
-        "iceErrorRetryHandlerRoleDefaultPolicy26094B45",
         "MainLambdaRoleDefaultPolicy5347C905",
         "MetricsGathererPermissionsPolicyAA99320A",
         "MetricsGeneratorRoleDefaultPolicy19F5F29A",
         "MetricsUuidPermissionsPolicyD0672406",
+        "resizeRequestHandlerPolicy65D6C75D",
         "ResourceRegistrationCreateRegionalEventRulesLambdaRoleDefaultPolicyAEEA7C27",
         "ResourceRegistrationCreateRegionalEventRulesPolicy1531DABC",
         "ResourceRegistrationCustomResourceProviderframeworkisCompleteServiceRoleDefaultPolicy209D7A94",
         "ResourceRegistrationCustomResourceProviderframeworkonEventServiceRoleDefaultPolicy2620E1E1",
         "ResourceRegistrationCustomResourceProviderframeworkonTimeoutServiceRoleDefaultPolicy1CE45C4E",
         "ResourceRegistrationCustomResourceProviderwaiterstatemachineRoleDefaultPolicy71F426D3",
+        "ResourceRegistrationhubLambdaInvokePolicy5F97F17F",
         "ResourceRegistrationHubTagEventForwardingRoleDefaultPolicy04836F11",
         "ResourceRegistrationRegionRegistrationLambdaRoleDefaultPolicyD77B4753",
         "ResourceRegistrationRegionRegistrationWaitingLambdaRoleDefaultPolicy57C65D22",
         "ResourceRegistrationResourceRegistrationLambdaRoleDefaultPolicy5CED86F8",
-        "retryIceErrorHandlerPolicy0496828B",
         "SchedulerRoleASGSchedulingPermissions3ABCC443",
         "SchedulerRoleEc2SchedulingPermissionsF1A25C28",
         "SchedulerRoleRdsSchedulingPermissionsEBB3D20F",
@@ -1295,8 +1385,8 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
     },
     "IamRoleDeploymentGate": {
       "DependsOn": [
+        "Ec2ResizeRequestHandlerRoleC503C8DF",
         "HeartbeatMetricsReporterRole9FB59405",
-        "iceErrorRetryHandlerRoleBB1DEADD",
         "MainLambdaRole500DC55A",
         "MetricsGeneratorRole83735CC4",
         "ResourceRegistrationCreateRegionalEventRulesLambdaRole7F7A057A",
@@ -1315,6 +1405,75 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         "SpokeRegistrationRole0E2E4D3E",
       ],
       "Type": "AWS::CloudFormation::WaitConditionHandle",
+    },
+    "InstanceSchedulerEc2ResizeDLQueue2836CBB6": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "KmsMasterKeyId": {
+          "Fn::GetAtt": [
+            "InstanceSchedulerEncryptionKey",
+            "Arn",
+          ],
+        },
+      },
+      "Type": "AWS::SQS::Queue",
+      "UpdateReplacePolicy": "Delete",
+    },
+    "InstanceSchedulerEc2ResizeDLQueuePolicy69671A56": {
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sqs:*",
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false",
+                },
+              },
+              "Effect": "Deny",
+              "Principal": {
+                "AWS": "*",
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "InstanceSchedulerEc2ResizeDLQueue2836CBB6",
+                  "Arn",
+                ],
+              },
+            },
+          ],
+          "Version": "2012-10-17",
+        },
+        "Queues": [
+          {
+            "Ref": "InstanceSchedulerEc2ResizeDLQueue2836CBB6",
+          },
+        ],
+      },
+      "Type": "AWS::SQS::QueuePolicy",
+    },
+    "InstanceSchedulerEc2ResizeRequestQueueCF79B931": {
+      "DeletionPolicy": "Delete",
+      "Properties": {
+        "KmsMasterKeyId": {
+          "Fn::GetAtt": [
+            "InstanceSchedulerEncryptionKey",
+            "Arn",
+          ],
+        },
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {
+            "Fn::GetAtt": [
+              "InstanceSchedulerEc2ResizeDLQueue2836CBB6",
+              "Arn",
+            ],
+          },
+          "maxReceiveCount": 1,
+        },
+        "VisibilityTimeout": 180,
+      },
+      "Type": "AWS::SQS::Queue",
+      "UpdateReplacePolicy": "Delete",
     },
     "InstanceSchedulerEncryptionKey": {
       "DeletionPolicy": {
@@ -1412,75 +1571,6 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       },
       "Type": "AWS::KMS::Alias",
     },
-    "InstanceSchedulerIceRetryDLQueue4B3D73CB": {
-      "DeletionPolicy": "Delete",
-      "Properties": {
-        "KmsMasterKeyId": {
-          "Fn::GetAtt": [
-            "InstanceSchedulerEncryptionKey",
-            "Arn",
-          ],
-        },
-      },
-      "Type": "AWS::SQS::Queue",
-      "UpdateReplacePolicy": "Delete",
-    },
-    "InstanceSchedulerIceRetryDLQueuePolicy8953A569": {
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sqs:*",
-              "Condition": {
-                "Bool": {
-                  "aws:SecureTransport": "false",
-                },
-              },
-              "Effect": "Deny",
-              "Principal": {
-                "AWS": "*",
-              },
-              "Resource": {
-                "Fn::GetAtt": [
-                  "InstanceSchedulerIceRetryDLQueue4B3D73CB",
-                  "Arn",
-                ],
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "Queues": [
-          {
-            "Ref": "InstanceSchedulerIceRetryDLQueue4B3D73CB",
-          },
-        ],
-      },
-      "Type": "AWS::SQS::QueuePolicy",
-    },
-    "InstanceSchedulerIceRetryQueueE4C492AF": {
-      "DeletionPolicy": "Delete",
-      "Properties": {
-        "KmsMasterKeyId": {
-          "Fn::GetAtt": [
-            "InstanceSchedulerEncryptionKey",
-            "Arn",
-          ],
-        },
-        "RedrivePolicy": {
-          "deadLetterTargetArn": {
-            "Fn::GetAtt": [
-              "InstanceSchedulerIceRetryDLQueue4B3D73CB",
-              "Arn",
-            ],
-          },
-          "maxReceiveCount": 1,
-        },
-        "VisibilityTimeout": 180,
-      },
-      "Type": "AWS::SQS::Queue",
-      "UpdateReplacePolicy": "Delete",
-    },
     "InstanceSchedulerSnsTopic": {
       "Properties": {
         "KmsMasterKeyId": {
@@ -1524,8 +1614,8 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
     "LambdaDeploymentGate": {
       "DependsOn": [
         "HeartbeatMetricsReporter812E35D0",
-        "iceErrorRetryHandlerLambda93DCA812",
         "MetricsUuidGenerator172A04DB",
+        "ResizeRequestHandlerLambdaBD990D86",
         "ResourceRegistrationCreateRegionalEventRulesLambdaBADBA499",
         "ResourceRegistrationCustomResourceProviderframeworkisComplete44F29B9D",
         "ResourceRegistrationCustomResourceProviderframeworkonEvent294A3755",
@@ -2737,6 +2827,130 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
       },
       "Type": "AWS::CloudWatch::Dashboard",
     },
+    "ResizeRequestHandlerLambdaBD990D86": {
+      "DependsOn": [
+        "Ec2ResizeRequestHandlerRoleDefaultPolicy18BD1509",
+        "Ec2ResizeRequestHandlerRoleC503C8DF",
+      ],
+      "Properties": {
+        "Code": "Omitted to remove snapshot dependency on code hash",
+        "Description": "Handles EC2 resizing requests, version v9.9.9",
+        "Environment": {
+          "Variables": {
+            "ASG_METADATA_TAG_KEY": {
+              "Ref": "AsgScheduledTagKey",
+            },
+            "ASG_SCHEDULED_RULES_PREFIX": {
+              "Ref": "AsgRulePrefix",
+            },
+            "CONFIG_TABLE": {
+              "Ref": "ConfigTable",
+            },
+            "GLOBAL_EVENT_BUS_NAME": {
+              "Ref": "globalEventsF68743C0",
+            },
+            "HUB_ACCOUNT_ID": {
+              "Ref": "AWS::AccountId",
+            },
+            "LOCAL_EVENT_BUS_NAME": {
+              "Fn::Join": [
+                "",
+                [
+                  "IS-LocalEvents-",
+                  {
+                    "Ref": "Namespace",
+                  },
+                ],
+              ],
+            },
+            "METRICS_URL": "https://metrics.awssolutionsbuilder.com/generic",
+            "METRICS_UUID": {
+              "Fn::GetAtt": [
+                "MetricsUuidProvider",
+                "Uuid",
+              ],
+            },
+            "POWERTOOLS_SERVICE_NAME": "instance-scheduler",
+            "REGISTRY_TABLE": {
+              "Ref": "ResourceRegistryC5838BF9",
+            },
+            "SCHEDULER_ROLE_NAME": {
+              "Fn::Join": [
+                "",
+                [
+                  {
+                    "Ref": "Namespace",
+                  },
+                  "-Scheduler-Role",
+                ],
+              ],
+            },
+            "SCHEDULE_TAG_KEY": {
+              "Ref": "TagName",
+            },
+            "SCHEDULING_INTERVAL_MINUTES": {
+              "Ref": "SchedulerFrequency",
+            },
+            "SEND_METRICS": {
+              "Fn::If": [
+                "AnonymizedMetricsEnabled",
+                "True",
+                "False",
+              ],
+            },
+            "SOLUTION_ID": "my-solution-id",
+            "SOLUTION_VERSION": "v9.9.9",
+            "STACK_NAME": {
+              "Ref": "AWS::StackName",
+            },
+            "USER_AGENT_EXTRA": "AwsSolution/my-solution-id/v9.9.9",
+          },
+        },
+        "Handler": "lambda_handler",
+        "LoggingConfig": {
+          "ApplicationLogLevel": {
+            "Fn::If": [
+              "TraceCondition",
+              "DEBUG",
+              "INFO",
+            ],
+          },
+          "LogFormat": "JSON",
+          "LogGroup": {
+            "Ref": "SchedulingLogs24313C6E",
+          },
+          "SystemLogLevel": "INFO",
+        },
+        "MemorySize": 512,
+        "Role": {
+          "Fn::GetAtt": [
+            "Ec2ResizeRequestHandlerRoleC503C8DF",
+            "Arn",
+          ],
+        },
+        "Runtime": "python3.11",
+        "Timeout": 180,
+        "TracingConfig": {
+          "Mode": "Active",
+        },
+      },
+      "Type": "AWS::Lambda::Function",
+    },
+    "ResizeRequestHandlerLambdaSqsEventSourcestackInstanceSchedulerEc2ResizeRequestQueueC0D07543DF22FAC2": {
+      "Properties": {
+        "BatchSize": 1,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "InstanceSchedulerEc2ResizeRequestQueueCF79B931",
+            "Arn",
+          ],
+        },
+        "FunctionName": {
+          "Ref": "ResizeRequestHandlerLambdaBD990D86",
+        },
+      },
+      "Type": "AWS::Lambda::EventSourceMapping",
+    },
     "ResourceRegistrationAsgTaggingEventsToLambdaAllowEventRulestackResourceRegistrationLambdaBEF595B37E8B5C0F": {
       "Properties": {
         "Action": "lambda:InvokeFunction",
@@ -2812,6 +3026,11 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
     },
     "ResourceRegistrationCreateRegionalEventRules9BE794F3": {
       "DeletionPolicy": "Delete",
+      "DependsOn": [
+        "IamPolicyDeploymentGate",
+        "IamRoleDeploymentGate",
+        "LambdaDeploymentGate",
+      ],
       "Properties": {
         "ServiceToken": {
           "Fn::GetAtt": [
@@ -2819,8 +3038,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             "Arn",
           ],
         },
+        "namespace": {
+          "Ref": "Namespace",
+        },
         "regions": {
           "Ref": "Regions",
+        },
+        "scheduleTagKey": {
+          "Ref": "TagName",
         },
         "version": "v9.9.9",
       },
@@ -3979,60 +4204,6 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
       },
       "Type": "AWS::Lambda::Function",
     },
-    "ResourceRegistrationRegionRegistrationCustomResourceLambdaPolicy4210499E": {
-      "Condition": "ResourceRegistrationisNotHubStackDeployment951A17BF",
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::Join": [
-                  "",
-                  [
-                    "arn:",
-                    {
-                      "Ref": "AWS::Partition",
-                    },
-                    ":iam::",
-                    {
-                      "Ref": "AWS::AccountId",
-                    },
-                    ":role/",
-                    {
-                      "Ref": "Namespace",
-                    },
-                    "-SpokeRegistrationInvokeFunction-Role",
-                  ],
-                ],
-              },
-            },
-            {
-              "Action": [
-                "logs:CreateLogStream",
-                "logs:PutLogEvents",
-              ],
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "AdministrationLogsC5F47471",
-                  "Arn",
-                ],
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "ResourceRegistrationRegionRegistrationCustomResourceLambdaPolicy4210499E",
-        "Roles": [
-          {
-            "Ref": "ResourceRegistrationRegionRegistrationLambdaRoleB05DE28F",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
-    },
     "ResourceRegistrationRegionRegistrationLambdaRoleB05DE28F": {
       "Metadata": {
         "guard": {
@@ -4152,6 +4323,19 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
               ],
               "Effect": "Allow",
               "Resource": "*",
+            },
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "AdministrationLogsC5F47471",
+                  "Arn",
+                ],
+              },
             },
           ],
           "Version": "2012-10-17",
@@ -4771,134 +4955,6 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
       },
       "Type": "AWS::IAM::Policy",
     },
-    "ResourceRegistrationSpokeRegistrationUpdateSSMParamRoleCA31EFC6": {
-      "Condition": "ResourceRegistrationisNotHubStackDeployment951A17BF",
-      "Metadata": {
-        "guard": {
-          "SuppressedRules": [
-            "CFN_NO_EXPLICIT_RESOURCE_NAMES",
-            "IAM_NO_INLINE_POLICY_CHECK",
-            "IAM_POLICYDOCUMENT_NO_WILDCARD_RESOURCE",
-          ],
-        },
-      },
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "AWS": {
-                  "Fn::Join": [
-                    "",
-                    [
-                      "arn:",
-                      {
-                        "Ref": "AWS::Partition",
-                      },
-                      ":iam::",
-                      {
-                        "Ref": "AWS::AccountId",
-                      },
-                      ":role/",
-                      {
-                        "Ref": "Namespace",
-                      },
-                      "-SpokeRegistrationHandler-Role",
-                    ],
-                  ],
-                },
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "Policies": [
-          {
-            "PolicyDocument": {
-              "Statement": [
-                {
-                  "Action": [
-                    "ssm:GetParametersByPath",
-                    "ssm:GetParameters",
-                    "ssm:GetParameter",
-                  ],
-                  "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Join": [
-                      "",
-                      [
-                        "arn:",
-                        {
-                          "Ref": "AWS::Partition",
-                        },
-                        ":ssm:*:",
-                        {
-                          "Ref": "AWS::AccountId",
-                        },
-                        ":parameter/IS/",
-                        {
-                          "Ref": "Namespace",
-                        },
-                        "/regions/*",
-                      ],
-                    ],
-                  },
-                },
-                {
-                  "Action": "ssm:DescribeParameters",
-                  "Effect": "Allow",
-                  "Resource": "*",
-                },
-                {
-                  "Action": [
-                    "ssm:PutParameter",
-                    "ssm:DeleteParameter",
-                    "ssm:DeleteParameters",
-                  ],
-                  "Effect": "Allow",
-                  "Resource": {
-                    "Fn::Join": [
-                      "",
-                      [
-                        "arn:",
-                        {
-                          "Ref": "AWS::Partition",
-                        },
-                        ":ssm:*:",
-                        {
-                          "Ref": "AWS::AccountId",
-                        },
-                        ":parameter/IS/",
-                        {
-                          "Ref": "Namespace",
-                        },
-                        "/regions/*",
-                      ],
-                    ],
-                  },
-                },
-              ],
-              "Version": "2012-10-17",
-            },
-            "PolicyName": "SpokeRegistrationUpdateSSMParamPolicy",
-          },
-        ],
-        "RoleName": {
-          "Fn::Join": [
-            "",
-            [
-              {
-                "Ref": "Namespace",
-              },
-              "-SpokeRegistrationUpdateSSMParamRole",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::IAM::Role",
-    },
     "ResourceRegistrationTaggingEventsToLambda5A63CF2E": {
       "Properties": {
         "EventBusName": {
@@ -4959,7 +5015,6 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
       "Type": "AWS::Lambda::Permission",
     },
     "ResourceRegistrationhubLambdaInvokePolicy5F97F17F": {
-      "Condition": "ResourceRegistrationisHubStackDeploymentF267769A",
       "Properties": {
         "PolicyDocument": {
           "Statement": [
@@ -5176,7 +5231,7 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
               "Principal": {
                 "AWS": {
                   "Fn::GetAtt": [
-                    "iceErrorRetryHandlerRoleBB1DEADD",
+                    "Ec2ResizeRequestHandlerRoleC503C8DF",
                     "Arn",
                   ],
                 },
@@ -5553,7 +5608,10 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
           "Fn::Join": [
             "",
             [
-              "stack-",
+              {
+                "Ref": "AWS::StackName",
+              },
+              "-",
               {
                 "Ref": "Namespace",
               },
@@ -6736,229 +6794,7 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
       },
       "Type": "AWS::Events::EventBus",
     },
-    "iceErrorRetryHandlerLambda93DCA812": {
-      "DependsOn": [
-        "iceErrorRetryHandlerRoleDefaultPolicy26094B45",
-        "iceErrorRetryHandlerRoleBB1DEADD",
-      ],
-      "Properties": {
-        "Code": "Omitted to remove snapshot dependency on code hash",
-        "Description": "Handles ICE error retry events, version v9.9.9",
-        "Environment": {
-          "Variables": {
-            "ASG_METADATA_TAG_KEY": {
-              "Ref": "AsgScheduledTagKey",
-            },
-            "ASG_SCHEDULED_RULES_PREFIX": {
-              "Ref": "AsgRulePrefix",
-            },
-            "CONFIG_TABLE": {
-              "Ref": "ConfigTable",
-            },
-            "GLOBAL_EVENT_BUS_NAME": {
-              "Ref": "globalEventsF68743C0",
-            },
-            "HUB_ACCOUNT_ID": {
-              "Ref": "AWS::AccountId",
-            },
-            "LOCAL_EVENT_BUS_NAME": {
-              "Fn::Join": [
-                "",
-                [
-                  "IS-LocalEvents-",
-                  {
-                    "Ref": "Namespace",
-                  },
-                ],
-              ],
-            },
-            "METRICS_URL": "https://metrics.awssolutionsbuilder.com/generic",
-            "METRICS_UUID": {
-              "Fn::GetAtt": [
-                "MetricsUuidProvider",
-                "Uuid",
-              ],
-            },
-            "POWERTOOLS_SERVICE_NAME": "instance-scheduler",
-            "REGISTRY_TABLE": {
-              "Ref": "ResourceRegistryC5838BF9",
-            },
-            "SCHEDULER_ROLE_NAME": {
-              "Fn::Join": [
-                "",
-                [
-                  {
-                    "Ref": "Namespace",
-                  },
-                  "-Scheduler-Role",
-                ],
-              ],
-            },
-            "SCHEDULE_TAG_KEY": {
-              "Ref": "TagName",
-            },
-            "SCHEDULING_INTERVAL_MINUTES": {
-              "Ref": "SchedulerFrequency",
-            },
-            "SEND_METRICS": {
-              "Fn::If": [
-                "AnonymizedMetricsEnabled",
-                "True",
-                "False",
-              ],
-            },
-            "SOLUTION_ID": "my-solution-id",
-            "SOLUTION_VERSION": "v9.9.9",
-            "STACK_NAME": {
-              "Ref": "AWS::StackName",
-            },
-            "USER_AGENT_EXTRA": "AwsSolution/my-solution-id/v9.9.9",
-          },
-        },
-        "Handler": "lambda_handler",
-        "LoggingConfig": {
-          "ApplicationLogLevel": {
-            "Fn::If": [
-              "TraceCondition",
-              "DEBUG",
-              "INFO",
-            ],
-          },
-          "LogFormat": "JSON",
-          "LogGroup": {
-            "Ref": "SchedulingLogs24313C6E",
-          },
-          "SystemLogLevel": "INFO",
-        },
-        "MemorySize": 128,
-        "Role": {
-          "Fn::GetAtt": [
-            "iceErrorRetryHandlerRoleBB1DEADD",
-            "Arn",
-          ],
-        },
-        "Runtime": "python3.11",
-        "Timeout": 180,
-        "TracingConfig": {
-          "Mode": "Active",
-        },
-      },
-      "Type": "AWS::Lambda::Function",
-    },
-    "iceErrorRetryHandlerLambdaSqsEventSourcestackInstanceSchedulerIceRetryQueue9CC502EF124CE592": {
-      "Properties": {
-        "BatchSize": 1,
-        "EventSourceArn": {
-          "Fn::GetAtt": [
-            "InstanceSchedulerIceRetryQueueE4C492AF",
-            "Arn",
-          ],
-        },
-        "FunctionName": {
-          "Ref": "iceErrorRetryHandlerLambda93DCA812",
-        },
-      },
-      "Type": "AWS::Lambda::EventSourceMapping",
-    },
-    "iceErrorRetryHandlerRoleBB1DEADD": {
-      "Metadata": {
-        "guard": {
-          "SuppressedRules": [
-            "CFN_NO_EXPLICIT_RESOURCE_NAMES",
-          ],
-        },
-      },
-      "Properties": {
-        "AssumeRolePolicyDocument": {
-          "Statement": [
-            {
-              "Action": "sts:AssumeRole",
-              "Effect": "Allow",
-              "Principal": {
-                "Service": "lambda.amazonaws.com",
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "RoleName": {
-          "Fn::Join": [
-            "",
-            [
-              {
-                "Ref": "Namespace",
-              },
-              "-IceErrorRetryHandler-Role",
-            ],
-          ],
-        },
-      },
-      "Type": "AWS::IAM::Role",
-    },
-    "iceErrorRetryHandlerRoleDefaultPolicy26094B45": {
-      "Metadata": {
-        "cdk_nag": {
-          "rules_to_suppress": [
-            {
-              "applies_to": [
-                "Resource::*",
-              ],
-              "id": "AwsSolutions-IAM5",
-              "reason": "required for xray",
-            },
-          ],
-        },
-      },
-      "Properties": {
-        "PolicyDocument": {
-          "Statement": [
-            {
-              "Action": [
-                "xray:PutTraceSegments",
-                "xray:PutTelemetryRecords",
-              ],
-              "Effect": "Allow",
-              "Resource": "*",
-            },
-            {
-              "Action": [
-                "sqs:ReceiveMessage",
-                "sqs:ChangeMessageVisibility",
-                "sqs:GetQueueUrl",
-                "sqs:DeleteMessage",
-                "sqs:GetQueueAttributes",
-              ],
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "InstanceSchedulerIceRetryQueueE4C492AF",
-                  "Arn",
-                ],
-              },
-            },
-            {
-              "Action": "kms:Decrypt",
-              "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "InstanceSchedulerEncryptionKey",
-                  "Arn",
-                ],
-              },
-            },
-          ],
-          "Version": "2012-10-17",
-        },
-        "PolicyName": "iceErrorRetryHandlerRoleDefaultPolicy26094B45",
-        "Roles": [
-          {
-            "Ref": "iceErrorRetryHandlerRoleBB1DEADD",
-          },
-        ],
-      },
-      "Type": "AWS::IAM::Policy",
-    },
-    "retryIceErrorHandlerPolicy0496828B": {
+    "resizeRequestHandlerPolicy65D6C75D": {
       "Metadata": {
         "cdk_nag": {
           "rules_to_suppress": [
@@ -7044,7 +6880,7 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
               "Effect": "Allow",
               "Resource": {
                 "Fn::GetAtt": [
-                  "InstanceSchedulerIceRetryQueueE4C492AF",
+                  "InstanceSchedulerEc2ResizeRequestQueueCF79B931",
                   "Arn",
                 ],
               },
@@ -7105,10 +6941,10 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
           ],
           "Version": "2012-10-17",
         },
-        "PolicyName": "retryIceErrorHandlerPolicy0496828B",
+        "PolicyName": "resizeRequestHandlerPolicy65D6C75D",
         "Roles": [
           {
-            "Ref": "iceErrorRetryHandlerRoleBB1DEADD",
+            "Ref": "Ec2ResizeRequestHandlerRoleC503C8DF",
           },
         ],
       },
@@ -7166,9 +7002,6 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             "HUB_STACK_NAME": {
               "Ref": "AWS::StackName",
             },
-            "ICE_RETRY_SQS_URL": {
-              "Ref": "InstanceSchedulerIceRetryQueueE4C492AF",
-            },
             "LOCAL_EVENT_BUS_NAME": {
               "Fn::Join": [
                 "",
@@ -7193,6 +7026,9 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             "POWERTOOLS_SERVICE_NAME": "instance-scheduler",
             "REGISTRY_TABLE": {
               "Ref": "ResourceRegistryC5838BF9",
+            },
+            "RESIZE_REQUEST_SQS_URL": {
+              "Ref": "InstanceSchedulerEc2ResizeRequestQueueCF79B931",
             },
             "SCHEDULER_ROLE_NAME": {
               "Fn::Join": [
@@ -7460,7 +7296,7 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
               "Effect": "Allow",
               "Resource": {
                 "Fn::GetAtt": [
-                  "InstanceSchedulerIceRetryQueueE4C492AF",
+                  "InstanceSchedulerEc2ResizeRequestQueueCF79B931",
                   "Arn",
                 ],
               },

@@ -22,8 +22,8 @@ from tests.integration.helpers.ec2_helpers import (
 from tests.integration.helpers.run_handler import simple_schedule
 from tests.integration.helpers.schedule_helpers import quick_time
 from tests.integration.ops_metrics.conftest import override_should_send_metric
-from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_metrics_environment import MockMetricsEnviron
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 from tests.test_utils.unordered_list import UnorderedList

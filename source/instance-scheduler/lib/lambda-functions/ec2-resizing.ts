@@ -15,7 +15,7 @@ import { addCfnGuardSuppression } from "../helpers/cfn-guard";
 import { KmsKeys } from "../helpers/kms";
 import { EventBus } from "aws-cdk-lib/aws-events";
 
-export interface IceErrorRetryProps {
+export interface Ec2ResizingProps {
   readonly description: string;
   readonly dataLayer: InstanceSchedulerDataLayer;
   readonly namespace: string;
@@ -35,24 +35,24 @@ export interface IceErrorRetryProps {
   readonly factory: FunctionFactory;
 }
 
-export class IceErrorRetry extends Construct {
-  readonly retryIceErrorLambda: LambdaFunction;
-  readonly iceRetryQueue: Queue;
+export class Ec2Resizing extends Construct {
+  readonly resizeRequestHandler: LambdaFunction;
+  readonly resizeRequestQueue: Queue;
 
   static roleName(namespace: string) {
-    return `${namespace}-IceErrorRetryHandler-Role`;
+    return `${namespace}-Ec2ResizeRequestHandler-Role`;
   }
 
-  constructor(scope: Construct, id: string, props: IceErrorRetryProps) {
+  constructor(scope: Construct, id: string, props: Ec2ResizingProps) {
     super(scope, id);
 
-    this.iceRetryQueue = new Queue(scope, "InstanceSchedulerIceRetryQueue", {
+    this.resizeRequestQueue = new Queue(scope, "InstanceSchedulerEc2ResizeRequestQueue", {
       encryptionMasterKey: KmsKeys.get(scope),
       visibilityTimeout: Duration.seconds(180),
       encryption: QueueEncryption.KMS,
       deadLetterQueue: {
         maxReceiveCount: 1,
-        queue: new Queue(scope, "InstanceSchedulerIceRetryDLQueue", {
+        queue: new Queue(scope, "InstanceSchedulerEc2ResizeDLQueue", {
           encryption: QueueEncryption.KMS,
           encryptionMasterKey: KmsKeys.get(scope),
           enforceSSL: true,
@@ -60,19 +60,19 @@ export class IceErrorRetry extends Construct {
       },
     });
 
-    const iceErrorRetryLambdaRole = new Role(scope, "iceErrorRetryHandlerRole", {
-      roleName: IceErrorRetry.roleName(props.namespace),
+    const resizeRequestHandlerLambdaRole = new Role(scope, "Ec2ResizeRequestHandlerRole", {
+      roleName: Ec2Resizing.roleName(props.namespace),
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
     });
 
-    addCfnGuardSuppression(iceErrorRetryLambdaRole, ["CFN_NO_EXPLICIT_RESOURCE_NAMES"]);
+    addCfnGuardSuppression(resizeRequestHandlerLambdaRole, ["CFN_NO_EXPLICIT_RESOURCE_NAMES"]);
 
-    this.retryIceErrorLambda = props.factory.createFunction(scope, "iceErrorRetryHandlerLambda", {
+    this.resizeRequestHandler = props.factory.createFunction(scope, "ResizeRequestHandlerLambda", {
       description: props.description,
-      index: "instance_scheduler/handler/ice_retry_handler.py",
+      index: "instance_scheduler/handler/resize_handler.py",
       handler: "lambda_handler",
-      memorySize: 128,
-      role: iceErrorRetryLambdaRole,
+      memorySize: 512,
+      role: resizeRequestHandlerLambdaRole,
       timeout: Duration.seconds(180),
       logGroup: ISLogGroups.schedulingLogGroup(scope),
       environment: {
@@ -90,27 +90,27 @@ export class IceErrorRetry extends Construct {
       },
     });
 
-    if (!this.retryIceErrorLambda.role) {
+    if (!this.resizeRequestHandler.role) {
       throw new Error("retry lambda function role is missing");
     }
 
     // Add SQS event source
-    this.retryIceErrorLambda.addEventSource(
-      new SqsEventSource(this.iceRetryQueue, {
+    this.resizeRequestHandler.addEventSource(
+      new SqsEventSource(this.resizeRequestQueue, {
         batchSize: 1,
       }),
     );
 
-    const retryIceErrorHandlerPolicy = new Policy(scope, "retryIceErrorHandlerPolicy", {
-      roles: [this.retryIceErrorLambda.role],
+    const resizeRequestHandlerPolicy = new Policy(scope, "resizeRequestHandlerPolicy", {
+      roles: [this.resizeRequestHandler.role],
     });
 
-    props.dataLayer.registry.grantReadWriteData(retryIceErrorHandlerPolicy);
-    this.iceRetryQueue.grantConsumeMessages(retryIceErrorHandlerPolicy);
-    props.globalEventBus.grantPutEventsTo(retryIceErrorHandlerPolicy);
-    ISLogGroups.schedulingLogGroup(scope).grantWrite(retryIceErrorHandlerPolicy);
+    props.dataLayer.registry.grantReadWriteData(resizeRequestHandlerPolicy);
+    this.resizeRequestQueue.grantConsumeMessages(resizeRequestHandlerPolicy);
+    props.globalEventBus.grantPutEventsTo(resizeRequestHandlerPolicy);
+    ISLogGroups.schedulingLogGroup(scope).grantWrite(resizeRequestHandlerPolicy);
 
-    retryIceErrorHandlerPolicy.addStatements(
+    resizeRequestHandlerPolicy.addStatements(
       //assume scheduler role in hub/spoke accounts
       new PolicyStatement({
         actions: ["sts:AssumeRole"],
@@ -119,7 +119,7 @@ export class IceErrorRetry extends Construct {
       }),
     );
 
-    const defaultPolicy = this.retryIceErrorLambda.role.node.tryFindChild("DefaultPolicy");
+    const defaultPolicy = this.resizeRequestHandler.role.node.tryFindChild("DefaultPolicy");
     if (!defaultPolicy) {
       throw Error("Unable to find default policy on lambda role");
     }
@@ -132,7 +132,7 @@ export class IceErrorRetry extends Construct {
       },
     ]);
 
-    NagSuppressions.addResourceSuppressions(retryIceErrorHandlerPolicy, [
+    NagSuppressions.addResourceSuppressions(resizeRequestHandlerPolicy, [
       {
         id: "AwsSolutions-IAM5",
         appliesTo: ["Action::kms:GenerateDataKey*", "Action::kms:ReEncrypt*"],

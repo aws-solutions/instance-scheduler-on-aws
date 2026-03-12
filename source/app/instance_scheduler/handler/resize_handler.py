@@ -15,8 +15,9 @@ from botocore.exceptions import ClientError
 from instance_scheduler.configuration.scheduling_context import (
     SchedulingContext,
 )
-from instance_scheduler.handler.environments.ice_retry_request_environment import (
-    IceErrorRequestEnvironment,
+from instance_scheduler.handler.environments.resize_request_environment import (
+    Ec2ResizeRequest,
+    ResizeRequestEnvironment,
 )
 from instance_scheduler.observability.error_codes import ErrorCode
 from instance_scheduler.observability.events import (
@@ -30,13 +31,15 @@ from instance_scheduler.observability.powertools_logging import (
     should_log_events,
 )
 from instance_scheduler.scheduling.ec2.ec2 import Ec2Service, ManagedEC2Instance
-from instance_scheduler.scheduling.ec2.ice_retry import IceRetryRequest
 from instance_scheduler.scheduling.scheduling_decision import (
     ManagedInstance,
     RequestedAction,
     SchedulingDecision,
 )
-from instance_scheduler.scheduling.scheduling_result import SchedulingResult
+from instance_scheduler.scheduling.scheduling_result import (
+    SchedulingAction,
+    SchedulingResult,
+)
 from instance_scheduler.scheduling.states import InstanceState
 from instance_scheduler.util import safe_json
 from instance_scheduler.util.session_manager import AssumedRole, assume_role
@@ -47,18 +50,19 @@ from instance_scheduler.util.validation import (
 
 if TYPE_CHECKING:
     from aws_lambda_powertools.utilities.typing import LambdaContext
+    from mypy_boto3_ec2.client import EC2Client
     from mypy_boto3_sqs.type_defs import MessageTypeDef
 else:
     LambdaContext = object
-    InstanceTypeDef = object
+    EC2Client = object
     MessageTypeDef = object
 
 logger: Final = powertools_logger()
 
 
-def validate_ice_retry_request(
+def validate_resize_request(
     untyped_dict: Mapping[str, Any],
-) -> TypeGuard[IceRetryRequest]:
+) -> TypeGuard[Ec2ResizeRequest]:
     validate_string(untyped_dict, "account", required=True)
     validate_string(untyped_dict, "region", required=True)
     validate_string(untyped_dict, "instance_id", required=True)
@@ -71,7 +75,7 @@ class InvalidRequestException(Exception):
     pass
 
 
-class IceRetryEventException(Exception):
+class ResizeEventException(Exception):
     pass
 
 
@@ -80,31 +84,31 @@ def lambda_handler(
     event: Mapping[str, Any],
     lambda_context: LambdaContext,
 ) -> str:
-    env = IceErrorRequestEnvironment.from_env()
+    env = ResizeRequestEnvironment.from_env()
 
     try:
         sqs_event: MessageTypeDef = event.get("Records", [])[0]
-        ice_retry_event: IceRetryRequest = json.loads(str(sqs_event.get("body")))
-        if validate_ice_retry_request(ice_retry_event):
-            scheduling_context = build_scheduling_context(ice_retry_event, env)
-            handler = IceRetryRequestHandler(
-                ice_retry_event,
+        resize_event: Ec2ResizeRequest = json.loads(str(sqs_event.get("body")))
+        if validate_resize_request(resize_event):
+            scheduling_context = build_scheduling_context(resize_event, env)
+            handler = ResizeRequestHandler(
+                resize_event,
                 env=env,
                 scheduling_context=scheduling_context,
             )
 
             return handler.handle_request()
         else:
-            raise InvalidRequestException("Invalid ice retry request")
+            raise InvalidRequestException("Invalid resize request")
     except Exception as error:
         logger.error(
-            f"Error in lambda {lambda_context.function_name} handling ice retry request {safe_json(event)}: ({error})\n{traceback.format_exc()}",
+            f"Error in lambda {lambda_context.function_name} handling resize request {safe_json(event)}: ({error})\n{traceback.format_exc()}",
         )
         raise error
 
 
 def build_scheduling_context(
-    event: IceRetryRequest, env: IceErrorRequestEnvironment
+    event: Ec2ResizeRequest, env: ResizeRequestEnvironment
 ) -> SchedulingContext:
     current_dt = datetime.now(timezone.utc)
     role = assume_role(
@@ -116,11 +120,11 @@ def build_scheduling_context(
     return context
 
 
-class IceRetryRequestHandler:
+class ResizeRequestHandler:
     def __init__(
         self,
-        event: IceRetryRequest,
-        env: IceErrorRequestEnvironment,
+        event: Ec2ResizeRequest,
+        env: ResizeRequestEnvironment,
         scheduling_context: SchedulingContext,
     ) -> None:
         self._event = event
@@ -141,7 +145,7 @@ class IceRetryRequestHandler:
             )
 
             if not runtime_info:
-                raise IceRetryEventException(
+                raise ResizeEventException(
                     f"Instance {instance_id} not found in account {self._scheduling_context.assumed_role.account} region {self._scheduling_context.assumed_role.region}"
                 )
 
@@ -155,7 +159,7 @@ class IceRetryRequestHandler:
                 registry_info=registry_info,
             )
 
-            result = attempt_ice_resize(
+            result = attempt_ec2_resize(
                 role=self._scheduling_context.assumed_role,
                 ec2_instance=managed_ec2,
                 prioritized_types=event["preferred_instance_types"],
@@ -179,19 +183,28 @@ class IceRetryRequestHandler:
         return "OK"
 
 
-def attempt_ice_resize(
+def attempt_ec2_resize(
     role: AssumedRole, ec2_instance: ManagedEC2Instance, prioritized_types: list[str]
 ) -> SchedulingResult[ManagedInstance]:
-    ec2_client = role.client("ec2")
+    ec2_client: EC2Client = role.client("ec2")
     decision: SchedulingDecision[ManagedInstance] = SchedulingDecision(
         instance=ec2_instance,
-        action=RequestedAction.START,
+        action=RequestedAction.RESIZE,
         new_stored_state=InstanceState.RUNNING,
-        reason="ICE Retry Requested",
+        reason="EC2 Resize Requested",
     )
 
     for instance_type in prioritized_types:
         try:
+            if ec2_instance.runtime_info.is_running:
+                if ec2_instance.runtime_info.current_size == instance_type:
+                    # already running with desired size
+                    return SchedulingResult.success(decision)
+                else:
+                    ec2_client.stop_instances(
+                        InstanceIds=[ec2_instance.runtime_info.resource_id]
+                    )
+
             resize_instance(
                 role,
                 ec2_instance.runtime_info.resource_id,
@@ -200,7 +213,9 @@ def attempt_ice_resize(
             ec2_client.start_instances(
                 InstanceIds=[ec2_instance.runtime_info.resource_id]
             )
-            return SchedulingResult.success(decision)
+            return SchedulingResult.success(
+                decision, action_taken=SchedulingAction.RESIZE
+            )
         except ClientError as error:
             if error.response["Error"]["Code"] == "InsufficientInstanceCapacity":
                 logger.debug(

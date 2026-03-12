@@ -45,8 +45,10 @@ from tests.handler.test_scheduling_orchestration_handler import (
 )
 from tests.integration.helpers.schedule_helpers import quick_time
 from tests.logger import MockLogger
-from tests.test_utils.mock_orchestrator_environment import MockOrchestratorEnvironment
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_orchestrator_environment import (
+    MockOrchestratorEnvironment,
+)
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 

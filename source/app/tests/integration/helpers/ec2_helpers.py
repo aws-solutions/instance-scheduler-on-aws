@@ -20,7 +20,11 @@ def create_ec2_instances(
     account: str = "123456789012",
     region: str = "us-east-1",
     instance_type: InstanceTypeType = "t2.micro",
+    additional_tags: Optional[list[TagTypeDef]] = None,
 ) -> tuple[str, ...]:
+    if not additional_tags:
+        additional_tags = []
+
     ec2_client: EC2Client = assume_mocked_role(account, region).client("ec2")
     create_response = ec2_client.run_instances(
         ImageId=get_ami(region),
@@ -29,8 +33,10 @@ def create_ec2_instances(
         InstanceType=instance_type,
     )
     instance_ids = [instance["InstanceId"] for instance in create_response["Instances"]]
+    schedule_tag: TagTypeDef = {"Key": "Schedule", "Value": schedule_name}
     ec2_client.create_tags(
-        Resources=instance_ids, Tags=[{"Key": "Schedule", "Value": schedule_name}]
+        Resources=instance_ids,
+        Tags=([schedule_tag] + additional_tags),
     )
 
     return tuple(instance_ids)

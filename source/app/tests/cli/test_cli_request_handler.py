@@ -23,7 +23,7 @@ from instance_scheduler.model.store.schedule_definition_store import (
 from instance_scheduler.util.dynamodb_utils import DynamoDBUtils
 from packaging.version import Version
 from tests.context import MockLambdaContext
-from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
+from tests.test_utils.mock_environs.mock_main_lambda_env import MockMainLambdaEnv
 from tests.test_utils.unordered_list import UnorderedList
 
 

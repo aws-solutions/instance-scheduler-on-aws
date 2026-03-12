@@ -16,7 +16,7 @@ from tests.integration.helpers.ec2_helpers import create_ec2_instances
 from tests.integration.helpers.run_handler import SchedulingTestContext
 from tests.integration.helpers.schedule_helpers import quick_time
 from tests.integration.ops_metrics.conftest import override_should_send_metric
-from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
+from tests.test_utils.mock_environs.mock_metrics_environment import MockMetricsEnviron
 
 schedule_1 = ScheduleDefinition(
     name="sched_1", periods=[PeriodIdentifier.of("period1")]

@@ -32,7 +32,7 @@ class MockSchedulingRequestEnvironment(SchedulingRequestEnvironment):
     scheduling_interval_minutes: int = 5
     config_table: str = "my-config-table-name"
     registry_table: str = "my-registry-table-name"
-    ice_retry_queue_url: Optional[str] = (
+    resize_request_queue_url: Optional[str] = (
         "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
     )
     asg_scheduled_rule_prefix: str = "IS-"
@@ -61,7 +61,7 @@ class MockSchedulingRequestEnvironment(SchedulingRequestEnvironment):
             "ENABLE_OPS_MONITORING": str(self.enable_ops_monitoring).lower(),
             "HUB_STACK_NAME": self.hub_stack_name,
             "REGISTRY_TABLE": self.registry_table,
-            "ICE_RETRY_SQS_URL": self.ice_retry_queue_url,
+            "RESIZE_REQUEST_SQS_URL": self.resize_request_queue_url,
             "ASG_SCHEDULED_RULES_PREFIX": self.asg_scheduled_rule_prefix,
             "ASG_METADATA_TAG_KEY": self.asg_metadata_tag_key,
             "LOCAL_EVENT_BUS_NAME": self.local_event_bus_name,

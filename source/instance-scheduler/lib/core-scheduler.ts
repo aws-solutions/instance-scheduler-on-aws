@@ -21,7 +21,7 @@ import { InstanceSchedulerDataLayer } from "./instance-scheduler-data-layer";
 import { LogInsightsQueries } from "./observability/log-insights-queries";
 import { KmsKeys } from "./helpers/kms";
 import { HubResourceRegistration } from "./lambda-functions/resource-registration";
-import { IceErrorRetry } from "./lambda-functions/ice-error-retry";
+import { Ec2Resizing } from "./lambda-functions/ec2-resizing";
 import { HeartbeatMetricReporter } from "./lambda-functions/heartbeat-metric-reporter";
 import { SnsLogSubscriber } from "./observability/log-sns-forwarding";
 import { SpokeRegistrationLambda } from "./lambda-functions/spoke-registration";
@@ -148,9 +148,8 @@ export class CoreScheduler {
       metricsEnv: metricsEnv,
     });
 
-    //ICE Retry lambda
-    const iceErrorRetry = new IceErrorRetry(scope, "IceErrorRetry", {
-      description: "Handles ICE error retry events, version " + props.solutionVersion,
+    const Ec2ResizeLambda = new Ec2Resizing(scope, "Ec2Resizing", {
+      description: "Handles EC2 resizing requests, version " + props.solutionVersion,
       dataLayer: this.dataLayer,
       namespace: props.namespace,
       userAgentExtra: USER_AGENT_EXTRA,
@@ -178,7 +177,7 @@ export class CoreScheduler {
       DEFAULT_TIMEZONE: props.defaultTimezone,
       STACK_ID: Aws.STACK_ID,
       STACK_NAME: Aws.STACK_NAME,
-      iceErrorRetryQueue: iceErrorRetry.iceRetryQueue,
+      ec2ResizeRequestQueue: Ec2ResizeLambda.resizeRequestQueue,
       asgScheduledRulesPrefix: props.rulePrefix,
       asgMetadataTagKey: props.asgMetadataTagKey,
       USER_AGENT_EXTRA: USER_AGENT_EXTRA,
@@ -241,7 +240,7 @@ export class CoreScheduler {
       assumedBy: new CompositePrincipal(
         schedulingRequestHandler.lambdaFunction.grantPrincipal,
         resourceRegistration.registrationLambda.grantPrincipal,
-        iceErrorRetry.retryIceErrorLambda.grantPrincipal,
+        Ec2ResizeLambda.resizeRequestHandler.grantPrincipal,
         spokeRegistrationLambda.lambdaFunction.grantPrincipal,
       ),
       namespace: props.namespace,

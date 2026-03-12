@@ -16,7 +16,9 @@ from instance_scheduler.util.custom_resource import (
     CustomResourceResponse,
 )
 from tests.context import MockLambdaContext
-from tests.test_utils.mock_metrics_uuid_environment import MockMetricsUuidEnviron
+from tests.test_utils.mock_environs.mock_metrics_uuid_environment import (
+    MockMetricsUuidEnviron,
+)
 
 if TYPE_CHECKING:
     from mypy_boto3_ssm.client import SSMClient

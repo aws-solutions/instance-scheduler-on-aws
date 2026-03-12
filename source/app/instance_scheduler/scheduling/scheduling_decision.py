@@ -58,6 +58,7 @@ class RequestedAction(Enum):
     START = "Start"
     STOP = "Stop"
     CONFIGURE = "Configure"
+    RESIZE = "Resize"
 
 
 T = TypeVar("T", bound=ManagedInstance)

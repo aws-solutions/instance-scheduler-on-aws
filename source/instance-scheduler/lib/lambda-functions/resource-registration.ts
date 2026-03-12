@@ -127,10 +127,16 @@ export class HubResourceRegistration extends Construct {
       properties: {
         regions: props.regions,
         version: props.solutionVersion, // force an update when updating solution version
+        //force update when changing input props (this should prob be refactored later)
+        scheduleTagKey: props.scheduleTagKey,
+        namespace: props.namespace,
       },
     });
     const regionsCustomResourceCfnResource = regionsCustomResource.node.defaultChild as CfnResource;
     regionsCustomResourceCfnResource.addOverride("UpdateReplacePolicy", "Retain");
+    regionsCustomResourceCfnResource.addDependency(SequencingGates.afterAllPolicies(scope));
+    regionsCustomResourceCfnResource.addDependency(SequencingGates.afterAllRoles(scope));
+    regionsCustomResourceCfnResource.addDependency(SequencingGates.afterAllLambdas(scope));
 
     this.regionalEventBusName = regionsCustomResource.getAtt("REGIONAL_BUS_NAME").toString();
 

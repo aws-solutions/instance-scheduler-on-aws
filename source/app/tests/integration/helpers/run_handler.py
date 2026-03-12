@@ -20,7 +20,7 @@ from instance_scheduler.model.store.in_memory_schedule_definition_store import (
 )
 from mypy_boto3_ec2.literals import InstanceTypeType
 from tests.context import MockLambdaContext
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 

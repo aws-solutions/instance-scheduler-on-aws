@@ -5,7 +5,6 @@ import { Construct } from "constructs";
 import { FunctionFactory } from "./function-factory";
 import {
   ArnPrincipal,
-  CfnRole,
   Effect,
   Policy,
   PolicyDocument,
@@ -13,7 +12,7 @@ import {
   Role,
   ServicePrincipal,
 } from "aws-cdk-lib/aws-iam";
-import { Aws, CfnCondition, Duration, Fn } from "aws-cdk-lib";
+import { Aws, Duration } from "aws-cdk-lib";
 import { TargetStack } from "../stack-types";
 import { ISLogGroups } from "../observability/log-groups";
 import { Provider } from "aws-cdk-lib/custom-resources";
@@ -35,9 +34,6 @@ export interface RegionRegistrationCustomResourceProps {
 
 export class RegionRegistrationCustomResource {
   readonly regionRegistrationCustomResourceProvider: Provider;
-  readonly spokeRegistrationUpdateSSMParamRoleCfnResource: CfnRole;
-  readonly regionRegistrationCustomResourceLambdaRoleCfnResource: CfnRole;
-  readonly regionRegistrationWaitLambdaRoleCfnResource: CfnRole;
 
   static ssmParamPathName(namespace: string) {
     return `/IS/${namespace}/regions`;
@@ -56,14 +52,6 @@ export class RegionRegistrationCustomResource {
   }
 
   constructor(scope: Construct, id: string, props: RegionRegistrationCustomResourceProps) {
-    const isNotHubStackDeployment = new CfnCondition(scope, "isNotHubStackDeployment", {
-      expression: Fn.conditionEquals(TargetStack.REMOTE, props.targetStack),
-    });
-
-    const isHubStackDeployment = new CfnCondition(scope, "isHubStackDeployment", {
-      expression: Fn.conditionEquals(TargetStack.HUB, props.targetStack),
-    });
-
     const regionRegistrationCustomResourceLambdaRole = new Role(scope, "RegionRegistrationLambdaRole", {
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
       roleName: RegionRegistrationCustomResource.invokeFunctionRemoteRoleName(props.namespace),
@@ -93,29 +81,6 @@ export class RegionRegistrationCustomResource {
       "IAM_POLICYDOCUMENT_NO_WILDCARD_RESOURCE",
     ]);
 
-    const spokeRegistrationUpdateSSMParamRole = new Role(scope, "SpokeRegistrationUpdateSSMParamRole", {
-      roleName: RegionRegistrationCustomResource.ssmParamUpdateRoleName(props.namespace),
-      assumedBy: new ArnPrincipal(roleArnFor(props.hubAccountId, SpokeRegistrationLambda.roleName(props.namespace))),
-      inlinePolicies: {
-        SpokeRegistrationUpdateSSMParamPolicy: new PolicyDocument({
-          statements: [getSSMParams(props.namespace), describeSSMParams(), updateSSMParams(props.namespace)],
-        }),
-      },
-    });
-
-    addCfnGuardSuppression(spokeRegistrationUpdateSSMParamRole, [
-      "CFN_NO_EXPLICIT_RESOURCE_NAMES",
-      "IAM_NO_INLINE_POLICY_CHECK",
-      "IAM_POLICYDOCUMENT_NO_WILDCARD_RESOURCE",
-    ]);
-
-    const spokeRegistrationUpdateSSMParamRoleCfnResource = spokeRegistrationUpdateSSMParamRole.node
-      .defaultChild as CfnRole;
-    spokeRegistrationUpdateSSMParamRoleCfnResource.cfnOptions.condition = isNotHubStackDeployment;
-    this.spokeRegistrationUpdateSSMParamRoleCfnResource = spokeRegistrationUpdateSSMParamRoleCfnResource;
-
-    const lambdaDefaultLogGroup = ISLogGroups.adminLogGroup(scope, props.targetStack);
-
     const regionRegistrationCustomResourceLambda = props.factory.createFunction(
       scope,
       "RegionRegistrationCustomResourceLambda",
@@ -127,7 +92,7 @@ export class RegionRegistrationCustomResource {
         role: regionRegistrationCustomResourceLambdaRole,
         timeout: Duration.minutes(15),
         targetStack: props.targetStack,
-        logGroup: lambdaDefaultLogGroup,
+        logGroup: ISLogGroups.adminLogGroup(scope, props.targetStack),
         environment: {
           USER_AGENT_EXTRA: props.USER_AGENT_EXTRA,
           HUB_ACCOUNT_ID: props.hubAccountId,
@@ -141,6 +106,7 @@ export class RegionRegistrationCustomResource {
         },
       },
     );
+    ISLogGroups.adminLogGroup(scope, props.targetStack).grantWrite(regionRegistrationCustomResourceLambdaRole);
 
     const regionRegistrationWaitLambda = props.factory.createFunction(scope, "RegionRegistrationWaitLambda", {
       description: "Custom Resource lambda to wait and confirm region registrations.",
@@ -150,7 +116,7 @@ export class RegionRegistrationCustomResource {
       role: regionRegistrationWaitLambdaRole,
       timeout: Duration.minutes(15),
       targetStack: props.targetStack,
-      logGroup: lambdaDefaultLogGroup,
+      logGroup: ISLogGroups.adminLogGroup(scope, props.targetStack),
       environment: {
         USER_AGENT_EXTRA: props.USER_AGENT_EXTRA,
         HUB_ACCOUNT_ID: props.hubAccountId,
@@ -163,6 +129,7 @@ export class RegionRegistrationCustomResource {
         HUB_REGISTRATION_ROLE_NAME: SpokeRegistrationLambda.roleNameForSpokeTemplateInvokeFunction(props.namespace),
       },
     });
+    ISLogGroups.adminLogGroup(scope, props.targetStack).grantWrite(regionRegistrationWaitLambdaRole);
 
     const provider = new Provider(scope, "CustomResourceProvider", {
       onEventHandler: regionRegistrationCustomResourceLambda,
@@ -181,55 +148,65 @@ export class RegionRegistrationCustomResource {
       }
     });
 
-    const regionRegistrationCustomResourceLambdaPolicy = new Policy(
-      scope,
-      "RegionRegistrationCustomResourceLambdaPolicy",
-      {
-        roles: [regionRegistrationCustomResourceLambdaRole],
-        statements: [
-          new PolicyStatement({
-            actions: ["sts:AssumeRole"],
-            effect: Effect.ALLOW,
-            resources: [
-              roleArnFor(
-                props.hubAccountId,
-                SpokeRegistrationLambda.roleNameForSpokeTemplateInvokeFunction(props.namespace),
-              ),
-            ],
-          }),
-        ],
-      },
-    );
-
-    const regionRegistrationCustomResourceLambdaPolicyCfnResource = regionRegistrationCustomResourceLambdaPolicy.node
-      .defaultChild as CfnRole;
-    regionRegistrationCustomResourceLambdaPolicyCfnResource.cfnOptions.condition = isNotHubStackDeployment;
-
-    const hubLambdaInvokePolicy = new Policy(scope, "hubLambdaInvokePolicy", {
-      roles: [regionRegistrationCustomResourceLambdaRole],
-      statements: [
-        new PolicyStatement({
-          actions: ["lambda:InvokeFunction"],
-          effect: Effect.ALLOW,
-          resources: [
-            RegionRegistrationCustomResource.functionArnFor(props.hubRegisterRegionFunctionName, props.hubAccountId),
+    switch (props.targetStack) {
+      case TargetStack.HUB: {
+        //Hub stack can perform direct invoke on registration function
+        //lambda-lambda invoke of register function
+        new Policy(scope, "hubLambdaInvokePolicy", {
+          roles: [regionRegistrationCustomResourceLambdaRole],
+          statements: [
+            new PolicyStatement({
+              actions: ["lambda:InvokeFunction"],
+              effect: Effect.ALLOW,
+              resources: [
+                RegionRegistrationCustomResource.functionArnFor(
+                  props.hubRegisterRegionFunctionName,
+                  props.hubAccountId,
+                ),
+              ],
+            }),
           ],
-        }),
-      ],
-    });
+        });
+        break;
+      }
+      case TargetStack.REMOTE: {
+        //Remote stack needs to assume a role in the hub to invoke the registration function
+        const spokeRegistrationUpdateSSMParamRole = new Role(scope, "SpokeRegistrationUpdateSSMParamRole", {
+          roleName: RegionRegistrationCustomResource.ssmParamUpdateRoleName(props.namespace),
+          assumedBy: new ArnPrincipal(
+            roleArnFor(props.hubAccountId, SpokeRegistrationLambda.roleName(props.namespace)),
+          ),
+          inlinePolicies: {
+            SpokeRegistrationUpdateSSMParamPolicy: new PolicyDocument({
+              statements: [getSSMParams(props.namespace), describeSSMParams(), updateSSMParams(props.namespace)],
+            }),
+          },
+        });
 
-    const hubLambdaInvokePolicyCfnResource = hubLambdaInvokePolicy.node.defaultChild as CfnRole;
-    hubLambdaInvokePolicyCfnResource.cfnOptions.condition = isHubStackDeployment;
+        addCfnGuardSuppression(spokeRegistrationUpdateSSMParamRole, [
+          "CFN_NO_EXPLICIT_RESOURCE_NAMES",
+          "IAM_NO_INLINE_POLICY_CHECK",
+          "IAM_POLICYDOCUMENT_NO_WILDCARD_RESOURCE",
+        ]);
 
-    const regionRegistrationCustomResourceLambdaRoleCfnResource = regionRegistrationCustomResourceLambdaRole.node
-      .defaultChild as CfnRole;
-    this.regionRegistrationCustomResourceLambdaRoleCfnResource = regionRegistrationCustomResourceLambdaRoleCfnResource;
-
-    const regionRegistrationWaitLambdaRoleCfnResource = regionRegistrationWaitLambdaRole.node.defaultChild as CfnRole;
-    this.regionRegistrationWaitLambdaRoleCfnResource = regionRegistrationWaitLambdaRoleCfnResource;
-
-    lambdaDefaultLogGroup.grantWrite(regionRegistrationCustomResourceLambdaPolicy);
-    lambdaDefaultLogGroup.grantWrite(regionRegistrationWaitLambdaRole);
+        //spoke STS -> hub trusted role -> lambda-lambda invoke of register functon
+        new Policy(scope, "RegionRegistrationCustomResourceLambdaPolicy", {
+          roles: [regionRegistrationCustomResourceLambdaRole],
+          statements: [
+            new PolicyStatement({
+              actions: ["sts:AssumeRole"],
+              effect: Effect.ALLOW,
+              resources: [
+                roleArnFor(
+                  props.hubAccountId,
+                  SpokeRegistrationLambda.roleNameForSpokeTemplateInvokeFunction(props.namespace),
+                ),
+              ],
+            }),
+          ],
+        });
+      }
+    }
 
     this.regionRegistrationCustomResourceProvider = provider;
   }
