@@ -4,8 +4,7 @@
     "solutionId": "SO0030",
     "solutionName": "instance-scheduler-on-aws",
     "appRegApplicationName": "AWS-Solutions",
-    "appRegSolutionName": "instance-scheduler-on-aws",
-    "instance-scheduler-on-aws-pipeline-source": "codecommit"
+    "appRegSolutionName": "instance-scheduler-on-aws"
   },
   "output": "build/cdk.out",
   "build": "npx projen bundle",

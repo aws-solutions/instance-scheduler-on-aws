@@ -25,10 +25,10 @@ from tests.integration.helpers.rds_helpers import (
 )
 from tests.integration.helpers.run_handler import simple_schedule, target
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.test_utils.mock_resource_registration_environment import (
+from tests.test_utils.mock_environs.mock_resource_registration_environment import (
     MockResourceRegistrationEnvironment,
 )
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 from tests.test_utils.unordered_list import UnorderedList

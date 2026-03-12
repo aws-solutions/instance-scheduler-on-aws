@@ -25,7 +25,9 @@ from instance_scheduler.scheduling.states import InstanceState
 from instance_scheduler.util.arn import ARN
 from tests.context import MockLambdaContext
 from tests.logger import MockLogger
-from tests.test_utils.mock_orchestrator_environment import MockOrchestratorEnvironment
+from tests.test_utils.mock_environs.mock_orchestrator_environment import (
+    MockOrchestratorEnvironment,
+)
 
 if TYPE_CHECKING:
     from mypy_boto3_dynamodb.client import DynamoDBClient

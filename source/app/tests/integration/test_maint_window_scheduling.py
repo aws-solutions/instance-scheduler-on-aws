@@ -15,7 +15,7 @@ from instance_scheduler.model import (
 )
 from tests.integration.helpers.ec2_helpers import get_current_state, stop_ec2_instances
 from tests.integration.helpers.run_handler import simple_schedule
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 

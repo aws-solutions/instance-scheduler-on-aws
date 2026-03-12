@@ -5,15 +5,16 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import IntEnum
 from itertools import chain
-from typing import TYPE_CHECKING, Final, List, Literal, Optional, Union, cast
+from typing import TYPE_CHECKING, Final, Iterable, List, Literal, Optional, Union, cast
 
 from botocore.exceptions import ClientError
 from instance_scheduler.configuration.instance_schedule import InstanceSchedule
 from instance_scheduler.configuration.scheduling_context import (
     SchedulingContext,
 )
-from instance_scheduler.handler.environments.ice_retry_request_environment import (
-    IceErrorRequestEnvironment,
+from instance_scheduler.handler.environments.resize_request_environment import (
+    Ec2ResizeRequest,
+    ResizeRequestEnvironment,
 )
 from instance_scheduler.handler.environments.scheduling_request_environment import (
     SchedulingRequestEnvironment,
@@ -30,7 +31,6 @@ from instance_scheduler.model.store.resource_registry import ResourceRegistry
 from instance_scheduler.observability.error_codes import ErrorCode
 from instance_scheduler.observability.powertools_logging import powertools_logger
 from instance_scheduler.observability.tag_keys import ControlTagKey
-from instance_scheduler.scheduling.ec2.ice_retry import IceRetryRequest
 from instance_scheduler.scheduling.ec2.sqs import send_message_to_queue
 from instance_scheduler.scheduling.scheduling_decision import (
     ManagedInstance,
@@ -43,7 +43,7 @@ from instance_scheduler.scheduling.scheduling_result import (
     SchedulingAction,
     SchedulingResult,
 )
-from instance_scheduler.scheduling.states import InstanceState
+from instance_scheduler.scheduling.states import InstanceState, ScheduleState
 from instance_scheduler.util.arn import ARN
 from instance_scheduler.util.batch import bisect_retry
 from instance_scheduler.util.session_manager import AssumedRole
@@ -144,21 +144,26 @@ class ManagedEC2Instance(ManagedInstance):
     runtime_info: EC2RuntimeInfo
 
 
+@dataclass(kw_only=True)
+class ResizeDecision(SchedulingDecision[ManagedEC2Instance]):
+    size_preferences: list[str]
+
+
 class Ec2Service:
     scheduling_context: SchedulingContext
     mw_context: Optional[MaintenanceWindowContext] = None
-    ice_retry_queue_url: Optional[str] = None
+    ec2_resize_request_queue_url: Optional[str] = None
 
     def __init__(
         self,
         scheduling_context: SchedulingContext,
-        env: Union[SchedulingRequestEnvironment, IceErrorRequestEnvironment],
+        env: Union[SchedulingRequestEnvironment, ResizeRequestEnvironment],
     ) -> None:
         self.scheduling_context = scheduling_context
         self.ec2_client: Final[EC2Client] = scheduling_context.assumed_role.client(
             "ec2"
         )
-        self.ice_retry_queue_url = env.ice_retry_queue_url
+        self.ec2_resize_request_queue_url = env.resize_request_queue_url
 
         if env.enable_ec2_ssm_maintenance_windows:
             self.mw_context = MaintenanceWindowContext(
@@ -166,29 +171,32 @@ class Ec2Service:
                 mw_store=DynamoMWStore(env.maintenance_window_table_name),
             )
 
-    def _send_ice_retry_request(
-        self, decision: SchedulingDecision[ManagedEC2Instance]
-    ) -> SchedulingResult[ManagedEC2Instance]:
-        preferred_instance_types = (
-            decision.instance.runtime_info.requested_instance_types
-        )
-        if self.ice_retry_queue_url is not None and len(preferred_instance_types) > 0:
-            ice_retry_request = IceRetryRequest(
-                account=self.scheduling_context.assumed_role.account,
-                region=self.scheduling_context.assumed_role.region,
-                instance_id=decision.instance.runtime_info.resource_id,
-                preferred_instance_types=preferred_instance_types,
-            )
+    def send_resize_requests(
+        self, resize_decisions: Iterable[ResizeDecision]
+    ) -> Iterator[SchedulingResult[ManagedEC2Instance]]:
+        for resize_decision in resize_decisions:
+            if (
+                self.ec2_resize_request_queue_url is not None
+                and len(resize_decision.size_preferences) > 0
+            ):
+                resize_request = Ec2ResizeRequest(
+                    account=resize_decision.instance.runtime_info.account,
+                    region=resize_decision.instance.runtime_info.region,
+                    instance_id=resize_decision.instance.runtime_info.resource_id,
+                    preferred_instance_types=resize_decision.size_preferences,
+                )
 
-            message_id = send_message_to_queue(
-                queue_url=self.ice_retry_queue_url,
-                delay_in_seconds=10,
-                message_body=json.dumps(ice_retry_request),
+                message_id = send_message_to_queue(
+                    queue_url=self.ec2_resize_request_queue_url,
+                    delay_in_seconds=10,  # provide EC2 api a delay before retrying (useful for ICE retry scenario)
+                    message_body=json.dumps(resize_request),
+                )
+                logger.info(
+                    f"Sent resize request to queue with message ID: {message_id}"
+                )
+            yield SchedulingResult.success(
+                resize_decision, action_taken=SchedulingAction.RESIZE_REQUESTED
             )
-            logger.info(
-                f"Sent ice retry request to queue with message ID: {message_id}"
-            )
-        return SchedulingResult.no_action_needed(decision, "Ice Retry Initiated")
 
     def schedule_target(self) -> Iterator[SchedulingResult[ManagedEC2Instance]]:
         registry = self.scheduling_context.registry
@@ -203,15 +211,16 @@ class Ec2Service:
         start_decisions: list[SchedulingDecision[ManagedEC2Instance]] = []
         stop_decisions: list[SchedulingDecision[ManagedEC2Instance]] = []
         hibernate_decisions: list[SchedulingDecision[ManagedEC2Instance]] = []
+        resize_decisions: list[ResizeDecision] = []
         do_nothing_decisions: list[SchedulingDecision[ManagedEC2Instance]] = []
 
         for managed_instance in self.describe_schedulable_instances():
-            schedule = self.scheduling_context.schedule_store.find_by_name(
+            schedule_definition = self.scheduling_context.schedule_store.find_by_name(
                 managed_instance.registry_info.schedule,
                 cache_only=True,  # cache should have been preloaded by scheduling request handler
             )
 
-            if schedule is None:
+            if schedule_definition is None:
                 logger.info(
                     f"Schedule {managed_instance.registry_info.schedule} not found, skipping instance {managed_instance.registry_info.resource_id}"
                 )
@@ -221,13 +230,35 @@ class Ec2Service:
                 )
                 continue
 
+            schedule = schedule_definition.to_instance_schedule(
+                self.scheduling_context.period_store
+            )
+
+            # Ec2 resizing short-circuit
+            desired_state, desired_type, _ = schedule.get_desired_state(
+                self.scheduling_context.current_dt
+            )
+            if (
+                desired_state == ScheduleState.RUNNING
+                and desired_type
+                and desired_type != managed_instance.runtime_info.size
+            ):
+                resize_decisions.append(
+                    ResizeDecision(
+                        instance=managed_instance,
+                        action=RequestedAction.RESIZE,
+                        new_stored_state=InstanceState.RUNNING,
+                        reason=f"Instance needs resizing from {managed_instance.runtime_info.size} to {desired_type}",
+                        size_preferences=[desired_type],
+                    )
+                )
+                continue
+
             decision = make_scheduling_decision(
                 instance=managed_instance,
-                schedule=schedule.to_instance_schedule(
-                    self.scheduling_context.period_store
-                ),
+                schedule=schedule,
                 current_dt=self.scheduling_context.current_dt,
-                maintenance_windows=self._fetch_mw_schedules_for(schedule),
+                maintenance_windows=self._fetch_mw_schedules_for(schedule_definition),
             )
 
             match decision.action:
@@ -249,6 +280,7 @@ class Ec2Service:
             self.start_instances(start_decisions),
             self.hibernate_instances(hibernate_decisions),
             self.stop_instances(stop_decisions),
+            self.send_resize_requests(resize_decisions),
             [SchedulingResult.no_action_needed(d) for d in do_nothing_decisions],
         ):
             if (
@@ -522,12 +554,25 @@ class Ec2Service:
         # Filter out already running instances and yield no_action_needed for them
         decisions_to_start = []
         for decision in decisions:
+            # already running
             if decision.instance.runtime_info.is_running:
                 yield SchedulingResult.no_action_needed(
                     decision, "Instance is already running"
                 )
+            # needs to start but is not correct instance type
             elif not decision.instance.runtime_info.is_using_preferred_instance_type():
-                yield self._send_ice_retry_request(decision)
+                yield from self.send_resize_requests(
+                    [
+                        ResizeDecision(
+                            instance=decision.instance,
+                            action=RequestedAction.RESIZE,
+                            reason="Current instance size is not most preferred type",
+                            new_stored_state=decision.new_stored_state,
+                            size_preferences=decision.instance.runtime_info.requested_instance_types,
+                        )
+                    ]
+                )
+            # normal start
             else:
                 decisions_to_start.append(decision)
 
@@ -549,7 +594,7 @@ class Ec2Service:
             )
 
         # Yield success results
-        # success event with not matching the preferred instance type should go through the ice retry lambda.
+        # success event with not matching the preferred instance type should go through the resize lambda.
         for response in responses.success_responses:
             for started_decision in response.successful_input:
                 yield SchedulingResult.success(started_decision)
@@ -561,7 +606,25 @@ class Ec2Service:
                 and failure.error.response["Error"]["Code"]
                 == "InsufficientInstanceCapacity"
             ):
-                yield self._send_ice_retry_request(failure.failed_input)
+                failed_decision: SchedulingDecision[ManagedEC2Instance] = (
+                    failure.failed_input
+                )
+                if (
+                    len(failed_decision.instance.runtime_info.requested_instance_types)
+                    >= 2
+                ):
+                    yield from self.send_resize_requests(
+                        [
+                            ResizeDecision(
+                                instance=failed_decision.instance,
+                                action=RequestedAction.RESIZE,
+                                reason="Insufficient capacity for instance type",
+                                new_stored_state=failed_decision.new_stored_state,
+                                size_preferences=failed_decision.instance.runtime_info.requested_instance_types,
+                            )
+                        ]
+                    )
+                    continue
 
             logger.error(
                 f"Failed to start EC2 instance with ID {failure.failed_input.instance.runtime_info.resource_id}: {str(failure.error)}",

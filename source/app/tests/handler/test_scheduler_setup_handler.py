@@ -20,7 +20,7 @@ from instance_scheduler.model.store.schedule_definition_store import (
 from instance_scheduler.util.custom_resource import CustomResourceRequest
 from pytest import fixture
 from tests.context import MockLambdaContext
-from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
+from tests.test_utils.mock_environs.mock_main_lambda_env import MockMainLambdaEnv
 from tests.test_utils.unordered_list import UnorderedList
 
 stack_arn = "arn:aws:cloudformation:us-west-2:123456789012:stack/teststack/51af3dc0-da77-11e4-872e-1234567db123"

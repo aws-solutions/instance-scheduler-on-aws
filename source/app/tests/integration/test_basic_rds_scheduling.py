@@ -400,5 +400,5 @@ def test_rds_unschedulable_resource_applies_error_tags(
         [f"arn:aws:rds:us-east-1:123456789012:db:{rds_instance}"],
     ).__next__()
 
-    assert rds_info.tags["IS-Error"] == "UnsupportedResource (2026-01-05 05:00:00 UTC)"
+    assert rds_info.tags["IS-Error"] == "UnsupportedResource 2026-01-05 05:00:00 UTC"
     assert "read replica" in rds_info.tags["IS-ErrorMessage"]

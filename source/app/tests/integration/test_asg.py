@@ -22,7 +22,7 @@ from tests.integration.helpers.asg_helpers import (
     set_mdm_tag,
 )
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.test_utils.mock_resource_registration_environment import (
+from tests.test_utils.mock_environs.mock_resource_registration_environment import (
     MockResourceRegistrationEnvironment,
 )
 from tests.test_utils.scheduling_context import create_simple_schedule

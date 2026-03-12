@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.1.4", cdkVersion: "2.239.0" }).synth();
+  new InstanceScheduler({ version: "3.2.0", cdkVersion: "2.241.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -33,7 +33,6 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     solutionName: this.solutionName,
     appRegApplicationName: "AWS-Solutions",
     appRegSolutionName: this.solutionName,
-    "instance-scheduler-on-aws-pipeline-source": "codecommit",
   };
 
   private static readonly tsconfig: TypescriptConfigOptions = {
@@ -54,16 +53,6 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     .split("\n");
 
   private static readonly deps: string[] = [
-    "@aws-sdk/client-auto-scaling",
-    "@aws-sdk/client-cloudformation",
-    "@aws-sdk/client-docdb",
-    "@aws-sdk/client-dynamodb",
-    "@aws-sdk/util-dynamodb",
-    "@aws-sdk/client-ec2",
-    "@aws-sdk/client-lambda",
-    "@aws-sdk/client-neptune",
-    "@aws-sdk/client-rds",
-    "@aws-sdk/client-ssm",
     "cdk-nag",
     "source-map-support",
     "uuid",
@@ -71,7 +60,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
 
   private static readonly devDeps: string[] = [
     "@types/uuid",
-    "@typescript-eslint/eslint-plugin",
+    "@typescript-eslint/eslint-plugin@^8",
     "eslint",
     "eslint-config-prettier",
     "eslint-plugin-header",
@@ -140,7 +129,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
       testdir: InstanceScheduler.testdir,
       eslint: false,
       tsconfig: InstanceScheduler.tsconfig,
-      typescriptVersion: "~5.2.x", //@typescript-eslint/typescript-estree doesn't support 5.3.x yet
+      typescriptVersion: "~5.x",
       disableTsconfigDev: true,
       projenrcTs: true,
       defaultReleaseBranch: "main",
@@ -238,8 +227,6 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
   }
 
   private addTestTasks(): void {
-    this.addE2ETestTask();
-
     const prettierTask = this.addTask("test:prettier", { exec: "npx prettier --check ./**/*.ts" });
     const eslintTask = this.addTask("test:eslint", { exec: "npx eslint --max-warnings=0 ." });
 
@@ -318,29 +305,6 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     testCiTask.spawn(cdkCiTask);
     testCiTask.spawn(appTestCiTask);
     testCiTask.spawn(cliTestCiTask);
-  }
-
-  private addE2ETestTask(): void {
-    const e2eConfigFile = "source/pipeline/jest.config.json";
-    new Jest(this, {
-      junitReporting: false, // we will override
-      updateSnapshot: UpdateSnapshot.NEVER,
-      configFilePath: e2eConfigFile,
-      jestConfig: {
-        reporters: [
-          new JestReporter("jest-junit", {
-            outputDirectory: InstanceScheduler.testReportDir,
-            outputName: "e2e-test-report.xml",
-          }),
-        ],
-        roots: [`<rootDir>/e2e-tests`],
-        setupFilesAfterEnv: ["jest-extended/all"],
-        transform: { "^.+\\.tsx?$": new Transform("ts-jest") },
-        globalSetup: "./setup.ts",
-      },
-    });
-
-    this.addTask("e2e-tests", { exec: `node --experimental-vm-modules node_modules/.bin/jest --config ${e2eConfigFile}`, receiveArgs: true });
   }
 
   private addTypescriptFiles(...files: string[]): void {

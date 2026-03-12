@@ -12,7 +12,7 @@ from freezegun import freeze_time
 from instance_scheduler.ops_metrics.metric_type.ops_metric import OpsMetric
 from instance_scheduler.ops_metrics.metrics import collect_metric, should_collect_metric
 from tests.logger import MockLogger
-from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
+from tests.test_utils.mock_environs.mock_metrics_environment import MockMetricsEnviron
 
 
 @dataclass(frozen=True)

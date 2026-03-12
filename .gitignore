@@ -47,6 +47,7 @@ git-info
 deployment/test-reports
 deployment/coverage-reports
 !/jest.config.json
+/coverage/
 !/.github/pull_request_template.md
 !/source/instance-scheduler/tests/
 !/tsconfig.json
@@ -59,7 +60,5 @@ deployment/coverage-reports
 /build/cdk.out/
 .cdk.staging/
 .parcel-cache/
-!/source/pipeline/jest.config.json
-/coverage/
 !/solution-manifest.yaml
 !/.projenrc.ts

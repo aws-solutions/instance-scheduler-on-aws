@@ -21,10 +21,10 @@ from instance_scheduler.scheduling.states import InstanceState
 from instance_scheduler.util.arn import ARN
 from tests.context import MockLambdaContext
 from tests.integration.ops_metrics.conftest import override_should_send_metric
-from tests.test_utils.mock_heartbeat_metrics_environment import (
+from tests.test_utils.mock_environs.mock_heartbeat_metrics_environment import (
     MockHeartbeatMetricsEnvironment,
 )
-from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
+from tests.test_utils.mock_environs.mock_metrics_environment import MockMetricsEnviron
 from tests.test_utils.unordered_list import UnorderedList
 
 

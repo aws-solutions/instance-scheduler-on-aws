@@ -88,7 +88,7 @@ class InfoTaggingContext:
                 request.execute(self.assumed_role, self.buffers[request])
                 del self.buffers[request]
             except Exception:
-                # Keep buffer intact on failure for potential retry
+                # Keep buffer intact on failure for potential retry (error logged by request.execute)
                 pass
 
     def flush(self) -> None:
@@ -109,7 +109,8 @@ class InfoTaggingContext:
     ) -> None:
 
         for resource in resources:
-            if InformationalTagKey.ERROR in resource.tags:
+            # if no new error code, clear error tags (new error codes will overwrite)
+            if not error_code and InformationalTagKey.ERROR.value in resource.tags:
                 self.push(
                     resource.arn,
                     TagDeleteRequest(
@@ -159,7 +160,7 @@ def apply_informational_tags_for_results(
             if result.error_code:
                 context.push_info_tag_update(
                     [result.instance.runtime_info],
-                    error_code=f"{result.error_code.value} ({current_time})",
+                    error_code=f"{result.error_code.value} {current_time}",
                     error_message=result.error_message,
                 )
             else:

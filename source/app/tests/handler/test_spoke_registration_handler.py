@@ -16,7 +16,7 @@ from tests.integration.helpers.rds_helpers import (
     create_rds_clusters,
     create_rds_instances,
 )
-from tests.test_utils.mock_spoke_registration_environment import (
+from tests.test_utils.mock_environs.mock_spoke_registration_environment import (
     MockSpokeRegistrationEnvironment,
 )
 from tests.test_utils.unordered_list import UnorderedList

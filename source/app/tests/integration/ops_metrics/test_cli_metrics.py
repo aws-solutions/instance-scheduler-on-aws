@@ -9,8 +9,8 @@ from freezegun.api import freeze_time
 from instance_scheduler import __version__
 from instance_scheduler.handler.cli.cli_request_handler import CliRequestHandler
 from tests.context import MockLambdaContext
-from tests.test_utils.mock_main_lambda_env import MockMainLambdaEnv
-from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
+from tests.test_utils.mock_environs.mock_main_lambda_env import MockMainLambdaEnv
+from tests.test_utils.mock_environs.mock_metrics_environment import MockMetricsEnviron
 
 
 @freeze_time(datetime.datetime(2023, 6, 12, 12, 0, 0, tzinfo=ZoneInfo("UTC")))

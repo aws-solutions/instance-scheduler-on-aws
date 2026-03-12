@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from freezegun import freeze_time
 from instance_scheduler.configuration.scheduling_context import SchedulingContext
+from instance_scheduler.handler import resize_handler
 from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.period_identifier import PeriodIdentifier
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
@@ -32,8 +33,12 @@ from tests.integration.helpers.rds_helpers import (
     stop_rds_instances,
 )
 from tests.integration.helpers.run_handler import SchedulingTestContext, target
-from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
-from tests.test_utils.mock_resource_registration_environment import (
+from tests.integration.helpers.sqs_helpers import (
+    mock_forward_sqs_messages_to_lambda_handler,
+)
+from tests.test_utils.mock_environs.mock_metrics_environment import MockMetricsEnviron
+from tests.test_utils.mock_environs.mock_resize_environment import MockResizeEnvironment
+from tests.test_utils.mock_environs.mock_resource_registration_environment import (
     MockResourceRegistrationEnvironment,
 )
 from tests.test_utils.unordered_list import UnorderedList
@@ -49,13 +54,17 @@ will_stop = ScheduleDefinition(
     name="will_stop", periods=[PeriodIdentifier.of("stop-at-noon")]
 )
 
+will_resize = ScheduleDefinition(
+    name="will_resize", periods=[PeriodIdentifier.of("start-at-noon", "t3.nano")]
+)
+
 periods = [
     PeriodDefinition(name="start-at-noon", begintime="12:00"),
     PeriodDefinition(name="stop-at-noon", endtime="12:00"),
 ]
 
 context = SchedulingTestContext(
-    schedules=[will_start, will_stop],
+    schedules=[will_start, will_stop, will_resize],
     periods=periods,
 )
 
@@ -108,12 +117,21 @@ def test_scheduling_execution_sends_expected_actions_metric(
     mock_metrics_endpoint: MagicMock,
     scheduling_context: SchedulingContext,
 ) -> None:
-    with MockMetricsEnviron(send_anonymous_metrics=True) as metrics_env:
+    with (
+        MockMetricsEnviron(send_anonymous_metrics=True) as metrics_env,
+        mock_forward_sqs_messages_to_lambda_handler(
+            lambda_handler=resize_handler.lambda_handler,
+            lambda_env=MockResizeEnvironment(),
+        ),
+    ):
         stopped_instances = chain(
             create_ec2_instances(
                 8, instance_type=medium, schedule_name=will_start.name
             ),
             create_ec2_instances(6, instance_type=large, schedule_name=will_start.name),
+            create_ec2_instances(
+                2, instance_type=large, schedule_name=will_resize.name
+            ),
         )
         running_instances = chain(
             create_ec2_instances(4, instance_type=medium, schedule_name=will_stop.name),
@@ -135,8 +153,8 @@ def test_scheduling_execution_sends_expected_actions_metric(
             "context_version": 2,
             "context": {
                 "duration_seconds": ANY,
-                "num_instances_scanned": 20,
-                "num_unique_schedules": 2,
+                "num_instances_scanned": 22,
+                "num_unique_schedules": 3,
                 "actions": UnorderedList(
                     [
                         {
@@ -159,6 +177,12 @@ def test_scheduling_execution_sends_expected_actions_metric(
                         },
                         {
                             "action": "Stopped",
+                            "instanceType": "a1.large",
+                            "instances": 2,
+                            "service": "ec2",
+                        },
+                        {
+                            "action": "ResizeRequested",
                             "instanceType": "a1.large",
                             "instances": 2,
                             "service": "ec2",

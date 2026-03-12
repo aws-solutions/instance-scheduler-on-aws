@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 from dataclasses import dataclass
 from os import environ
-from typing import Optional
+from typing import Optional, TypedDict
 
 from instance_scheduler.configuration.scheduling_context import SchedulingEnvironment
 from instance_scheduler.util.app_env_utils import AppEnvError
 
 
 @dataclass(frozen=True)
-class IceErrorRequestEnvironment(SchedulingEnvironment):
+class ResizeRequestEnvironment(SchedulingEnvironment):
     user_agent_extra: str
     hub_stack_name: str
     config_table_name: str
@@ -19,7 +19,7 @@ class IceErrorRequestEnvironment(SchedulingEnvironment):
     asg_scheduled_rule_prefix: str
     asg_metadata_tag_key: str
     enable_ec2_ssm_maintenance_windows: bool
-    ice_retry_queue_url: Optional[str]
+    resize_request_queue_url: Optional[str]
     local_event_bus_name: str
     global_event_bus_name: str
 
@@ -28,9 +28,9 @@ class IceErrorRequestEnvironment(SchedulingEnvironment):
     maintenance_window_table_name: str
 
     @staticmethod
-    def from_env() -> "IceErrorRequestEnvironment":
+    def from_env() -> "ResizeRequestEnvironment":
         try:
-            return IceErrorRequestEnvironment(
+            return ResizeRequestEnvironment(
                 user_agent_extra=environ["USER_AGENT_EXTRA"],
                 config_table_name=environ["CONFIG_TABLE"],
                 scheduler_role_name=environ["SCHEDULER_ROLE_NAME"],
@@ -40,7 +40,7 @@ class IceErrorRequestEnvironment(SchedulingEnvironment):
                 schedule_tag_key=environ["SCHEDULE_TAG_KEY"],
                 scheduling_interval_minutes=int(environ["SCHEDULING_INTERVAL_MINUTES"]),
                 enable_ec2_ssm_maintenance_windows=False,
-                ice_retry_queue_url=None,
+                resize_request_queue_url=None,
                 maintenance_window_table_name="",
                 asg_scheduled_rule_prefix=environ["ASG_SCHEDULED_RULES_PREFIX"],
                 asg_metadata_tag_key=environ["ASG_METADATA_TAG_KEY"],
@@ -51,3 +51,15 @@ class IceErrorRequestEnvironment(SchedulingEnvironment):
             raise AppEnvError(
                 f"Missing required application environment variable: {err.args[0]}"
             ) from err
+
+
+Ec2ResizeRequest = TypedDict(
+    "Ec2ResizeRequest",
+    {
+        "account": str,
+        "region": str,
+        "instance_id": str,
+        "preferred_instance_types": list[str],
+    },
+    total=False,
+)

@@ -38,8 +38,8 @@ from tests.integration.helpers.event_helpers import (
     mock_events_client,
 )
 from tests.integration.helpers.schedule_helpers import quick_time
-from tests.test_utils.mock_metrics_environment import MockMetricsEnviron
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_metrics_environment import MockMetricsEnviron
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 from tests.test_utils.testsuite_env import MockSuiteEnv

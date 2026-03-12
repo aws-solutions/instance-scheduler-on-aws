@@ -13,7 +13,7 @@ from tests.integration.helpers.rds_helpers import (
     create_rds_clusters,
     create_rds_instances,
 )
-from tests.test_utils.mock_scheduling_request_environment import (
+from tests.test_utils.mock_environs.mock_scheduling_request_environment import (
     MockSchedulingRequestEnvironment,
 )
 
