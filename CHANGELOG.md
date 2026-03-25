@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.1] - 2026-03-25
+
+### Added
+
+- Informational Tags can now be disabled entirely via EnableInformationalTagging parameter on the hub stack
+
+### Fixed
+
+- IS_Error tag now records timestamp of first-occurrence rather than being updated every scheduling interval
+- IS_ManagedBy tag now records hub stack ARN instead of name
+
+
+### Security
+
+- Updated black to mitigate CVE-2026-32274
+
 
 ## [v3.2.0] - 2026-03-12
 

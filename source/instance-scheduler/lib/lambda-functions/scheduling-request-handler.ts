@@ -38,6 +38,7 @@ export interface SchedulingRequestHandlerProps {
   readonly regionalEventBusName: string;
   readonly globalEventBus: EventBus;
   readonly factory: FunctionFactory;
+  readonly enableInformationalTagging: CfnCondition;
 }
 
 export class SchedulingRequestHandlerLambda {
@@ -77,8 +78,10 @@ export class SchedulingRequestHandlerLambda {
         LOCAL_EVENT_BUS_NAME: props.regionalEventBusName,
         GLOBAL_EVENT_BUS_NAME: props.globalEventBus.eventBusName,
         HUB_STACK_NAME: props.STACK_NAME,
+        HUB_STACK_ARN: Aws.STACK_ID,
         ASG_SCHEDULED_RULES_PREFIX: props.asgScheduledRulesPrefix,
         ASG_METADATA_TAG_KEY: props.asgMetadataTagKey,
+        ENABLE_INFORMATIONAL_TAGGING: cfnConditionToTrueFalse(props.enableInformationalTagging),
         ...props.metricsEnv,
       },
     });

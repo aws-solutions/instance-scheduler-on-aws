@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 """Determine if a `datetime` satisfies a recurrence expression"""
+
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta

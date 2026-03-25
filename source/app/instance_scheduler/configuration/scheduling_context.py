@@ -24,12 +24,14 @@ class SchedulingEnvironment(EventsEnv, AsgSchedulingEnvironment, Protocol):
     config_table: str
     registry_table: str
     hub_stack_name: str
+    hub_stack_arn: str
     schedule_tag_key: str
     scheduling_interval_minutes: int
     asg_scheduled_rule_prefix: str
     asg_metadata_tag_key: str
     local_event_bus_name: str
     global_event_bus_name: str
+    enable_informational_tagging: bool
 
 
 class SchedulingContext:

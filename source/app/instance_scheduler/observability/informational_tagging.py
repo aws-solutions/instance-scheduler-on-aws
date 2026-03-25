@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from itertools import batched
 from typing import Any, Iterable, Optional, Self, Union
 
+from instance_scheduler.configuration.scheduling_context import SchedulingEnvironment
 from instance_scheduler.observability.powertools_logging import powertools_logger
 from instance_scheduler.observability.tag_keys import (
     InformationalTagKey,
@@ -64,14 +65,14 @@ class TagDeleteRequest:
 
 class InfoTaggingContext:
     BUFFER_MAX_LENGTH = 20
-    hub_stack_arn: str
 
-    def __init__(self, assumed_role: AssumedRole, hub_stack_arn: str) -> None:
+    def __init__(self, assumed_role: AssumedRole, env: SchedulingEnvironment) -> None:
         self.buffers: dict[Union[TagWriteRequest, TagDeleteRequest], list[str]] = (
             defaultdict(list)
         )
         self.assumed_role = assumed_role
-        self.hub_stack_arn = hub_stack_arn
+        self.hub_stack_arn = env.hub_stack_arn
+        self.enable_informational_tagging = env.enable_informational_tagging
 
     def __enter__(self) -> Self:
         return self
@@ -107,6 +108,8 @@ class InfoTaggingContext:
         error_message: Optional[str] = None,
         additional_tags: Optional[dict[str, str]] = None,
     ) -> None:
+        if not self.enable_informational_tagging:
+            return
 
         for resource in resources:
             # if no new error code, clear error tags (new error codes will overwrite)
@@ -150,14 +153,24 @@ def format_current_time() -> str:
 def apply_informational_tags_for_results(
     assumed_role: AssumedRole,
     results: Iterable[SchedulingResult[ManagedInstance]],
-    hub_stack_arn: str,
+    env: SchedulingEnvironment,
 ) -> None:
-    with InfoTaggingContext(assumed_role, hub_stack_arn) as context:
+    if not env.enable_informational_tagging:
+        return
+
+    with InfoTaggingContext(assumed_role, env) as context:
         # calculate current time once to ensure tags all use the same time for batching
         current_time = format_current_time()
 
         for result in results:
             if result.error_code:
+                if (
+                    result.error_code
+                    == result.instance.runtime_info.tags.get(
+                        InformationalTagKey.ERROR.value, ""
+                    ).split(" ")[0]
+                ):
+                    continue  # skip re-writing tags for recurring errors
                 context.push_info_tag_update(
                     [result.instance.runtime_info],
                     error_code=f"{result.error_code.value} {current_time}",

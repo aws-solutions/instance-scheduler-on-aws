@@ -64,6 +64,7 @@ day-of-week recurrence string will be "*".
 field, Instance Scheduler was implemented with the value zero meaning Monday, which
 corresponds to the values in the Python `calendar` package.
 """
+
 from dataclasses import dataclass
 
 

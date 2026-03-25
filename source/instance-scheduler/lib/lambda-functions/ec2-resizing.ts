@@ -9,6 +9,7 @@ import { Effect, Policy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { ISLogGroups } from "../observability/log-groups";
 import { AnonymizedMetricsEnvironment } from "../anonymized-metrics-environment";
+import { cfnConditionToTrueFalse } from "../cfn";
 import { NagSuppressions } from "cdk-nag";
 import { Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
 import { addCfnGuardSuppression } from "../helpers/cfn-guard";
@@ -33,6 +34,7 @@ export interface Ec2ResizingProps {
   readonly regionalEventBusName: string;
   readonly globalEventBus: EventBus;
   readonly factory: FunctionFactory;
+  readonly enableInformationalTagging: CfnCondition;
 }
 
 export class Ec2Resizing extends Construct {
@@ -79,13 +81,15 @@ export class Ec2Resizing extends Construct {
         CONFIG_TABLE: props.dataLayer.configTable.tableName,
         REGISTRY_TABLE: props.dataLayer.registry.tableName,
         USER_AGENT_EXTRA: props.userAgentExtra,
-        STACK_NAME: props.stackName,
+        STACK_NAME: Aws.STACK_NAME,
+        STACK_ID: Aws.STACK_ID,
         SCHEDULER_ROLE_NAME: props.schedulerRoleName,
         SCHEDULE_TAG_KEY: props.tagKey,
         ASG_SCHEDULED_RULES_PREFIX: props.asgScheduledRulesPrefix,
         ASG_METADATA_TAG_KEY: props.asgMetadataTagKey,
         LOCAL_EVENT_BUS_NAME: props.regionalEventBusName,
         GLOBAL_EVENT_BUS_NAME: props.globalEventBus.eventBusName,
+        ENABLE_INFORMATIONAL_TAGGING: cfnConditionToTrueFalse(props.enableInformationalTagging),
         ...props.metricsEnv,
       },
     });

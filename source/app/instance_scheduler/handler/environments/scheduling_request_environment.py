@@ -14,6 +14,7 @@ class SchedulingRequestEnvironment(SchedulingEnvironment):
     user_agent_extra: str
     resize_request_queue_url: Optional[str]
     hub_stack_name: str
+    hub_stack_arn: str
     config_table_name: str
     maintenance_window_table_name: str
     scheduler_role_name: str
@@ -37,6 +38,8 @@ class SchedulingRequestEnvironment(SchedulingEnvironment):
     # for rds
     enable_rds_snapshots: bool
 
+    enable_informational_tagging: bool
+
     @staticmethod
     def from_env() -> "SchedulingRequestEnvironment":
         try:
@@ -56,12 +59,16 @@ class SchedulingRequestEnvironment(SchedulingEnvironment):
                 global_event_bus_name=environ["GLOBAL_EVENT_BUS_NAME"],
                 enable_ops_monitoring=env_to_bool(environ["ENABLE_OPS_MONITORING"]),
                 hub_stack_name=environ["HUB_STACK_NAME"],
+                hub_stack_arn=environ["HUB_STACK_ARN"],
                 scheduling_interval_minutes=int(environ["SCHEDULING_INTERVAL_MINUTES"]),
                 config_table=environ["CONFIG_TABLE"],
                 registry_table=environ["REGISTRY_TABLE"],
                 resize_request_queue_url=environ["RESIZE_REQUEST_SQS_URL"],
                 asg_scheduled_rule_prefix=environ["ASG_SCHEDULED_RULES_PREFIX"],
                 asg_metadata_tag_key=environ["ASG_METADATA_TAG_KEY"],
+                enable_informational_tagging=env_to_bool(
+                    environ["ENABLE_INFORMATIONAL_TAGGING"]
+                ),
             )
         except ZoneInfoNotFoundError as err:
             raise AppEnvError(f"Invalid timezone: {err.args[0]}") from err

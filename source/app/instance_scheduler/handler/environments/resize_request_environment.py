@@ -5,13 +5,14 @@ from os import environ
 from typing import Optional, TypedDict
 
 from instance_scheduler.configuration.scheduling_context import SchedulingEnvironment
-from instance_scheduler.util.app_env_utils import AppEnvError
+from instance_scheduler.util.app_env_utils import AppEnvError, env_to_bool
 
 
 @dataclass(frozen=True)
 class ResizeRequestEnvironment(SchedulingEnvironment):
     user_agent_extra: str
     hub_stack_name: str
+    hub_stack_arn: str
     config_table_name: str
     scheduler_role_name: str
     schedule_tag_key: str
@@ -27,6 +28,8 @@ class ResizeRequestEnvironment(SchedulingEnvironment):
     registry_table: str
     maintenance_window_table_name: str
 
+    enable_informational_tagging: bool
+
     @staticmethod
     def from_env() -> "ResizeRequestEnvironment":
         try:
@@ -35,6 +38,7 @@ class ResizeRequestEnvironment(SchedulingEnvironment):
                 config_table_name=environ["CONFIG_TABLE"],
                 scheduler_role_name=environ["SCHEDULER_ROLE_NAME"],
                 hub_stack_name=environ["STACK_NAME"],
+                hub_stack_arn=environ["STACK_ID"],
                 config_table=environ["CONFIG_TABLE"],
                 registry_table=environ["REGISTRY_TABLE"],
                 schedule_tag_key=environ["SCHEDULE_TAG_KEY"],
@@ -46,6 +50,9 @@ class ResizeRequestEnvironment(SchedulingEnvironment):
                 asg_metadata_tag_key=environ["ASG_METADATA_TAG_KEY"],
                 local_event_bus_name=environ["LOCAL_EVENT_BUS_NAME"],
                 global_event_bus_name=environ["GLOBAL_EVENT_BUS_NAME"],
+                enable_informational_tagging=env_to_bool(
+                    environ["ENABLE_INFORMATIONAL_TAGGING"]
+                ),
             )
         except KeyError as err:
             raise AppEnvError(

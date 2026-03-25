@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.2.0", cdkVersion: "2.241.0" }).synth();
+  new InstanceScheduler({ version: "3.2.1", cdkVersion: "2.243.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -187,7 +187,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     const homepage = "https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/";
 
     const commonPythonDevDeps = [
-      "black@^24.3.0",
+      "black@^26.3.0",
       "flake8@^6.1.0",
       "isort@^5.12.0",
       "mypy@^1.7.1",

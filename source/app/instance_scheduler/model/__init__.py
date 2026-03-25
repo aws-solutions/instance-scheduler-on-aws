@@ -26,6 +26,7 @@ Maintenance windows
         Raises `EC2SSMMaintenanceWindowValidationError` on validation error
     Store: `EC2SSMMaintenanceWindowStore`
 """
+
 from instance_scheduler.model.store.maint_win_store import EC2SSMMaintenanceWindowStore
 
 from .maint_win import EC2SSMMaintenanceWindow, EC2SSMMaintenanceWindowValidationError

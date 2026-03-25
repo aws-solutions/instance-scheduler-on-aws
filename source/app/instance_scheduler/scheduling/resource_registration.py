@@ -63,7 +63,7 @@ def register_ec2_resources(
     registry = DynamoResourceRegistry(env.registry_table)
 
     with (
-        InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
+        InfoTaggingContext(scheduling_role, env) as tagging_context,
         EventsBuffer(scheduling_role, env) as event_buffer,
         logger.append_context_keys(
             context=LogContext.REGISTRATION.value,
@@ -102,7 +102,7 @@ def deregister_ec2_resources(
 ) -> None:
     registry = DynamoResourceRegistry(env.registry_table)
     with (
-        InfoTaggingContext(scheduler_role, env.hub_stack_name) as tagging_context,
+        InfoTaggingContext(scheduler_role, env) as tagging_context,
         logger.append_context_keys(
             context=LogContext.REGISTRATION.value,
             account=scheduler_role.account,
@@ -127,7 +127,7 @@ def register_rds_resources(
     current_time = format_current_time()
 
     with (
-        InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
+        InfoTaggingContext(scheduling_role, env) as tagging_context,
         EventsBuffer(scheduling_role, env) as event_buffer,
         logger.append_context_keys(
             context=LogContext.REGISTRATION.value,
@@ -180,7 +180,7 @@ def deregister_rds_resources(
 ) -> None:
     registry = DynamoResourceRegistry(env.registry_table)
     with (
-        InfoTaggingContext(scheduler_role, env.hub_stack_name) as tagging_context,
+        InfoTaggingContext(scheduler_role, env) as tagging_context,
         logger.append_context_keys(
             context=LogContext.REGISTRATION.value,
             account=scheduler_role.account,
@@ -207,7 +207,7 @@ def register_asg_resources(
     current_time = format_current_time()
 
     with (
-        InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
+        InfoTaggingContext(scheduling_role, env) as tagging_context,
         EventsBuffer(scheduling_role, env) as event_buffer,
         logger.append_context_keys(
             context=LogContext.REGISTRATION.value,
@@ -290,7 +290,7 @@ def deregister_asg_resources(
     registry = DynamoResourceRegistry(env.registry_table)
 
     with (
-        InfoTaggingContext(scheduling_role, env.hub_stack_name) as tagging_context,
+        InfoTaggingContext(scheduling_role, env) as tagging_context,
         logger.append_context_keys(
             account=scheduling_role.account, region=scheduling_role.region
         ),

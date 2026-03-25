@@ -149,7 +149,7 @@ def handle_scheduling_request(event: Mapping[str, Any], _context: LambdaContext)
             apply_informational_tags_for_results(
                 scheduling_context.assumed_role,
                 result_summary.results,
-                hub_stack_arn=env.hub_stack_name,
+                env=env,
             )
 
             report_scheduling_results_to_eventbus(
