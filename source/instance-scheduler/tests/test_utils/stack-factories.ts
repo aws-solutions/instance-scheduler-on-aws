@@ -57,6 +57,7 @@ export const conditions = {
   deployOpsInsightsDashboard: "DeployPropsInsightsDashboardCond",
   gatherPerInstanceTypeMetrics: "GatherPerInstanceTypeMetricsCond",
   gatherPerScheduleMetrics: "GatherPerScheduleMetricsCond",
+  enableInformationalTagging: "EnableInformationalTaggingCond",
 };
 
 export function findResourceWithPartialId(template: Template, resourceType: string, partialId: string) {
@@ -103,6 +104,7 @@ export function mockCoreScheduler(): Template {
     factory: new TestFunctionFactory(),
     asgMetadataTagKey: scheduledTagKey,
     rulePrefix,
+    enableInformationalTagging: trueCondition(stack, conditions.enableInformationalTagging),
   });
 
   return Template.fromStack(stack);

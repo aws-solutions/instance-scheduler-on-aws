@@ -9,6 +9,7 @@ supports different features, it is more convenient to allow any reasonable expre
 be parsed, then later use a validator for the specific field to raise errors. This way
 we only have to define one set of parsers.
 """
+
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import replace

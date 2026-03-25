@@ -172,7 +172,7 @@ class ResizeRequestHandler:
             apply_informational_tags_for_results(
                 self._scheduling_context.assumed_role,
                 results=[result],
-                hub_stack_arn=self._env.hub_stack_name,
+                env=self._env,
             )
             report_scheduling_results_to_eventbus(
                 results=[result],

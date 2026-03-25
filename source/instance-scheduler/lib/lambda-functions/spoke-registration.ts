@@ -5,6 +5,7 @@ import { Effect, Policy, PolicyStatement, Role, ServicePrincipal, CfnRole, CfnPo
 import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
 import { NagSuppressions } from "cdk-nag";
 import { FunctionFactory } from "./function-factory";
+import { cfnConditionToTrueFalse } from "../cfn";
 import { InstanceSchedulerDataLayer } from "../instance-scheduler-data-layer";
 import { ISLogGroups } from "../observability/log-groups";
 import { EventBus } from "aws-cdk-lib/aws-events";
@@ -29,6 +30,7 @@ export interface SpokeRegistrationLambdaProps {
   readonly factory: FunctionFactory;
   readonly ssmParamUpdateRoleName: string;
   readonly ssmParamPathName: string;
+  readonly enableInformationalTagging: CfnCondition;
 }
 export class SpokeRegistrationLambda {
   static getFunctionName(namespace: string) {
@@ -68,6 +70,7 @@ export class SpokeRegistrationLambda {
         SCHEDULER_ROLE_NAME: SchedulerRole.roleName(props.namespace),
         SCHEDULE_TAG_KEY: props.scheduleTagKey,
         HUB_STACK_NAME: Aws.STACK_NAME,
+        HUB_STACK_ARN: Aws.STACK_ID,
         SCHEDULING_INTERVAL_MINUTES: props.schedulingIntervalMinutes.toString(),
         ASG_SCHEDULED_RULES_PREFIX: props.asgRulePrefix,
         ASG_METADATA_TAG_KEY: props.asgMetadataTagKey,
@@ -75,6 +78,7 @@ export class SpokeRegistrationLambda {
         GLOBAL_EVENT_BUS_NAME: props.globalEventBus.eventBusName,
         SSM_PARAM_PATH_NAME: props.ssmParamPathName,
         SSM_PARAM_UPDATE_ROLE_NAME: props.ssmParamUpdateRoleName,
+        ENABLE_INFORMATIONAL_TAGGING: cfnConditionToTrueFalse(props.enableInformationalTagging),
       },
     });
 

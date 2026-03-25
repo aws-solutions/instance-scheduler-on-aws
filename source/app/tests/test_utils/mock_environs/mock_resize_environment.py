@@ -17,6 +17,9 @@ class MockResizeEnvironment(ResizeRequestEnvironment, MockEnvironment):
     user_agent_extra: str = "my-user-agent-extra"
     topic_arn: str = "arn:aws:sns:us-east-1:123456789012:test-topic"
     hub_stack_name: str = "my-hub-stack-name"
+    hub_stack_arn: str = (
+        "arn:aws:cloudformation:us-east-1:123456789012:stack/my-hub-stack-name/guid"
+    )
     config_table_name: str = "my-config-table-name"
     scheduler_role_name: str = "my-scheduler-role-name"
     schedule_tag_key: str = "Schedule"
@@ -32,6 +35,7 @@ class MockResizeEnvironment(ResizeRequestEnvironment, MockEnvironment):
     asg_metadata_tag_key: str = "scheduled"
     local_event_bus_name: str = "local-events"
     global_event_bus_name: str = "global-events"
+    enable_informational_tagging: bool = True
 
     @contextmanager
     def patch_env(self, clear: bool = True) -> Iterator[None]:
@@ -39,6 +43,7 @@ class MockResizeEnvironment(ResizeRequestEnvironment, MockEnvironment):
             "USER_AGENT_EXTRA": self.user_agent_extra,
             "ISSUES_TOPIC_ARN": self.topic_arn,
             "STACK_NAME": self.hub_stack_name,
+            "STACK_ID": self.hub_stack_arn,
             "CONFIG_TABLE": self.config_table_name,
             "SCHEDULER_ROLE_NAME": self.scheduler_role_name,
             "SCHEDULE_TAG_KEY": self.schedule_tag_key,
@@ -48,6 +53,9 @@ class MockResizeEnvironment(ResizeRequestEnvironment, MockEnvironment):
             "ASG_METADATA_TAG_KEY": self.asg_metadata_tag_key,
             "LOCAL_EVENT_BUS_NAME": self.local_event_bus_name,
             "GLOBAL_EVENT_BUS_NAME": self.global_event_bus_name,
+            "ENABLE_INFORMATIONAL_TAGGING": str(
+                self.enable_informational_tagging
+            ).lower(),
         }
         with patch.dict(environ, {**environ, **env_vars}, clear=clear):
             yield

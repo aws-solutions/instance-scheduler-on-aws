@@ -6,6 +6,7 @@ implementation and the specific field. There are potentially valid strings that 
 rejected in the past, such as the last wildcard "L" in a range expresssion within a
 month-of-year expression.
 """
+
 from instance_scheduler.cron.expression import (
     CronAll,
     CronExpression,

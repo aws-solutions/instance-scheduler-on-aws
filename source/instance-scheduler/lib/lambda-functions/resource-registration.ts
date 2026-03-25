@@ -8,6 +8,7 @@ import { AnyPrincipal, Effect, PolicyStatement, Role, ServicePrincipal } from "a
 import { Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
 import { FunctionFactory } from "./function-factory";
 import { NagSuppressions } from "cdk-nag";
+import { cfnConditionToTrueFalse } from "../cfn";
 import { ISLogGroups } from "../observability/log-groups";
 import { Table } from "aws-cdk-lib/aws-dynamodb";
 import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
@@ -38,6 +39,7 @@ interface ResourceRegistrationProps {
   readonly spokeRegistrationLambda: LambdaFunction;
   readonly spokeRegistrationLambdaRoleName: string;
   readonly globalEventBus: EventBus;
+  readonly enableInformationalTagging: CfnCondition;
 }
 
 function registrationEventBusName(namespace: string) {
@@ -170,6 +172,7 @@ export class HubResourceRegistration extends Construct {
         CONFIG_TABLE: props.configTable.tableName,
         REGISTRY_TABLE: props.registryTable.tableName,
         HUB_STACK_NAME: props.stackName,
+        HUB_STACK_ARN: Aws.STACK_ID,
         SCHEDULER_ROLE_NAME: props.schedulerRoleName,
         SCHEDULE_TAG_KEY: props.scheduleTagKey,
         SCHEDULING_INTERVAL_MINUTES: props.schedulingIntervalMinutes.toString(),
@@ -177,6 +180,7 @@ export class HubResourceRegistration extends Construct {
         ASG_METADATA_TAG_KEY: props.asgMetadataTagKey,
         LOCAL_EVENT_BUS_NAME: props.regionalEventBusName,
         GLOBAL_EVENT_BUS_NAME: props.globalEventBus.eventBusName,
+        ENABLE_INFORMATIONAL_TAGGING: cfnConditionToTrueFalse(props.enableInformationalTagging),
       },
     });
 

@@ -100,6 +100,13 @@ export class InstanceSchedulerStack extends Stack {
       default: "5",
     });
 
+    const enableInformationalTagging = new YesNoParameter(this, "EnableInformationalTagging", {
+      label: "Enable informational tagging",
+      description:
+        "When enabled, Instance Scheduler will write informational tags to managed resources indicating the last action taken and any errors encountered.",
+      default: YesNoType.Yes,
+    });
+
     const enableEc2SsmMaintenanceWindows = new YesNoParameter(this, "EnableSSMMaintenanceWindows", {
       label: "Enable EC2 SSM Maintenance Windows",
       description:
@@ -132,6 +139,7 @@ export class InstanceSchedulerStack extends Stack {
         enableScheduling,
         defaultTimezone,
         schedulerIntervalMinutes,
+        enableInformationalTagging,
         enableEc2SsmMaintenanceWindows,
         createRdsSnapshots,
         rulePrefix,
@@ -289,6 +297,7 @@ export class InstanceSchedulerStack extends Stack {
       factory,
       asgMetadataTagKey: scheduledTagKey.valueAsString,
       rulePrefix: rulePrefix.valueAsString,
+      enableInformationalTagging: enableInformationalTagging.getCondition(),
     });
 
     new CfnOutput(this, "AccountId", {

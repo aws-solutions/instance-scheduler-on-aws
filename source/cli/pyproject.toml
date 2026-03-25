@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "instance_scheduler_cli"
-version = "3.2.0"
+version = "3.2.1"
 description = "Instance Scheduler on AWS CLI"
 license = "Apache-2.0"
 authors = [ "Amazon Web Services" ]
@@ -19,7 +19,7 @@ readme = "README.md"
   python = "^3.11.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.3.0"
+black = "^26.3.0"
 flake8 = "^6.1.0"
 isort = "^5.12.0"
 jsonschema = "~4.17.3"

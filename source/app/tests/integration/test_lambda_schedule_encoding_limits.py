@@ -8,6 +8,7 @@ if a customer has too many schedules this event can exceed the maximum payload s
 
 In this scenario the schedules will be omitted from the event, and instead need to be refetched from dynamodb
 """
+
 import json
 from typing import Iterator
 from unittest.mock import MagicMock, patch

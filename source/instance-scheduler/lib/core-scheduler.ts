@@ -49,6 +49,7 @@ export interface CoreSchedulerProps {
   readonly factory: FunctionFactory;
   readonly asgMetadataTagKey: string;
   readonly rulePrefix: string;
+  readonly enableInformationalTagging: CfnCondition;
 }
 
 export class CoreScheduler {
@@ -100,6 +101,7 @@ export class CoreScheduler {
       factory: props.factory,
       ssmParamUpdateRoleName: RegionRegistrationCustomResource.ssmParamUpdateRoleName(props.namespace),
       ssmParamPathName: RegionRegistrationCustomResource.ssmParamPathName(props.namespace),
+      enableInformationalTagging: props.enableInformationalTagging,
     });
 
     const resourceRegistration = new HubResourceRegistration(scope, "ResourceRegistration", {
@@ -123,6 +125,7 @@ export class CoreScheduler {
       spokeRegistrationLambda: spokeRegistrationLambda.lambdaFunction,
       spokeRegistrationLambdaRoleName: SpokeRegistrationLambda.roleName(props.namespace),
       globalEventBus: this.globalEventBus,
+      enableInformationalTagging: props.enableInformationalTagging,
     });
 
     this.regionalEventBusName = resourceRegistration.regionalEventBusName;
@@ -166,6 +169,7 @@ export class CoreScheduler {
       asgMetadataTagKey: props.asgMetadataTagKey,
       regionalEventBusName: REGIONAL_EVENT_BUS_NAME,
       globalEventBus: this.globalEventBus,
+      enableInformationalTagging: props.enableInformationalTagging,
     });
 
     const schedulingRequestHandler = new SchedulingRequestHandlerLambda(scope, {
@@ -191,6 +195,7 @@ export class CoreScheduler {
       regionalEventBusName: REGIONAL_EVENT_BUS_NAME,
       globalEventBus: this.globalEventBus,
       factory: props.factory,
+      enableInformationalTagging: props.enableInformationalTagging,
     });
 
     const orchestratorLambda = new SchedulingOrchestrator(scope, {

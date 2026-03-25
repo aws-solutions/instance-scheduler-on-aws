@@ -17,6 +17,9 @@ class MockSpokeRegistrationEnvironment(SpokeRegistrationEnvironment):
     scheduler_role_name: str = "my-scheduler-role-name"
     schedule_tag_key: str = "Schedule"
     hub_stack_name: str = "my-hub-stack-name"
+    hub_stack_arn: str = (
+        "arn:aws:cloudformation:us-east-1:123456789012:stack/my-hub-stack-name/guid"
+    )
     scheduling_interval_minutes: int = 5
     asg_scheduled_rule_prefix: str = "my-asg-rule-prefix"
     asg_metadata_tag_key: str = "scheduled"
@@ -24,6 +27,7 @@ class MockSpokeRegistrationEnvironment(SpokeRegistrationEnvironment):
     global_event_bus_name: str = "global-events"
     ssm_param_path_name: str = "/IS/default/regions"
     ssm_param_update_role_name: str = "my-ssm-param-update-role-name"
+    enable_informational_tagging: bool = True
 
     @contextmanager
     def patch_env(self, clear: bool = True) -> Iterator[None]:
@@ -34,6 +38,7 @@ class MockSpokeRegistrationEnvironment(SpokeRegistrationEnvironment):
             "SCHEDULER_ROLE_NAME": self.scheduler_role_name,
             "SCHEDULE_TAG_KEY": self.schedule_tag_key,
             "HUB_STACK_NAME": self.hub_stack_name,
+            "HUB_STACK_ARN": self.hub_stack_arn,
             "SCHEDULING_INTERVAL_MINUTES": str(self.scheduling_interval_minutes),
             "ASG_SCHEDULED_RULES_PREFIX": self.asg_scheduled_rule_prefix,
             "ASG_METADATA_TAG_KEY": self.asg_metadata_tag_key,
@@ -41,6 +46,9 @@ class MockSpokeRegistrationEnvironment(SpokeRegistrationEnvironment):
             "GLOBAL_EVENT_BUS_NAME": self.global_event_bus_name,
             "SSM_PARAM_PATH_NAME": self.ssm_param_path_name,
             "SSM_PARAM_UPDATE_ROLE_NAME": self.ssm_param_update_role_name,
+            "ENABLE_INFORMATIONAL_TAGGING": str(
+                self.enable_informational_tagging
+            ).lower(),
         }
         with patch.dict(environ, {**environ, **env_vars}, clear=clear):
             yield

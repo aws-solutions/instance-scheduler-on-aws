@@ -23,6 +23,14 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         "Yes",
       ],
     },
+    "EnableInformationalTaggingCondition": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableInformationalTagging",
+        },
+        "Yes",
+      ],
+    },
     "EnableSSMMaintenanceWindowsCondition": {
       "Fn::Equals": [
         {
@@ -178,6 +186,7 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
             "SchedulingActive",
             "DefaultTimezone",
             "SchedulerFrequency",
+            "EnableInformationalTagging",
             "EnableSSMMaintenanceWindows",
             "CreateRdsSnapshot",
             "AsgRulePrefix",
@@ -226,6 +235,9 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         },
         "DefaultTimezone": {
           "default": "Default time zone",
+        },
+        "EnableInformationalTagging": {
+          "default": "Enable informational tagging",
         },
         "EnableSSMMaintenanceWindows": {
           "default": "Enable EC2 SSM Maintenance Windows",
@@ -806,6 +818,15 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       ],
       "Default": "UTC",
       "Description": "Default IANA time zone identifier used by schedules that do not specify a time zone.",
+      "Type": "String",
+    },
+    "EnableInformationalTagging": {
+      "AllowedValues": [
+        "Yes",
+        "No",
+      ],
+      "Default": "Yes",
+      "Description": "When enabled, Instance Scheduler will write informational tags to managed resources indicating the last action taken and any errors encountered.",
       "Type": "String",
     },
     "EnableSSMMaintenanceWindows": {
@@ -1887,12 +1908,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -1916,12 +1939,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -2102,12 +2127,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -2115,12 +2142,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -2132,12 +2161,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -2145,12 +2176,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -2846,6 +2879,13 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             "CONFIG_TABLE": {
               "Ref": "ConfigTable",
             },
+            "ENABLE_INFORMATIONAL_TAGGING": {
+              "Fn::If": [
+                "EnableInformationalTaggingCondition",
+                "True",
+                "False",
+              ],
+            },
             "GLOBAL_EVENT_BUS_NAME": {
               "Ref": "globalEventsF68743C0",
             },
@@ -2900,6 +2940,9 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             },
             "SOLUTION_ID": "my-solution-id",
             "SOLUTION_VERSION": "v9.9.9",
+            "STACK_ID": {
+              "Ref": "AWS::StackId",
+            },
             "STACK_NAME": {
               "Ref": "AWS::StackName",
             },
@@ -4036,8 +4079,18 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             "CONFIG_TABLE": {
               "Ref": "ConfigTable",
             },
+            "ENABLE_INFORMATIONAL_TAGGING": {
+              "Fn::If": [
+                "EnableInformationalTaggingCondition",
+                "True",
+                "False",
+              ],
+            },
             "GLOBAL_EVENT_BUS_NAME": {
               "Ref": "globalEventsF68743C0",
+            },
+            "HUB_STACK_ARN": {
+              "Ref": "AWS::StackId",
             },
             "HUB_STACK_NAME": {
               "Ref": "AWS::StackName",
@@ -4863,12 +4916,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -4892,12 +4947,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -4913,12 +4970,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -4926,12 +4985,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": "events:PutEvents",
@@ -5736,12 +5797,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -5749,12 +5812,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -5766,12 +5831,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -5779,12 +5846,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -6328,8 +6397,18 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             "CONFIG_TABLE": {
               "Ref": "ConfigTable",
             },
+            "ENABLE_INFORMATIONAL_TAGGING": {
+              "Fn::If": [
+                "EnableInformationalTaggingCondition",
+                "True",
+                "False",
+              ],
+            },
             "GLOBAL_EVENT_BUS_NAME": {
               "Ref": "globalEventsF68743C0",
+            },
+            "HUB_STACK_ARN": {
+              "Ref": "AWS::StackId",
             },
             "HUB_STACK_NAME": {
               "Ref": "AWS::StackName",
@@ -6541,12 +6620,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -6554,12 +6635,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -6575,12 +6658,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -6604,12 +6689,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": "events:PutEvents",
@@ -6833,12 +6920,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -6862,12 +6951,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -6979,6 +7070,13 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "False",
               ],
             },
+            "ENABLE_INFORMATIONAL_TAGGING": {
+              "Fn::If": [
+                "EnableInformationalTaggingCondition",
+                "True",
+                "False",
+              ],
+            },
             "ENABLE_OPS_MONITORING": {
               "Fn::If": [
                 "OpsMonitoringCondition",
@@ -6998,6 +7096,9 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             },
             "HUB_ACCOUNT_ID": {
               "Ref": "AWS::AccountId",
+            },
+            "HUB_STACK_ARN": {
+              "Ref": "AWS::StackId",
             },
             "HUB_STACK_NAME": {
               "Ref": "AWS::StackName",
@@ -7149,12 +7250,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -7162,12 +7265,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ConfigTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ConfigTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -7183,12 +7288,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "StateTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "StateTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -7212,12 +7319,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "StateTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "StateTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -7233,12 +7342,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -7246,12 +7357,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "ResourceRegistryC5838BF9",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ResourceRegistryC5838BF9",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -7267,12 +7380,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:DescribeTable",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "MaintenanceWindowTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "MaintenanceWindowTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [
@@ -7280,12 +7395,14 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
                 "dynamodb:GetShardIterator",
               ],
               "Effect": "Allow",
-              "Resource": {
-                "Fn::GetAtt": [
-                  "MaintenanceWindowTable",
-                  "Arn",
-                ],
-              },
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "MaintenanceWindowTable",
+                    "Arn",
+                  ],
+                },
+              ],
             },
             {
               "Action": [

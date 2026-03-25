@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Convert cron expressions into recurrence strings for AutoScaling Group Scheduled
 Scaling Actions"""
+
 from typing import Final
 
 from instance_scheduler.cron.expression import (
