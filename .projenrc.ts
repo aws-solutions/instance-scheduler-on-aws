@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.2.1", cdkVersion: "2.243.0" }).synth();
+  new InstanceScheduler({ version: "3.2.2", cdkVersion: "2.248.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -181,6 +181,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
           { template: "instance-scheduler-on-aws-remote.template" },
         ],
         build_environment: { build_image: "aws/codebuild/standard:7.0" },
+        auto_create_github_pr: true,
       },
     });
 
@@ -221,7 +222,6 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
   private getCdkDeps(cdkVersion: string): string[] {
     return [
       `@aws-cdk/aws-lambda-python-alpha@${cdkVersion}-alpha.0`,
-      `@aws-cdk/aws-servicecatalogappregistry-alpha@${cdkVersion}-alpha.0`,
       `@aws-cdk/aws-neptune-alpha@${cdkVersion}-alpha.0`,
     ];
   }

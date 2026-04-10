@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.2] - 2026-04-10
+
+### Security
+
+- Upgrade npm dependencies to address vulnerabilities in handlebars, picomatch and brace-expansion
+- Upgrade python dependencies to address vulnerabilities in requests
+
 ## [v3.2.1] - 2026-03-25
 
 ### Added

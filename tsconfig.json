@@ -27,6 +27,11 @@
     "strictPropertyInitialization": false,
     "stripInternal": true,
     "target": "ES2022",
+    "types": [
+      "jest",
+      "node",
+      "uuid"
+    ],
     "moduleResolution": "nodenext",
     "typeRoots": [
       "./node_modules/@types"
