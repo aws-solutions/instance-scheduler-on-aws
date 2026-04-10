@@ -354,7 +354,7 @@
           "exec": "npm install"
         },
         {
-          "exec": "npm update @types/jest @types/node @types/uuid @typescript-eslint/eslint-plugin aws-cdk esbuild eslint eslint-config-prettier eslint-plugin-header eslint-plugin-import eslint-plugin-prettier jest jest-extended jest-junit projen ts-jest ts-node typescript @aws-cdk/aws-lambda-python-alpha @aws-cdk/aws-neptune-alpha @aws-cdk/aws-servicecatalogappregistry-alpha aws-cdk-lib cdk-nag constructs source-map-support uuid"
+          "exec": "npm update @types/jest @types/node @types/uuid @typescript-eslint/eslint-plugin aws-cdk esbuild eslint eslint-config-prettier eslint-plugin-header eslint-plugin-import eslint-plugin-prettier jest jest-extended jest-junit projen ts-jest ts-node typescript @aws-cdk/aws-lambda-python-alpha @aws-cdk/aws-neptune-alpha aws-cdk-lib cdk-nag constructs source-map-support uuid"
         },
         {
           "exec": "npx projen"
