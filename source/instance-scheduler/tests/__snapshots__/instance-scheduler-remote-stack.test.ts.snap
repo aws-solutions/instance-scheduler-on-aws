@@ -221,6 +221,7 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "DependsOn": [
         "CreateRegionalEventRulesLambdaRoleDefaultPolicy80005665",
         "CreateRegionalEventRulesLambdaRole1BE94A3C",
+        "CreateRegionalEventRulesPolicyBA8F60E9",
       ],
       "Properties": {
         "Code": "Omitted to remove snapshot dependency on code hash",
