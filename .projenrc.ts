@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.2.2", cdkVersion: "2.248.0" }).synth();
+  new InstanceScheduler({ version: "3.2.3", cdkVersion: "2.254.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -195,7 +195,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
       "pytest@^7.4.3",
       "pytest-cov@^4.1.0",
       "tox@^4.11.4",
-      "urllib3@^2"
+      "urllib3@^2.7.0"
     ];
 
     const commonPythonProjectOptions: CommonPythonProjectOptions = {
@@ -396,7 +396,7 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
       "tzdata@^2023.3",
     ].forEach((spec: string) => this.addDevDependency(spec));
 
-    ["aws-lambda-powertools@^3.4.1", "packaging@^24.0", "pydantic", "urllib3@^2",].forEach((spec: string) => this.addDependency(spec));
+    ["aws-lambda-powertools@^3.4.1", "packaging@^24.0", "pydantic", "urllib3@^2.7.0",].forEach((spec: string) => this.addDependency(spec));
 
     const pyproject = this.tryFindObjectFile("pyproject.toml");
     if (!pyproject) {
