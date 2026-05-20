@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "instance_scheduler"
-version = "3.2.2"
+version = "3.2.3"
 description = "Instance Scheduler on AWS"
 license = "Apache-2.0"
 authors = [ "Amazon Web Services" ]
@@ -18,7 +18,7 @@ readme = "README.md"
   packaging = "^24.0"
   pydantic = "*"
   python = "^3.12"
-  urllib3 = "^2"
+  urllib3 = "^2.7.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^26.3.0"
@@ -42,7 +42,7 @@ types-jmespath = "1.0.1"
 types-python-dateutil = "2.8.2"
 types-requests = "^2"
 tzdata = "^2023.3"
-urllib3 = "^2"
+urllib3 = "^2.7.0"
 
   [tool.poetry.group.dev.dependencies.boto3-stubs-lite]
   version = "^1.40.4"

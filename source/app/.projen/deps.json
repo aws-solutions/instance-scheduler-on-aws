@@ -117,7 +117,7 @@
     },
     {
       "name": "urllib3",
-      "version": "^2",
+      "version": "^2.7.0",
       "type": "devenv"
     },
     {
@@ -141,7 +141,7 @@
     },
     {
       "name": "urllib3",
-      "version": "^2",
+      "version": "^2.7.0",
       "type": "runtime"
     }
   ],

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.3] - 2026-05-20
+
+### Security
+
+- Upgrade urllib3 to >= 2.7.0 to resolve CVE-2026-44431 and CVE-2026-44432
+- Upgrade aws-cdk-lib to 2.254.0 with fast-uri 3.1.2 to resolve CVE-2026-6321 and CVE-2026-6322
+
 ## [v3.2.2] - 2026-04-10
 
 ### Security
