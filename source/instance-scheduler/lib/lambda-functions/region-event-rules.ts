@@ -3,11 +3,11 @@
 
 import { Construct } from "constructs";
 import { FunctionFactory } from "./function-factory";
-import { Effect, Policy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { CfnPolicy, Effect, Policy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Aws, Duration } from "aws-cdk-lib";
 import { TargetStack } from "../stack-types";
 import { ISLogGroups } from "../observability/log-groups";
-import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
+import { CfnFunction, Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
 import { addCfnGuardSuppression } from "../helpers/cfn-guard";
 
 export interface RegionEventRulesCustomResourceProps {
@@ -106,5 +106,12 @@ export class RegionEventRulesCustomResource {
     this.regionalEventsCustomResourceLambda = lambdaFunction;
     this.taggingEventRole = taggingEventRole;
     this.taggingEventBusArn = targetEventBusArn;
+
+    // Ensure the Lambda function depends on its policy to prevent race condition
+    // where CloudFormation invokes the Lambda (as a custom resource service token)
+    // before the policy granting it permissions is created
+    const cfnFunction = lambdaFunction.node.defaultChild as CfnFunction;
+    const cfnPolicy = rolePolicy.node.defaultChild as CfnPolicy;
+    cfnFunction.addDependency(cfnPolicy);
   }
 }
