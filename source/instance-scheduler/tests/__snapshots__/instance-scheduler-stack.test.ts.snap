@@ -39,6 +39,14 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         "Yes",
       ],
     },
+    "EncryptionModeCondition": {
+      "Fn::Equals": [
+        {
+          "Ref": "EncryptionMode",
+        },
+        "Enabled",
+      ],
+    },
     "OpsMonitoringCondition": {
       "Fn::Equals": [
         {
@@ -215,6 +223,14 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         },
         {
           "Label": {
+            "default": "Encryption",
+          },
+          "Parameters": [
+            "EncryptionMode",
+          ],
+        },
+        {
+          "Label": {
             "default": "Other",
           },
           "Parameters": [
@@ -241,6 +257,9 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
         },
         "EnableSSMMaintenanceWindows": {
           "default": "Enable EC2 SSM Maintenance Windows",
+        },
+        "EncryptionMode": {
+          "default": "Solution-managed KMS encryption",
         },
         "KmsKeyArns": {
           "default": "Kms Key Arns for EC2",
@@ -838,6 +857,15 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       "Description": "Allow schedules to specify a maintenance window name. Instance Scheduler will ensure the instance is running during that maintenance window.",
       "Type": "String",
     },
+    "EncryptionMode": {
+      "AllowedValues": [
+        "Enabled",
+        "Disabled",
+      ],
+      "Default": "Enabled",
+      "Description": "Controls customer-managed KMS encryption for solution-owned resources (DynamoDB tables, CloudWatch log groups, SNS topic, and SQS queues). When set to Enabled (default), the solution provisions a customer-managed CMK and uses it for all of the above. When set to Disabled, no encryption properties are set on those resources and they fall back to AWS-managed encryption (SSE-DDB / CloudWatch Logs default / SSE-SNS / SSE-SQS) - this avoids the per-key monthly cost for customers with their own key-management strategy. Existing deployments may switch this value in place; resources are updated, not replaced.",
+      "Type": "String",
+    },
     "KmsKeyArns": {
       "Default": "",
       "Description": "comma-separated list of kms arns to grant Instance Scheduler kms:CreateGrant permissions to provide the EC2  service with Decrypt permissions for encrypted EBS volumes. This allows the scheduler to start EC2 instances with attached encrypted EBS volumes. provide just (*) to give limited access to all kms keys, leave blank to disable. For details on the exact policy created, refer to security section of the implementation guide (https://aws.amazon.com/solutions/implementations/instance-scheduler-on-aws/)",
@@ -1009,9 +1037,17 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       },
       "Properties": {
         "KmsKeyId": {
-          "Fn::GetAtt": [
-            "InstanceSchedulerEncryptionKey",
-            "Arn",
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "Fn::GetAtt": [
+                "InstanceSchedulerEncryptionKey",
+                "Arn",
+              ],
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
           ],
         },
         "LogGroupName": {
@@ -1083,14 +1119,22 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
           "PointInTimeRecoveryEnabled": true,
         },
         "SSESpecification": {
-          "KMSMasterKeyId": {
-            "Fn::GetAtt": [
-              "InstanceSchedulerEncryptionKey",
-              "Arn",
-            ],
-          },
-          "SSEEnabled": true,
-          "SSEType": "KMS",
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "KMSMasterKeyId": {
+                "Fn::GetAtt": [
+                  "InstanceSchedulerEncryptionKey",
+                  "Arn",
+                ],
+              },
+              "SSEEnabled": true,
+              "SSEType": "KMS",
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
+          ],
         },
         "StreamSpecification": {
           "StreamViewType": "KEYS_ONLY",
@@ -1431,9 +1475,26 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       "DeletionPolicy": "Delete",
       "Properties": {
         "KmsMasterKeyId": {
-          "Fn::GetAtt": [
-            "InstanceSchedulerEncryptionKey",
-            "Arn",
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "Fn::GetAtt": [
+                "InstanceSchedulerEncryptionKey",
+                "Arn",
+              ],
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
+          ],
+        },
+        "SqsManagedSseEnabled": {
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "Ref": "AWS::NoValue",
+            },
+            true,
           ],
         },
       },
@@ -1477,9 +1538,17 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       "DeletionPolicy": "Delete",
       "Properties": {
         "KmsMasterKeyId": {
-          "Fn::GetAtt": [
-            "InstanceSchedulerEncryptionKey",
-            "Arn",
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "Fn::GetAtt": [
+                "InstanceSchedulerEncryptionKey",
+                "Arn",
+              ],
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
           ],
         },
         "RedrivePolicy": {
@@ -1490,6 +1559,15 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
             ],
           },
           "maxReceiveCount": 1,
+        },
+        "SqsManagedSseEnabled": {
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "Ref": "AWS::NoValue",
+            },
+            true,
+          ],
         },
         "VisibilityTimeout": 180,
       },
@@ -1595,9 +1673,17 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
     "InstanceSchedulerSnsTopic": {
       "Properties": {
         "KmsMasterKeyId": {
-          "Fn::GetAtt": [
-            "InstanceSchedulerEncryptionKey",
-            "Arn",
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "Fn::GetAtt": [
+                "InstanceSchedulerEncryptionKey",
+                "Arn",
+              ],
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
           ],
         },
       },
@@ -2034,14 +2120,22 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
           "PointInTimeRecoveryEnabled": true,
         },
         "SSESpecification": {
-          "KMSMasterKeyId": {
-            "Fn::GetAtt": [
-              "InstanceSchedulerEncryptionKey",
-              "Arn",
-            ],
-          },
-          "SSEEnabled": true,
-          "SSEType": "KMS",
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "KMSMasterKeyId": {
+                "Fn::GetAtt": [
+                  "InstanceSchedulerEncryptionKey",
+                  "Arn",
+                ],
+              },
+              "SSEEnabled": true,
+              "SSEType": "KMS",
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
+          ],
         },
       },
       "Type": "AWS::DynamoDB::Table",
@@ -5159,14 +5253,22 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
           "PointInTimeRecoveryEnabled": true,
         },
         "SSESpecification": {
-          "KMSMasterKeyId": {
-            "Fn::GetAtt": [
-              "InstanceSchedulerEncryptionKey",
-              "Arn",
-            ],
-          },
-          "SSEEnabled": true,
-          "SSEType": "KMS",
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "KMSMasterKeyId": {
+                "Fn::GetAtt": [
+                  "InstanceSchedulerEncryptionKey",
+                  "Arn",
+                ],
+              },
+              "SSEEnabled": true,
+              "SSEType": "KMS",
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
+          ],
         },
       },
       "Type": "AWS::DynamoDB::Table",
@@ -5660,9 +5762,17 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
       },
       "Properties": {
         "KmsKeyId": {
-          "Fn::GetAtt": [
-            "InstanceSchedulerEncryptionKey",
-            "Arn",
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "Fn::GetAtt": [
+                "InstanceSchedulerEncryptionKey",
+                "Arn",
+              ],
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
           ],
         },
         "LogGroupName": {
@@ -6846,14 +6956,22 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
           "PointInTimeRecoveryEnabled": true,
         },
         "SSESpecification": {
-          "KMSMasterKeyId": {
-            "Fn::GetAtt": [
-              "InstanceSchedulerEncryptionKey",
-              "Arn",
-            ],
-          },
-          "SSEEnabled": true,
-          "SSEType": "KMS",
+          "Fn::If": [
+            "EncryptionModeCondition",
+            {
+              "KMSMasterKeyId": {
+                "Fn::GetAtt": [
+                  "InstanceSchedulerEncryptionKey",
+                  "Arn",
+                ],
+              },
+              "SSEEnabled": true,
+              "SSEType": "KMS",
+            },
+            {
+              "Ref": "AWS::NoValue",
+            },
+          ],
         },
       },
       "Type": "AWS::DynamoDB::Table",

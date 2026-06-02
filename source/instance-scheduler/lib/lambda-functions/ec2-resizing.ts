@@ -11,10 +11,11 @@ import { ISLogGroups } from "../observability/log-groups";
 import { AnonymizedMetricsEnvironment } from "../anonymized-metrics-environment";
 import { cfnConditionToTrueFalse } from "../cfn";
 import { NagSuppressions } from "cdk-nag";
-import { Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
+import { CfnQueue, Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
 import { addCfnGuardSuppression } from "../helpers/cfn-guard";
 import { KmsKeys } from "../helpers/kms";
 import { EventBus } from "aws-cdk-lib/aws-events";
+import { InstanceSchedulerStack } from "../instance-scheduler-stack";
 
 export interface Ec2ResizingProps {
   readonly description: string;
@@ -48,18 +49,40 @@ export class Ec2Resizing extends Construct {
   constructor(scope: Construct, id: string, props: Ec2ResizingProps) {
     super(scope, id);
 
+    const dlq = new Queue(scope, "InstanceSchedulerEc2ResizeDLQueue", {
+      encryption: QueueEncryption.KMS,
+      encryptionMasterKey: KmsKeys.get(scope),
+      enforceSSL: true,
+    });
+
     this.resizeRequestQueue = new Queue(scope, "InstanceSchedulerEc2ResizeRequestQueue", {
       encryptionMasterKey: KmsKeys.get(scope),
       visibilityTimeout: Duration.seconds(180),
       encryption: QueueEncryption.KMS,
       deadLetterQueue: {
         maxReceiveCount: 1,
-        queue: new Queue(scope, "InstanceSchedulerEc2ResizeDLQueue", {
-          encryption: QueueEncryption.KMS,
-          encryptionMasterKey: KmsKeys.get(scope),
-          enforceSSL: true,
-        }),
+        queue: dlq,
       },
+    });
+
+    const conditionalKmsMasterKeyId = {
+      "Fn::If": [
+        InstanceSchedulerStack.sharedConfig.useSolutionManagedKeyCondition.logicalId,
+        KmsKeys.get(scope).keyArn,
+        Aws.NO_VALUE,
+      ],
+    };
+    (dlq.node.defaultChild as CfnQueue).addPropertyOverride("KmsMasterKeyId", conditionalKmsMasterKeyId);
+    (this.resizeRequestQueue.node.defaultChild as CfnQueue).addPropertyOverride(
+      "KmsMasterKeyId",
+      conditionalKmsMasterKeyId,
+    );
+    // When the customer disables solution-managed encryption, fall back to SSE-SQS
+    (dlq.node.defaultChild as CfnQueue).addPropertyOverride("SqsManagedSseEnabled", {
+      "Fn::If": [InstanceSchedulerStack.sharedConfig.useSolutionManagedKeyCondition.logicalId, Aws.NO_VALUE, true],
+    });
+    (this.resizeRequestQueue.node.defaultChild as CfnQueue).addPropertyOverride("SqsManagedSseEnabled", {
+      "Fn::If": [InstanceSchedulerStack.sharedConfig.useSolutionManagedKeyCondition.logicalId, Aws.NO_VALUE, true],
     });
 
     const resizeRequestHandlerLambdaRole = new Role(scope, "Ec2ResizeRequestHandlerRole", {

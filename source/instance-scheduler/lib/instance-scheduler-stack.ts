@@ -28,6 +28,7 @@ export class InstanceSchedulerStack extends Stack {
   public static sharedConfig: {
     retainDataAndLogsCondition: CfnCondition;
     enableDebugLoggingCondition: CfnCondition;
+    useSolutionManagedKeyCondition: CfnCondition;
     logRetentionDays: number;
     namespace: string;
   };
@@ -230,6 +231,25 @@ export class InstanceSchedulerStack extends Stack {
       parameters: [enableDebugLogging, logRetentionDays, enableOpsMonitoring],
     });
 
+    const encryptionMode = new EnabledDisabledParameter(this, "EncryptionMode", {
+      label: "Solution-managed KMS encryption",
+      description:
+        "Controls customer-managed KMS encryption for solution-owned resources " +
+        "(DynamoDB tables, CloudWatch log groups, SNS topic, and SQS queues). " +
+        "When set to Enabled (default), the solution provisions a customer-managed CMK and " +
+        "uses it for all of the above. When set to Disabled, no encryption properties are " +
+        "set on those resources and they fall back to AWS-managed encryption " +
+        "(SSE-DDB / CloudWatch Logs default / SSE-SNS / SSE-SQS) - this avoids the per-key " +
+        "monthly cost for customers with their own key-management strategy. " +
+        "Existing deployments may switch this value in place; resources are updated, not replaced.",
+      default: EnabledDisabledType.Enabled,
+    });
+
+    addParameterGroup(this, {
+      label: "Encryption",
+      parameters: [encryptionMode],
+    });
+
     const memorySizeValues = ["128", "384", "512", "640", "768", "896", "1024", "1152", "1280", "1408", "1536"];
     const memorySize = new ParameterWithLabel(this, "MemorySize", {
       label: "SchedulingRequestHandler Memory size (MB)",
@@ -268,6 +288,7 @@ export class InstanceSchedulerStack extends Stack {
     InstanceSchedulerStack.sharedConfig = {
       retainDataAndLogsCondition: retainDataAndLogs.getCondition(),
       enableDebugLoggingCondition: enableDebugLogging.getCondition(),
+      useSolutionManagedKeyCondition: encryptionMode.getCondition(),
       logRetentionDays: logRetentionDays.valueAsNumber,
       namespace: namespace.valueAsString,
     };
