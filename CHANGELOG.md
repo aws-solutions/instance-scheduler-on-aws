@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.4] - 2026-06-17
+
+### Security
+
+- Upgrade esbuild to >= 2.8.1 to resolve GHSA-gv7w-rqvm-qjhr
+
+### Fixed
+
+- Periods with a list of monthdays, months, and weekdays had non-deterministic hashes causing scheduled actions to be deleted and recreated. Hashed values are now deterministic.
+
+### Changed
+
+- AllowedPattern constraint on the Namespace parameter in hub and spoke stacks to reject empty or invalid values at deploy time
+
 ## [v3.2.3] - 2026-05-20
 
 ### Security
@@ -29,11 +43,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - IS_Error tag now records timestamp of first-occurrence rather than being updated every scheduling interval
 - IS_ManagedBy tag now records hub stack ARN instead of name
 
-
 ### Security
 
 - Updated black to mitigate CVE-2026-32274
-
 
 ## [v3.2.0] - 2026-03-12
 
@@ -46,15 +58,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- Re-added support for EC2 Instance resizing using the `periodName@size` pattern in 
+- Re-added support for EC2 Instance resizing using the `periodName@size` pattern in
 schedule configurations
 
 ### Security
 
 - Updated minimatch to mitigate CVE-2026-26996, CVE-2026-27903, and CVE-2026-27904
 - Updated joserfc to mitigate CVE-2026-27932
-
-
 
 ## [v3.1.4] - 2026-02-23
 

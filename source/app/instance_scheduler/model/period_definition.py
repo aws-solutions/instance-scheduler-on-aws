@@ -217,7 +217,7 @@ class PeriodDefinition:
 def _optional_list(input: Optional[Iterable[str]]) -> Optional[list[str]]:
     if input is None:
         return None
-    return list(input)
+    return sorted(input)
 
 
 def parse_csv_as_set(value: str) -> set[str]:

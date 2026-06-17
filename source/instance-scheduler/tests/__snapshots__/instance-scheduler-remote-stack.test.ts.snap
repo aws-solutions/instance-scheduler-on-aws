@@ -131,6 +131,8 @@ exports[`InstanceSchedulerRemoteStack snapshot test 1`] = `
       "Type": "CommaDelimitedList",
     },
     "Namespace": {
+      "AllowedPattern": "^[a-zA-Z0-9\\-_]+$",
+      "ConstraintDescription": "Namespace must be a non-empty string containing only alphanumeric characters, hyphens, and underscores.",
       "Default": "default",
       "Description": "Unique identifier used to differentiate between multiple solution deployments. Must be set to the same value as the Hub stack. Must be non-empty for Organizations deployments.",
       "Type": "String",

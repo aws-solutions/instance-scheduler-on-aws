@@ -1,6 +1,11 @@
 {
   "dependencies": [
     {
+      "name": "attrs",
+      "version": ">=22.2.0,<26",
+      "type": "devenv"
+    },
+    {
       "name": "black",
       "version": "^26.3.0",
       "type": "devenv"

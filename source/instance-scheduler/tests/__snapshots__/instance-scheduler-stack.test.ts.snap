@@ -891,6 +891,8 @@ exports[`InstanceSchedulerStack snapshot test 1`] = `
       "Type": "Number",
     },
     "Namespace": {
+      "AllowedPattern": "^[a-zA-Z0-9\\-_]+$",
+      "ConstraintDescription": "Namespace must be a non-empty string containing only alphanumeric characters, hyphens, and underscores.",
       "Default": "default",
       "Description": "Unique identifier per deployment. Cannot contain spaces.",
       "Type": "String",

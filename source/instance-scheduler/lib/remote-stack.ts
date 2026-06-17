@@ -38,6 +38,9 @@ export class SpokeStack extends Stack {
         "Unique identifier used to differentiate between multiple solution deployments. " +
         "Must be set to the same value as the Hub stack. Must be non-empty for Organizations deployments.",
       default: "default",
+      allowedPattern: String.raw`^[a-zA-Z0-9\-_]+$`,
+      constraintDescription:
+        "Namespace must be a non-empty string containing only alphanumeric characters, hyphens, and underscores.",
     });
 
     const usingAWSOrganizations = new YesNoParameter(this, "UsingAWSOrganizations", {
