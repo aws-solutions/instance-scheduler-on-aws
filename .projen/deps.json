@@ -6,7 +6,7 @@
     },
     {
       "name": "@types/node",
-      "version": "^18",
+      "version": "^22",
       "type": "build"
     },
     {

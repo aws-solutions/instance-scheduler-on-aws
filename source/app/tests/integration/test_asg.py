@@ -467,6 +467,63 @@ def test_stopped_asg_configured_with_zero_state(
     assert get_tag_value(asg.resource_id, "IS-MinDesiredMax") == "0-0-0"
 
 
+def test_schedule_hash_stability_with_multi_value_fields() -> None:
+    """
+    Verify that schedule hashes are deterministic across separate process invocations.
+    Each subprocess gets a unique PYTHONHASHSEED, which randomizes set iteration order.
+    Without sorted serialization, the hash would differ between invocations.
+
+    With 8! * 6! * 5! possible orderings (~3.5 billion), the probability of 5 runs
+    all producing the same hash by coincidence is effectively zero.
+    """
+    import subprocess
+    import sys
+
+    script = """
+import sys
+sys.path.insert(0, ".")
+from instance_scheduler.model.period_definition import PeriodDefinition
+from instance_scheduler.model.period_identifier import PeriodIdentifier
+from instance_scheduler.model.schedule_definition import ScheduleDefinition
+from instance_scheduler.model.store.in_memory_period_definition_store import InMemoryPeriodDefinitionStore
+
+period = PeriodDefinition(
+    name="multi-value-period",
+    begintime="08:30",
+    endtime="17:00",
+    weekdays={"mon", "tue", "wed", "thu", "fri"},
+    months={"jan", "mar", "may", "jul", "sep", "nov"},
+    monthdays={"1-2", "4-5", "7-8", "10-11", "14-15", "18-19", "22-23", "25-28"},
+)
+
+period_store = InMemoryPeriodDefinitionStore({"multi-value-period": period})
+
+schedule = ScheduleDefinition(
+    name="hash-test-schedule",
+    periods=[PeriodIdentifier("multi-value-period")],
+    timezone="UTC",
+)
+
+print(schedule.to_hash(period_store))
+"""
+
+    hashes = set()
+    for _ in range(5):
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            cwd=".",
+        )
+        assert result.returncode == 0, f"subprocess failed: {result.stderr}"
+        hashes.add(result.stdout.strip())
+
+    assert len(hashes) == 1, (
+        f"Expected exactly 1 unique hash across all invocations "
+        f"but got {len(hashes)}: {hashes}"
+    )
+
+
 # The following tests are commented out as they test complex scenarios
 # that may not be applicable to the new registry-based architecture
 # and would require significant refactoring to work with the new system

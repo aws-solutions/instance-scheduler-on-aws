@@ -45,7 +45,7 @@ Instance Scheduler can be deployed to your AWS account directly from the source 
 
 - cloned repository
 - AWS CLI v2
-- Node.JS 18
+- Node.JS 22
 - docker
 
 #### Deploying the hub stack
@@ -103,7 +103,7 @@ buckets for access to assets within the region, such as Lambda code. You will ne
 
 - cloned repository
 - AWS CLI v2
-- Node.js 18
+- Node.js 22
 - docker
 - Two S3 buckets (minimum): 1 global and 1 for each region where you will deploy.
 
@@ -164,7 +164,7 @@ Ex. https://mybucket.s3.amazonaws.com/instance-scheduler-on-aws/v1.5.0.mybuild/i
 
 - cloned repository
 - AWS CLI v2
-- Node.js 18
+- Node.js 22
 - docker
 - Python 3.10
 - tox

@@ -39,6 +39,9 @@ export class InstanceSchedulerStack extends Stack {
       label: "Namespace",
       description: "Unique identifier per deployment. Cannot contain spaces.",
       default: "default",
+      allowedPattern: String.raw`^[a-zA-Z0-9\-_]+$`,
+      constraintDescription:
+        "Namespace must be a non-empty string containing only alphanumeric characters, hyphens, and underscores.",
     });
 
     const usingAWSOrganizations = new YesNoParameter(this, "UsingAWSOrganizations", {
