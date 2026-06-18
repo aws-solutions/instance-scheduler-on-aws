@@ -58,6 +58,7 @@ export const conditions = {
   gatherPerInstanceTypeMetrics: "GatherPerInstanceTypeMetricsCond",
   gatherPerScheduleMetrics: "GatherPerScheduleMetricsCond",
   enableInformationalTagging: "EnableInformationalTaggingCond",
+  useSolutionManagedKey: "UseSolutionManagedKeyCond",
 };
 
 export function findResourceWithPartialId(template: Template, resourceType: string, partialId: string) {
@@ -118,6 +119,7 @@ export function initializeInstanceSchedulerStackClass(stack: Stack) {
   InstanceSchedulerStack.sharedConfig = {
     retainDataAndLogsCondition: trueCondition(stack, conditions.enableDdbDeletionProtection),
     enableDebugLoggingCondition: trueCondition(stack, conditions.enableDebugLogging),
+    useSolutionManagedKeyCondition: trueCondition(stack, conditions.useSolutionManagedKey),
     logRetentionDays: RetentionDays.ONE_WEEK,
     namespace: namespace,
   };

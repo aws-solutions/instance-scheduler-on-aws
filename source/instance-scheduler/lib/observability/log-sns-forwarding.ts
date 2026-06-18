@@ -1,16 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { Construct } from "constructs";
-import { Topic } from "aws-cdk-lib/aws-sns";
+import { CfnTopic, Topic } from "aws-cdk-lib/aws-sns";
 import { KmsKeys } from "../helpers/kms";
 import { overrideLogicalId } from "../cfn";
 import { FunctionFactory } from "../lambda-functions/function-factory";
 import { Role, ServicePrincipal, PolicyStatement, Effect } from "aws-cdk-lib/aws-iam";
 import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
-import { Duration, Stack } from "aws-cdk-lib";
+import { Aws, Duration, Stack } from "aws-cdk-lib";
 import { FilterPattern, SubscriptionFilter } from "aws-cdk-lib/aws-logs";
 import { ISLogGroups } from "./log-groups";
 import { LambdaDestination } from "aws-cdk-lib/aws-logs-destinations";
+import { InstanceSchedulerStack } from "../instance-scheduler-stack";
 
 export interface SnsLogSubscriberProps {
   readonly factory: FunctionFactory;
@@ -29,6 +30,13 @@ export class SnsLogSubscriber extends Construct {
       enforceSSL: true,
     });
     overrideLogicalId(this.snsTopic, "InstanceSchedulerSnsTopic");
+    (this.snsTopic.node.defaultChild as CfnTopic).addPropertyOverride("KmsMasterKeyId", {
+      "Fn::If": [
+        InstanceSchedulerStack.sharedConfig.useSolutionManagedKeyCondition.logicalId,
+        KmsKeys.get(scope).keyArn,
+        Aws.NO_VALUE,
+      ],
+    });
 
     const lambdaRole = new Role(scope, "SnsLogForwarderRole", {
       assumedBy: new ServicePrincipal("lambda.amazonaws.com"),
