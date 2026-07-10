@@ -4,11 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.5] - 2026-07-09
+
+### Security
+
+- Upgrade joserfc to 1.7.2 in the app and cli development dependencies to resolve CVE-2026-49852 and CVE-2026-48990, where HMAC verification could accept an empty key. This is a development-only transitive dependency of the moto test library and is not included in any runtime or release artifact.
+
+### Changed
+
+- Updated NOTICE.txt with corrected and complete third party license attribution.
+
 ## [v3.2.4] - 2026-06-17
 
 ### Security
 
-- Upgrade esbuild to >= 2.8.1 to resolve GHSA-gv7w-rqvm-qjhr
+- Upgrade esbuild to >= 0.28.1 to resolve GHSA-gv7w-rqvm-qjhr
 
 ### Fixed
 
