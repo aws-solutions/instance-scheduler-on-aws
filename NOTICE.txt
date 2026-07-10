@@ -22,7 +22,7 @@ ansi-styles under the MIT license.
 astral-regex under the MIT license.
 balanced-match under the MIT license.
 brace-expansion under the MIT license.
-case under the MIT license.
+case under the MIT OR GPL-3.0-or-later license.
 color-convert under the MIT license.
 color-name under the MIT license.
 concat-map under the MIT license.
@@ -39,7 +39,7 @@ jsonschema under the MIT license.
 lodash.truncate under the MIT license.
 mime-db under the MIT license.
 mime-types under the MIT license.
-minimatch under the ISC license.
+minimatch under the BlueOak-1.0.0 license.
 punycode under the MIT license.
 require-from-string under the MIT license.
 semver under the ISC license.
@@ -212,13 +212,13 @@ espree under the BSD-2-Clause license.
 acorn under the MIT license.
 acorn-jsx under the MIT license.
 globals under the MIT license.
-type-fest under the MIT license.
+type-fest under the MIT OR CC0-1.0 license.
 import-fresh under the MIT license.
 parent-module under the MIT license.
 callsites under the MIT license.
 resolve-from under the MIT license.
 js-yaml under the MIT license.
-argparse under the MIT license.
+argparse under the Python-2.0 license.
 strip-json-comments under the MIT license.
 @eslint/js under the MIT license.
 @humanwhocodes/config-array under the Apache-2.0 license.
@@ -659,14 +659,12 @@ neo-async under the MIT license.
 wordwrap under the MIT license.
 uglify-js under the BSD-2-Clause license.
 lodash.memoize under the MIT license.
-redpencil-publisher-modules under the n/a license(s).
 markdownlint under the MIT license.
 markdown-it under the MIT license.
 entities under the BSD-2-Clause license.
 linkify-it under the MIT license.
 uc.micro under the MIT license.
 mdurl under the MIT license.
-redpencil-utils under the UNLICENSED license(s).
 @aws-sdk/client-eventbridge under the Apache-2.0 license.
 @aws-sdk/client-sso-oidc under the Apache-2.0 license.
 @aws-sdk/client-sts under the Apache-2.0 license.
@@ -705,8 +703,6 @@ sentence-similarity under the MIT license.
 helper-clockmaker under the MIT license.
 async under the MIT license.
 winston under the MIT license.
-cycle license unknown or missing
-eyes license unknown or missing
 isstream under the MIT license.
 stack-trace under the MIT license.
 binary-search under the CC0-1.0 license.
@@ -837,7 +833,7 @@ xdg-basedir under the MIT license.
 version-guard under the 0BSD license.
 @types/adm-zip under the MIT license.
 annotated-types under the MIT license.
-attrs
+attrs under the MIT license.
 aws-sam-translator under the Apache-2.0 license.
 aws-xray-sdk under the Apache-2.0 license.
 black under the MIT license.
@@ -848,30 +844,30 @@ botocore-stubs under the MIT license.
 cachetools under the MIT license.
 certifi under the MPL-2.0 license.
 cffi under the MIT license.
-cfn-lint under the MIT no attribution license(s).
-chardet under the GNU Lesser General Public License v2 or later (LGPLv2+) license(s).
+cfn-lint under the MIT-0 license.
+chardet under the 0BSD license.
 charset-normalizer under the MIT license.
-click under the 0BSD license.
+click under the BSD-3-Clause license.
 colorama under the 0BSD license.
 coverage under the Apache-2.0 license.
-cryptography under the Apache-2.0 license.
+cryptography under the Apache-2.0 OR BSD-3-Clause license.
 distlib under the PSF-2.0 license.
 docker under the Apache-2.0 license.
-filelock under the The Unlicense (Unlicense) license(s).
+filelock under the Unlicense license.
 flake8 under the MIT license.
 graphql-core under the MIT license.
-idna under the 0BSD license.
+idna under the BSD-3-Clause license.
 iniconfig under the MIT license.
 isort under the MIT license.
-jinja2 under the 0BSD license.
+jinja2 under the BSD-3-Clause license.
 jmespath under the MIT license.
-joserfc under the 0BSD license.
-jsonpatch under the 0BSD license.
-jsonpointer under the 0BSD license.
+joserfc under the BSD-3-Clause license.
+jsonpatch under the BSD-3-Clause license.
+jsonpointer under the BSD-3-Clause license.
 jsonschema-spec under the Apache-2.0 license.
-lazy-object-proxy under the 0BSD license.
+lazy-object-proxy under the BSD-2-Clause license.
 librt under the MIT license.
-markupsafe under the 0BSD license.
+markupsafe under the BSD-3-Clause license.
 mccabe under the MIT license.
 moto under the Apache-2.0 license.
 mpmath under the 0BSD license.
@@ -879,17 +875,17 @@ mypy under the MIT license.
 mypy-boto3-cloudformation under the MIT license.
 mypy-boto3-lambda under the MIT license.
 mypy-extensions under the MIT license.
-networkx under the 0BSD license.
-openapi-schema-validator under the 0BSD license.
+networkx under the BSD-3-Clause license.
+openapi-schema-validator under the BSD-3-Clause license.
 openapi-spec-validator under the Apache-2.0 license.
-packaging under the Apache-2.0 license.
+packaging under the Apache-2.0 OR BSD-2-Clause license.
 pathable under the Apache-2.0 license.
 pathspec under the MPL-2.0 license.
 platformdirs under the MIT license.
 pluggy under the MIT license.
 py-partiql-parser under the MIT license.
 pycodestyle under the MIT license.
-pycparser under the 0BSD license.
+pycparser under the BSD-3-Clause license.
 pydantic under the MIT license.
 pydantic-core under the MIT license.
 pyflakes under the MIT license.
@@ -911,16 +907,16 @@ six under the MIT license.
 sympy under the 0BSD license.
 tox under the MIT license.
 types-awscrt under the MIT license.
-types-jmespath under the Apache-2.0 license license(s).
+types-jmespath under the Apache-2.0 license.
 types-PyYAML under the Apache-2.0 license.
 types-requests under the Apache-2.0 license.
 types-s3transfer under the MIT license.
-types-urllib3 under the Apache-2.0 license license(s).
+types-urllib3 under the Apache-2.0 license.
 typing-extensions under the PSF-2.0 license.
 urllib3 under the MIT license.
 virtualenv under the MIT license.
-Werkzeug under the 0BSD license.
-wrapt under the 0BSD license.
+Werkzeug under the BSD-3-Clause license.
+wrapt under the BSD-2-Clause license.
 xmltodict under the MIT license.
 aws-lambda-powertools under the MIT license.
 execnet under the MIT license.
@@ -943,20 +939,25 @@ pytest-mock under the MIT license.
 pytest-runner under the MIT license.
 pytest-xdist under the MIT license.
 rpds-py under the MIT license.
-types-freezegun under the Apache-2.0 license license(s).
+types-freezegun under the Apache-2.0 license.
 types-python-dateutil under the Apache-2.0 license.
 tzdata under the Apache-2.0 license.
-cycle license unknown or missing
-eyes license unknown or missing
-attrs
-pyyaml under the MIT license.
-types-pyyaml
-typing-inspection
-werkzeug
-mypy-boto3-events
-mypy-boto3-sqs
+typing-inspection under the MIT license.
+mypy-boto3-events under the MIT license.
+mypy-boto3-sqs under the MIT license.
 ply under the 0BSD license.
-referencing
+referencing under the MIT license.
+@aws-cdk/cloud-assembly-api under the Apache-2.0 license.
+@typescript-eslint/project-service under the MIT license.
+@typescript-eslint/tsconfig-utils under the MIT license.
+fdir under the MIT license.
+node-exports-info under the MIT license.
+pydantic-settings under the MIT license.
+python-discovery under the MIT license.
+python-dotenv under the BSD-3-Clause license.
+pytokens under the MIT license.
+tinyglobby under the MIT license.
+tomli-w under the MIT license.
 
 ********************
 OPEN SOURCE LICENSES
@@ -971,8 +972,11 @@ Apache-2.0 - https://www.apache.org/licenses/LICENSE-2.0
 BSD-2-Clause - https://opensource.org/licenses/BSD-2-Clause
 BSD-3-Clause - https://opensource.org/licenses/BSD-3-Clause
 CC-BY-4.0 - https://creativecommons.org/licenses/by/4.0/legalcode
+GPL-3.0-or-later - https://www.gnu.org/licenses/gpl-3.0.html
 ISC - https://www.isc.org/licenses/
 MIT - https://opensource.org/license/mit/
+MIT-0 - https://github.com/aws/mit-0
 MPL-2.0 - https://www.mozilla.org/MPL/2.0/
 PSF-2.0 - https://opensource.org/licenses/Python-2.0
 Python-2.0 - https://opensource.org/licenses/Python-2.0
+Unlicense - https://unlicense.org/

@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.2.4", cdkVersion: "2.254.0" }).synth();
+  new InstanceScheduler({ version: "3.2.5", cdkVersion: "2.254.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -112,6 +112,11 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
       roots: [`<rootDir>/${this.testdir}`],
       transform: { "^.+\\.tsx?$": new Transform("ts-jest") },
       setupFilesAfterEnv: ["jest-extended/all"],
+      // Use the babel coverage provider instead of v8. The v8 provider activates
+      // the V8 inspector to gather coverage, which intermittently crashes the
+      // Node process during CDK snapshot synthesis (V8 ScopeIterator fatal on
+      // OnDebugBreak). babel-plugin-istanbul is deterministic and avoids it.
+      coverageProvider: "babel",
     },
   };
 
@@ -231,7 +236,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     const eslintTask = this.addTask("test:eslint", { exec: "npx eslint --max-warnings=0 ." });
 
     const updateSnapshotsTask = this.addTask("test:update-snapshots", {
-      exec: "jest --updateSnapshot --passWithNoTests --coverageProvider=v8 --ci",
+      exec: "jest --updateSnapshot --passWithNoTests --coverageProvider=babel --ci",
     });
 
     const updateTask = this.tasks.tryFind("test:update");
@@ -243,7 +248,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     updateTask.spawn(eslintTask);
     updateTask.spawn(updateSnapshotsTask);
 
-    const baseJestCommand = "jest --coverageProvider=v8 --ci";
+    const baseJestCommand = "jest --coverageProvider=babel --ci";
     const cdkTestTask = this.addTask("test:cdk-tests", { exec: baseJestCommand });
 
     const cdkTask = this.addTask("test:cdk");

@@ -228,7 +228,7 @@
       "name": "test:cdk-tests",
       "steps": [
         {
-          "exec": "jest --coverageProvider=v8 --ci"
+          "exec": "jest --coverageProvider=babel --ci"
         }
       ]
     },
@@ -236,7 +236,7 @@
       "name": "test:cdk-tests:ci",
       "steps": [
         {
-          "exec": "jest --coverageProvider=v8 --ci --coverage --coverageDirectory deployment/coverage-reports/cdk-coverage"
+          "exec": "jest --coverageProvider=babel --ci --coverage --coverageDirectory deployment/coverage-reports/cdk-coverage"
         }
       ]
     },
@@ -327,7 +327,7 @@
       "name": "test:update-snapshots",
       "steps": [
         {
-          "exec": "jest --updateSnapshot --passWithNoTests --coverageProvider=v8 --ci"
+          "exec": "jest --updateSnapshot --passWithNoTests --coverageProvider=babel --ci"
         }
       ]
     },
