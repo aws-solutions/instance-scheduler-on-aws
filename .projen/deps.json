@@ -10,10 +10,6 @@
       "type": "build"
     },
     {
-      "name": "@types/uuid",
-      "type": "build"
-    },
-    {
       "name": "@typescript-eslint/eslint-plugin",
       "version": "^8",
       "type": "build"
@@ -57,6 +53,7 @@
     },
     {
       "name": "jest-junit",
+      "version": "17",
       "type": "build"
     },
     {
@@ -78,17 +75,17 @@
     },
     {
       "name": "@aws-cdk/aws-lambda-python-alpha",
-      "version": "2.254.0-alpha.0",
+      "version": "2.262.0-alpha.0",
       "type": "runtime"
     },
     {
       "name": "@aws-cdk/aws-neptune-alpha",
-      "version": "2.254.0-alpha.0",
+      "version": "2.262.0-alpha.0",
       "type": "runtime"
     },
     {
       "name": "aws-cdk-lib",
-      "version": "2.254.0",
+      "version": "2.262.0",
       "type": "runtime"
     },
     {
@@ -102,10 +99,6 @@
     },
     {
       "name": "source-map-support",
-      "type": "runtime"
-    },
-    {
-      "name": "uuid",
       "type": "runtime"
     }
   ],

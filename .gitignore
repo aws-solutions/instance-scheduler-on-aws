@@ -55,6 +55,7 @@ deployment/coverage-reports
 /lib
 /dist/
 !/.projen/jest-snapshot-resolver.js
+!/projenrc/tsconfig.json
 /assets/
 !/cdk.json
 /build/cdk.out/

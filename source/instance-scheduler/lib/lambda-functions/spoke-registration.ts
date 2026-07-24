@@ -1,6 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Aws, CfnCondition, Duration, Fn, Stack } from "aws-cdk-lib";
+import { Aws, CfnCondition, Duration, Fn, Stack, Tokenization } from "aws-cdk-lib";
 import { Effect, Policy, PolicyStatement, Role, ServicePrincipal, CfnRole, CfnPolicy } from "aws-cdk-lib/aws-iam";
 import { Function as LambdaFunction } from "aws-cdk-lib/aws-lambda";
 import { NagSuppressions } from "cdk-nag";
@@ -71,7 +71,7 @@ export class SpokeRegistrationLambda {
         SCHEDULE_TAG_KEY: props.scheduleTagKey,
         HUB_STACK_NAME: Aws.STACK_NAME,
         HUB_STACK_ARN: Aws.STACK_ID,
-        SCHEDULING_INTERVAL_MINUTES: props.schedulingIntervalMinutes.toString(),
+        SCHEDULING_INTERVAL_MINUTES: Tokenization.stringifyNumber(props.schedulingIntervalMinutes),
         ASG_SCHEDULED_RULES_PREFIX: props.asgRulePrefix,
         ASG_METADATA_TAG_KEY: props.asgMetadataTagKey,
         LOCAL_EVENT_BUS_NAME: props.localEventBusName,

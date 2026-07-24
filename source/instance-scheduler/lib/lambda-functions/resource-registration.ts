@@ -3,7 +3,7 @@
 import { Construct } from "constructs";
 import { EventBus, EventPattern, Rule } from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
-import { Aws, CfnCondition, CfnResource, CustomResource, Duration, Fn } from "aws-cdk-lib";
+import { Aws, CfnCondition, CfnResource, CustomResource, Duration, Fn, Tokenization } from "aws-cdk-lib";
 import { AnyPrincipal, Effect, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
 import { FunctionFactory } from "./function-factory";
@@ -175,7 +175,7 @@ export class HubResourceRegistration extends Construct {
         HUB_STACK_ARN: Aws.STACK_ID,
         SCHEDULER_ROLE_NAME: props.schedulerRoleName,
         SCHEDULE_TAG_KEY: props.scheduleTagKey,
-        SCHEDULING_INTERVAL_MINUTES: props.schedulingIntervalMinutes.toString(),
+        SCHEDULING_INTERVAL_MINUTES: Tokenization.stringifyNumber(props.schedulingIntervalMinutes),
         ASG_SCHEDULED_RULES_PREFIX: props.asgScheduledRulesPrefix,
         ASG_METADATA_TAG_KEY: props.asgMetadataTagKey,
         LOCAL_EVENT_BUS_NAME: props.regionalEventBusName,

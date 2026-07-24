@@ -1,6 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Aws, CfnCondition, Fn, Stack } from "aws-cdk-lib";
+import { Aws, CfnCondition, Fn, Stack, Tokenization } from "aws-cdk-lib";
 import { CfnRule, EventBus, Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction as LambdaFunctionTarget } from "aws-cdk-lib/aws-events-targets";
 import { CfnPolicy, CfnRole, CompositePrincipal, Role } from "aws-cdk-lib/aws-iam";
@@ -135,7 +135,7 @@ export class CoreScheduler {
       SEND_METRICS: cfnConditionToTrueFalse(props.sendAnonymizedMetrics),
       SOLUTION_ID: props.solutionId,
       SOLUTION_VERSION: props.solutionVersion,
-      SCHEDULING_INTERVAL_MINUTES: props.schedulingIntervalMinutes.toString(),
+      SCHEDULING_INTERVAL_MINUTES: Tokenization.stringifyNumber(props.schedulingIntervalMinutes),
       METRICS_UUID: metricsUuidGenerator.metricsUuid,
       HUB_ACCOUNT_ID: Aws.ACCOUNT_ID,
     };
@@ -229,7 +229,9 @@ export class CoreScheduler {
 
     const schedulerRule = new Rule(scope, "SchedulerEventRule", {
       description: `Instance Scheduler - Rule to trigger instance for scheduler function version ${props.solutionVersion}`,
-      schedule: Schedule.expression(schedulingIntervalToCron.getMapping(props.schedulingIntervalMinutes.toString())),
+      schedule: Schedule.expression(
+        schedulingIntervalToCron.getMapping(Tokenization.stringifyNumber(props.schedulingIntervalMinutes)),
+      ),
       targets: [
         new LambdaFunctionTarget(orchestratorLambda.lambdaFunction, {
           event: RuleTargetInput.fromObject({

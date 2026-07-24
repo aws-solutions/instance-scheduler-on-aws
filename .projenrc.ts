@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.2.5", cdkVersion: "2.254.0" }).synth();
+  new InstanceScheduler({ version: "3.2.6", cdkVersion: "2.262.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -52,14 +52,9 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     .toString()
     .split("\n");
 
-  private static readonly deps: string[] = [
-    "cdk-nag",
-    "source-map-support",
-    "uuid",
-  ];
+  private static readonly deps: string[] = ["cdk-nag", "source-map-support"];
 
   private static readonly devDeps: string[] = [
-    "@types/uuid",
     "@typescript-eslint/eslint-plugin@^8",
     "eslint",
     "eslint-config-prettier",
@@ -67,7 +62,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     "eslint-plugin-import",
     "eslint-plugin-prettier",
     "jest-extended",
-    "jest-junit",
+    "jest-junit@17",
     "ts-jest",
   ];
 
@@ -197,10 +192,10 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
       "flake8@^6.1.0",
       "isort@^5.12.0",
       "mypy@^1.7.1",
-      "pytest@^7.4.3",
-      "pytest-cov@^4.1.0",
+      "pytest@^9.0.0",
+      "pytest-cov@^7.0.0",
       "tox@^4.11.4",
-      "urllib3@^2.7.0"
+      "urllib3@^2.7.0",
     ];
 
     const commonPythonProjectOptions: CommonPythonProjectOptions = {
@@ -232,7 +227,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
   }
 
   private addTestTasks(): void {
-    const prettierTask = this.addTask("test:prettier", { exec: "npx prettier --check ./**/*.ts" });
+    const prettierTask = this.addTask("test:prettier", { exec: 'npx prettier --check "./**/*.ts"' });
     const eslintTask = this.addTask("test:eslint", { exec: "npx eslint --max-warnings=0 ." });
 
     const updateSnapshotsTask = this.addTask("test:update-snapshots", {
@@ -404,7 +399,9 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
     // Pin attrs below 26 to avoid incompatibility with pip's bundled rich/attr modules
     this.addDevDependency("attrs@>=22.2.0,<26");
 
-    ["aws-lambda-powertools@^3.4.1", "packaging@^24.0", "pydantic", "urllib3@^2.7.0",].forEach((spec: string) => this.addDependency(spec));
+    ["aws-lambda-powertools@^3.4.1", "packaging@^24.0", "pydantic", "urllib3@^2.7.0"].forEach((spec: string) =>
+      this.addDependency(spec),
+    );
 
     const pyproject = this.tryFindObjectFile("pyproject.toml");
     if (!pyproject) {
