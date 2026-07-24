@@ -62,7 +62,7 @@
     },
     {
       "name": "pytest-cov",
-      "version": "^4.1.0",
+      "version": "^7.0.0",
       "type": "devenv"
     },
     {
@@ -82,7 +82,7 @@
     },
     {
       "name": "pytest",
-      "version": "^7.4.3",
+      "version": "^9.0.0",
       "type": "devenv"
     },
     {

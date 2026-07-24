@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { MathExpression, Metric } from "aws-cdk-lib/aws-cloudwatch";
-import { Aws, Stack } from "aws-cdk-lib";
+import { Aws, Stack, Tokenization } from "aws-cdk-lib";
 import { SchedulingRequestHandlerLambda } from "../lambda-functions/scheduling-request-handler";
 import { SchedulingOrchestrator } from "../lambda-functions/scheduling-orchestrator";
 import { SchedulingIntervalToSeconds } from "../scheduling-interval-mappings";
@@ -30,7 +30,7 @@ export class Metrics {
       scope,
       "MetricsSchedulingIntervalToSeconds",
       {},
-    ).getMapping(this.props.schedulingIntervalMinutes.toString());
+    ).getMapping(Tokenization.stringifyNumber(this.props.schedulingIntervalMinutes));
   }
 
   TotalEc2InstancesControlled() {

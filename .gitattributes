@@ -15,5 +15,6 @@
 /LICENSE linguist-generated
 /package-lock.json linguist-generated
 /package.json linguist-generated
+/projenrc/tsconfig.json linguist-generated linguist-language=JSON-with-Comments
 /solution-manifest.yaml linguist-generated
 /tsconfig.json linguist-generated linguist-language=JSON-with-Comments

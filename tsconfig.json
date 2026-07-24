@@ -29,8 +29,7 @@
     "target": "ES2022",
     "types": [
       "jest",
-      "node",
-      "uuid"
+      "node"
     ],
     "moduleResolution": "nodenext",
     "typeRoots": [
@@ -42,9 +41,7 @@
   },
   "include": [
     "source/**/*.ts",
-    "deployment/cdk-solution-helper/**/*.ts",
-    ".projenrc.ts",
-    "projenrc/**/*.ts"
+    "deployment/cdk-solution-helper/**/*.ts"
   ],
   "exclude": [
     "node_modules",

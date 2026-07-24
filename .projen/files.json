@@ -10,6 +10,7 @@
     "cdk.json",
     "jest.config.json",
     "LICENSE",
+    "projenrc/tsconfig.json",
     "solution-manifest.yaml",
     "tsconfig.json"
   ],
