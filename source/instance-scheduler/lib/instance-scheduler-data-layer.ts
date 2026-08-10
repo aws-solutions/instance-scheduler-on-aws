@@ -1,8 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { RemovalPolicy, Stack } from "aws-cdk-lib";
+import { Aws, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { cfnConditionToValue, overrideLogicalId, overrideProperty, overrideRetentionPolicies } from "./cfn";
-import { AttributeType, BillingMode, StreamViewType, Table, TableEncryption } from "aws-cdk-lib/aws-dynamodb";
+import { AttributeType, BillingMode, CfnTable, StreamViewType, Table, TableEncryption } from "aws-cdk-lib/aws-dynamodb";
 import { KmsKeys } from "./helpers/kms";
 import { InstanceSchedulerStack } from "./instance-scheduler-stack";
 
@@ -15,6 +15,18 @@ export class InstanceSchedulerDataLayer {
   constructor(scope: Stack) {
     const kmsKey = KmsKeys.get(scope);
     const retainDataAndLogsCondition = InstanceSchedulerStack.sharedConfig.retainDataAndLogsCondition;
+    const useSolutionManagedKeyCondition = InstanceSchedulerStack.sharedConfig.useSolutionManagedKeyCondition;
+    const conditionalSseSpec = {
+      "Fn::If": [
+        useSolutionManagedKeyCondition.logicalId,
+        {
+          KMSMasterKeyId: kmsKey.keyArn,
+          SSEEnabled: true,
+          SSEType: "KMS",
+        },
+        Aws.NO_VALUE,
+      ],
+    };
     this.registry = new Table(scope, "ResourceRegistry", {
       partitionKey: { name: "account", type: AttributeType.STRING },
       sortKey: { name: "sk", type: AttributeType.STRING },
@@ -31,6 +43,7 @@ export class InstanceSchedulerDataLayer {
       "DeletionProtectionEnabled",
       cfnConditionToValue(retainDataAndLogsCondition, "True", "False"),
     );
+    (this.registry.node.defaultChild as CfnTable).addPropertyOverride("SSESpecification", conditionalSseSpec);
 
     this.stateTable = new Table(scope, "StateTable", {
       partitionKey: { name: "service", type: AttributeType.STRING },
@@ -49,6 +62,7 @@ export class InstanceSchedulerDataLayer {
       "DeletionProtectionEnabled",
       cfnConditionToValue(retainDataAndLogsCondition, "True", "False"),
     );
+    (this.stateTable.node.defaultChild as CfnTable).addPropertyOverride("SSESpecification", conditionalSseSpec);
 
     this.configTable = new Table(scope, "ConfigTable", {
       sortKey: { name: "name", type: AttributeType.STRING },
@@ -69,6 +83,7 @@ export class InstanceSchedulerDataLayer {
       "DeletionProtectionEnabled",
       cfnConditionToValue(retainDataAndLogsCondition, "True", "False"),
     );
+    (this.configTable.node.defaultChild as CfnTable).addPropertyOverride("SSESpecification", conditionalSseSpec);
 
     this.mwTable = new Table(scope, "MaintenanceWindowTable", {
       partitionKey: { name: "account-region", type: AttributeType.STRING },
@@ -88,5 +103,6 @@ export class InstanceSchedulerDataLayer {
       "DeletionProtectionEnabled",
       cfnConditionToValue(retainDataAndLogsCondition, "True", "False"),
     );
+    (this.mwTable.node.defaultChild as CfnTable).addPropertyOverride("SSESpecification", conditionalSseSpec);
   }
 }
