@@ -958,6 +958,15 @@ python-dotenv under the BSD-3-Clause license.
 pytokens under the MIT license.
 tinyglobby under the MIT license.
 tomli-w under the MIT license.
+@aws/cloudformation-validate under the Apache-2.0 license.
+es-abstract-get under the MIT license.
+is-document.all under the MIT license.
+dax under the MIT license.
+pygments under the BSD-2-Clause license.
+pyyaml under the MIT license.
+types-pyyaml under the Apache-2.0 license.
+werkzeug under the BSD-3-Clause license.
+actions/github-script under the MIT license.
 
 ********************
 OPEN SOURCE LICENSES
