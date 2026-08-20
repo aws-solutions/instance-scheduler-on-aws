@@ -1,3 +1,5 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 const path = require("path");
 const libtest = "lib/instance-scheduler/tests";
 const srctest= "source/instance-scheduler/tests";

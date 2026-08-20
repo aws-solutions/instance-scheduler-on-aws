@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.8] - 2026-08-20
+
+### Security
+
+- Upgrade aws-cdk-lib and its matching alpha modules to 2.265.0 to resolve CVE-2026-14257 and CVE-2026-69152, high severity brace-expansion denial of service vulnerabilities in a copy bundled inside aws-cdk-lib. These are build and deploy time transitive dependencies and are not included in any runtime or release artifact.
+
 ## [v3.2.7] - 2026-08-07
 
 ### Security
