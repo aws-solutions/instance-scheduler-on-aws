@@ -125,7 +125,11 @@ class CreateRegionEventRulesHandler(CustomResource[CreateRegionEventRulesPropert
                 "detail-type": ["AWS API Call via CloudTrail"],
                 "detail": {
                     "eventSource": ["autoscaling.amazonaws.com"],
-                    "eventName": ["CreateOrUpdateTags", "DeleteTags"],
+                    "eventName": [
+                        "CreateOrUpdateTags",
+                        "DeleteTags",
+                        "CreateAutoScalingGroup",
+                    ],
                     "requestParameters": {
                         "tags": {"key": [self._env.schedule_tag_key]}
                     },

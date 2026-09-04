@@ -224,6 +224,21 @@ def get_tag_value(group_name: str, tag_key: str) -> str:
     return matches[0]["Value"]
 
 
+def set_self_heal_last_attempt_tag(group_name: str, when: datetime) -> None:
+    autoscaling: Final[AutoScalingClient] = client("autoscaling")
+    autoscaling.create_or_update_tags(
+        Tags=[
+            {
+                "ResourceType": "auto-scaling-group",
+                "ResourceId": group_name,
+                "Key": "IS-SelfHealLastAttempt",
+                "Value": when.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "PropagateAtLaunch": False,
+            }
+        ]
+    )
+
+
 def delete_all_actions(group_name: str) -> None:
     autoscaling: Final[AutoScalingClient] = client("autoscaling")
     actions: Final = autoscaling.describe_scheduled_actions(

@@ -61,7 +61,7 @@ function asgTaggingEventPattern(scheduleTagKey: string): EventPattern {
     detailType: ["AWS API Call via CloudTrail"],
     detail: {
       eventSource: ["autoscaling.amazonaws.com"],
-      eventName: ["CreateOrUpdateTags", "DeleteTags"],
+      eventName: ["CreateOrUpdateTags", "DeleteTags", "CreateAutoScalingGroup"],
       requestParameters: {
         tags: {
           key: [scheduleTagKey],

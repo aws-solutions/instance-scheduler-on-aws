@@ -7,7 +7,10 @@ from typing import TYPE_CHECKING, Final, Optional, Tuple, cast
 from zoneinfo import ZoneInfo
 
 from aws_lambda_powertools.logging import Logger
-from instance_scheduler.configuration.scheduling_context import SchedulingContext
+from instance_scheduler.configuration.scheduling_context import (
+    SchedulingContext,
+    SchedulingEnvironment,
+)
 from instance_scheduler.configuration.time_utils import parse_time_str
 from instance_scheduler.cron.asg import (
     to_asg_expr_monthdays,
@@ -28,6 +31,10 @@ from instance_scheduler.model.period_definition import PeriodDefinition
 from instance_scheduler.model.schedule_definition import ScheduleDefinition
 from instance_scheduler.model.store.period_definition_store import PeriodDefinitionStore
 from instance_scheduler.observability.error_codes import ErrorCode
+from instance_scheduler.observability.informational_tagging import (
+    format_current_time,
+)
+from instance_scheduler.observability.tag_keys import ControlTagKey
 from instance_scheduler.scheduling.asg.asg_runtime_info import (
     MDM_TAG_KEY,
     AsgRuntimeInfo,
@@ -61,6 +68,13 @@ else:
 
 logger: Final = Logger(log_uncaught_exceptions=True, use_rfc3339=True)
 
+# Minimum time to wait between self-heal registration attempts for the same
+# tagged-but-unregistered ASG. Bounds retry frequency across scheduling cycles
+# for ASGs that persistently fail to self-heal (e.g. missing IAM permissions),
+# without ever permanently giving up -- the next cycle after this interval
+# elapses will retry again.
+SELF_HEAL_MIN_RETRY_INTERVAL: Final[timedelta] = timedelta(hours=1)
+
 
 @dataclass
 class ManagedAsgInstance(ManagedInstance):
@@ -86,8 +100,10 @@ class AsgService:
     def __init__(
         self,
         context: SchedulingContext,
+        env: SchedulingEnvironment,
     ) -> None:
         self.context = context
+        self.env = env
         self.client = context.assumed_role.client("autoscaling")
 
     def schedule_target(self) -> Iterator[SchedulingResult[ManagedAsgInstance]]:
@@ -107,10 +123,65 @@ class AsgService:
                 self.context.registry.get(RegistryKey.from_arn(asg_runtime_info.arn)),
             )
             if not registry_info:
-                logger.info(
-                    f"{asg_runtime_info.arn} is not registered for scheduling. skipping..."
+                last_attempt_str = asg_runtime_info.tags.get(
+                    ControlTagKey.SELF_HEAL_LAST_ATTEMPT.value
                 )
-                continue
+                if last_attempt_str and self._self_heal_throttled(last_attempt_str):
+                    logger.info(
+                        f"{asg_runtime_info.arn} is not registered for scheduling, "
+                        f"but a self-heal attempt was already made at {last_attempt_str}. "
+                        f"Skipping to respect the {SELF_HEAL_MIN_RETRY_INTERVAL} retry throttle."
+                    )
+                    continue
+
+                logger.info(
+                    f"{asg_runtime_info.arn} is not registered for scheduling. "
+                    "Attempting self-heal registration..."
+                )
+
+                # Recorded before the registration call, so a crash/timeout mid-attempt
+                # still leaves the throttle window in place for the next cycle. Failure
+                # to write it is non-fatal and fails open -- a bad tag write shouldn't
+                # block an otherwise-viable registration attempt below.
+                try:
+                    self._write_self_heal_attempt_tag(asg_runtime_info)
+                except Exception:
+                    logger.warning(
+                        f"Failed to record self-heal attempt tag for {asg_runtime_info.arn}. "
+                        "Proceeding with registration anyway."
+                    )
+
+                try:
+                    # Function-local import to avoid circular dependency:
+                    # resource_registration.py imports AsgService at module level.
+                    from instance_scheduler.scheduling.resource_registration import (
+                        register_asg_resources,
+                    )
+
+                    register_asg_resources(
+                        [asg_runtime_info], self.context.assumed_role, self.env
+                    )
+                except Exception:
+                    logger.exception(
+                        f"Self-heal registration failed for {asg_runtime_info.arn}. "
+                        "Skipping this ASG until the next retry window."
+                    )
+                    continue
+
+                # Re-read from the backing DynamoDB store (not the preloaded cache)
+                # to confirm registration succeeded.
+                registry_info = cast(
+                    Optional[RegisteredAsgInstance],
+                    self.context.registry.get(
+                        RegistryKey.from_arn(asg_runtime_info.arn)
+                    ),
+                )
+                if not registry_info:
+                    logger.warning(
+                        f"Self-heal registration for {asg_runtime_info.arn} did not "
+                        "produce a registry entry. Skipping."
+                    )
+                    continue
 
             result = self.schedule_asg(
                 ManagedAsgInstance(
@@ -122,6 +193,37 @@ class AsgService:
                 self.context.registry.put(result.updated_registry_info, overwrite=True)
 
             yield result
+
+    @staticmethod
+    def _self_heal_throttled(last_attempt_str: str) -> bool:
+        """
+        Returns True if a self-heal attempt was already made within
+        SELF_HEAL_MIN_RETRY_INTERVAL and should be skipped.
+
+        Fails open (returns False, allowing an attempt) if the tag value cannot
+        be parsed, so a malformed tag never permanently blocks self-heal.
+        """
+        try:
+            last_attempt = datetime.strptime(
+                last_attempt_str, "%Y-%m-%d %H:%M:%S UTC"
+            ).replace(tzinfo=timezone.utc)
+        except ValueError:
+            return False
+
+        return datetime.now(timezone.utc) - last_attempt < SELF_HEAL_MIN_RETRY_INTERVAL
+
+    def _write_self_heal_attempt_tag(self, asg_runtime_info: AsgRuntimeInfo) -> None:
+        self.client.create_or_update_tags(
+            Tags=[
+                {
+                    "ResourceId": asg_runtime_info.resource_id,
+                    "ResourceType": "auto-scaling-group",
+                    "Key": ControlTagKey.SELF_HEAL_LAST_ATTEMPT.value,
+                    "Value": format_current_time(),
+                    "PropagateAtLaunch": False,
+                }
+            ]
+        )
 
     @classmethod
     def describe_tagged_asgs(

@@ -13,3 +13,4 @@ class InformationalTagKey(str, Enum):
 class ControlTagKey(str, Enum):
     PREFERRED_INSTANCE_TYPES = "IS-PreferredInstanceTypes"
     MIN_DESIRED_MAX = "IS-MinDesiredMax"
+    SELF_HEAL_LAST_ATTEMPT = "IS-SelfHealLastAttempt"

@@ -31,7 +31,7 @@ from instance_scheduler.scheduling.resource_registration import (
     register_rds_resources,
 )
 from instance_scheduler.util.arn import ARN
-from instance_scheduler.util.session_manager import assume_role
+from instance_scheduler.util.session_manager import AssumedRole, assume_role
 from pydantic import BaseModel, Field
 
 logger = powertools_logger()
@@ -55,11 +55,18 @@ class ResourceRegistrationEvent(BaseModel):
 
 
 class AsgTag(BaseModel):
-    resourceId: str
-    resourceType: str
+    # CloudTrail only includes the fields the caller sent, and the shape varies by
+    # event. CreateOrUpdateTags/DeleteTags include resourceId/resourceType, but
+    # CreateAutoScalingGroup tag entries may omit them (the group name is carried in
+    # requestParameters.autoScalingGroupName instead). CreateOrUpdateTags may omit
+    # PropagateAtLaunch, and DeleteTags sends neither value nor propagateAtLaunch.
+    # Absent fields are represented as None; the handler decides register vs.
+    # deregister from the live DescribeAutoScalingGroups tags, not these fields.
     key: str
-    value: str
-    propagateAtLaunch: bool
+    resourceId: Optional[str] = None
+    resourceType: Optional[str] = None
+    value: Optional[str] = None
+    propagateAtLaunch: Optional[bool] = None
 
 
 class RegistrationFailureException(Exception):
@@ -67,7 +74,9 @@ class RegistrationFailureException(Exception):
 
 
 class AsgRequestParameters(BaseModel):
-    tags: List[AsgTag]
+    tags: List[AsgTag] = []
+    # present on CreateAutoScalingGroup: the name of the group created with tags
+    autoScalingGroupName: Optional[str] = None
 
 
 class AsgEventDetail(BaseModel):
@@ -263,16 +272,38 @@ def _deregister_resource(resource_arn: ARN) -> None:
     logger.info(f"Deregistered resource: {resource_arn}")
 
 
+def _reconcile_asg(assumed_role: AssumedRole, asg_name: str) -> None:
+    """Describe the named ASG and register or deregister it from its live tags.
+
+    The decision is made from the live DescribeAutoScalingGroups tags rather than
+    the event payload, so create, tag-update, and delete events all converge to the
+    correct state regardless of event type or ordering.
+    """
+    for asg in AsgService.describe_asgs(assumed_role, [asg_name]):
+        if asg.tags.get(env.schedule_tag_key):
+            register_asg_resources([asg], assumed_role, env)
+        else:
+            registry_record = cast(
+                Optional[RegisteredAsgInstance],
+                registry.get(RegistryKey.from_arn(asg.arn)),
+            )
+            # the resource may already be deregistered; don't error if it's missing
+            if registry_record:
+                deregister_asg_resources([registry_record], assumed_role, env)
+
+
 def handle_asg_tagging_event(event: AsgRegistrationEvent) -> Dict[str, Any]:
-    """Handle ASG CloudTrail tagging events."""
+    """Handle ASG CloudTrail events (tagging and creation).
 
-    # ASG tagging events are limited to just create/delete events from CloudTrail. Unfortunately
-    # a tag update is reported as a delete event immediately followed by a create event, and when
-    # an ASG is created with a schedule tag already existing on it, no tag create/delete event is sent
-    # to CloudTrail.
-    # this means that our most reliable way to ensure that ASGs are correctly registered/deregistered is to
-    # describe them in response to every event and rely on tags present on the describe call.
-
+    ASGs are onboarded from three CloudTrail events: CreateOrUpdateTags and
+    DeleteTags (tag add/change/remove on an existing group) and
+    CreateAutoScalingGroup (a group created with the schedule tag already present,
+    which emits no separate tagging event). A tag update also arrives as a
+    DeleteTags immediately followed by a CreateOrUpdateTags. In every case we
+    describe the group and rely on its live tags rather than the event payload, so
+    the outcome is correct regardless of event type or ordering.
+    """
+    detail = event.detail
     logger.append_keys(
         context=LogContext.REGISTRATION.value,
         account=event.account,
@@ -286,27 +317,28 @@ def handle_asg_tagging_event(event: AsgRegistrationEvent) -> Dict[str, Any]:
         role_name=env.scheduler_role_name,
     )
 
-    for asg_event in event.detail.requestParameters.tags:
-        if asg_event.key != env.schedule_tag_key:
-            continue  # ignore updates to non-schedule tags
-
-        logger.append_keys(
-            instance=asg_event.resourceId,
-        )
-
-        for asg in AsgService.describe_asgs(assumed_role, [asg_event.resourceId]):
-            # the event could be a create or delete event, so we need to check if the ASG has a schedule tag
-            if asg.tags.get(env.schedule_tag_key):
-                # create event
-                register_asg_resources([asg], assumed_role, env)
-            else:
-                # delete event
-                registry_record = cast(
-                    Optional[RegisteredAsgInstance],
-                    registry.get(RegistryKey.from_arn(asg.arn)),
-                )
-                # it's very possible that we have already deleted the resource, so don't error if the record does not exist
-                if registry_record:
-                    deregister_asg_resources([registry_record], assumed_role, env)
+    if detail.eventName == "CreateAutoScalingGroup":
+        # A group created with the schedule tag already on it. The group name is in
+        # requestParameters.autoScalingGroupName; tag entries may omit resourceId.
+        # The EventBridge rule only forwards creates carrying the schedule tag key.
+        asg_name = detail.requestParameters.autoScalingGroupName
+        if asg_name:
+            logger.append_keys(instance=asg_name)
+            _reconcile_asg(assumed_role, asg_name)
+        else:
+            # The rule matched this create, so a missing group name is unexpected;
+            # log it rather than silently dropping the event.
+            logger.warning(
+                "CreateAutoScalingGroup event has no autoScalingGroupName in "
+                "requestParameters; skipping"
+            )
+    else:
+        for asg_event in detail.requestParameters.tags:
+            if asg_event.key != env.schedule_tag_key:
+                continue  # ignore updates to non-schedule tags
+            if not asg_event.resourceId:
+                continue  # tag entry without a resource id cannot be located
+            logger.append_keys(instance=asg_event.resourceId)
+            _reconcile_asg(assumed_role, asg_event.resourceId)
 
     return {"statusCode": 200, "body": "ASG resources processed successfully"}
