@@ -63,3 +63,7 @@ deployment/coverage-reports
 .parcel-cache/
 !/solution-manifest.yaml
 !/.projenrc.ts
+.kiro/handoff
+.kiro/docs
+.kiro/scripts
+.python-version

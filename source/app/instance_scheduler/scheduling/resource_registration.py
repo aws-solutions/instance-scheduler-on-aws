@@ -286,7 +286,7 @@ def deregister_asg_resources(
         assumed_role=scheduling_role, current_dt=datetime.now(timezone.utc), env=env
     )
 
-    asg_service = AsgService(scheduling_context)
+    asg_service = AsgService(scheduling_context, env)
     registry = DynamoResourceRegistry(env.registry_table)
 
     with (

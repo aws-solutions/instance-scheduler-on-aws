@@ -3025,6 +3025,7 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             "eventName": [
               "CreateOrUpdateTags",
               "DeleteTags",
+              "CreateAutoScalingGroup",
             ],
             "eventSource": [
               "autoscaling.amazonaws.com",

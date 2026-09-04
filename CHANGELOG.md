@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.9] - 2026-09-03
+
+### Fixed
+
+- Auto Scaling group tag events are no longer rejected when the CloudTrail payload omits `Value` or `PropagateAtLaunch`.
+- Added `CreateAutoScalingGroup` to the Auto Scaling tagging EventBridge rule, registering groups created with the schedule tag already attached. These emit no tag-change event and were previously never registered.
+- Self-heal now sweeps Auto Scaling groups that were tagged but never registered due to a transient failure in real-time tag registration, registering them during a scheduling cycle. Attempts are rate-limited to once per hour per group.
+
 ## [v3.2.8] - 2026-08-20
 
 ### Security

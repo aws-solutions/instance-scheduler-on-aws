@@ -141,7 +141,7 @@ def handle_scheduling_request(event: Mapping[str, Any], _context: LambdaContext)
                     )
                 case "autoscaling":
                     result_summary = SchedulingSummary(
-                        AsgService(scheduling_context).schedule_target()  # type: ignore[arg-type]
+                        AsgService(scheduling_context, env).schedule_target()  # type: ignore[arg-type]
                     )
                 case _:
                     raise ValueError(f"Unknown service: {event['service']}")
