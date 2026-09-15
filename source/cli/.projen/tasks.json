@@ -54,7 +54,17 @@
       "description": "Install dependencies with frozen lockfile",
       "steps": [
         {
-          "exec": "poetry check --lock && poetry install"
+          "execArgs": [
+            "poetry",
+            "check",
+            "--lock"
+          ]
+        },
+        {
+          "execArgs": [
+            "poetry",
+            "install"
+          ]
         }
       ]
     },
