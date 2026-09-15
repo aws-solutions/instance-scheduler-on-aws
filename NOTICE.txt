@@ -40,6 +40,7 @@ lodash.truncate under the MIT license.
 mime-db under the MIT license.
 mime-types under the MIT license.
 minimatch under the BlueOak-1.0.0 license.
+properties-file under the MIT license.
 punycode under the MIT license.
 require-from-string under the MIT license.
 semver under the ISC license.

@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.10] - 2026-09-14
+
+### Security
+
+- Patched the js-yaml and adm-zip npm package vulnerabilities.
+- Updated the following dependencies versions:
+  - aws-lambda-powertools 3.31.1 → 3.34.0
+  - pydantic 2.13.4 → 2.13.5
+  - pydantic-core 2.46.4 → 2.46.5
+  - annotated-types 0.7.0 → 0.8.0
+  - typing-inspection 0.4.2 → 0.4.4
+  - boto3 / botocore 1.43.52 → 1.43.92
+  - s3transfer 0.19.1 → 0.19.2
+  - constructs 10.7.1 → 10.8.1
+  - @aws-cdk/cloud-assembly-schema 54.13.0 → 54.23.0
+
 ## [v3.2.9] - 2026-09-03
 
 ### Fixed

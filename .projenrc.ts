@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.2.9", cdkVersion: "2.265.0" }).synth();
+  new InstanceScheduler({ version: "3.2.10", cdkVersion: "2.265.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
