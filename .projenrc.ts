@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.2.10", cdkVersion: "2.265.0" }).synth();
+  new InstanceScheduler({ version: "3.2.11", cdkVersion: "2.265.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -195,7 +195,7 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
       "pytest@^9.0.0",
       "pytest-cov@^7.0.0",
       "tox@^4.11.4",
-      "urllib3@^2.7.0",
+      "urllib3@^2.8.0",
     ];
 
     const commonPythonProjectOptions: CommonPythonProjectOptions = {
@@ -399,7 +399,7 @@ class InstanceSchedulerLambdaFunction extends PythonProject {
     // Pin attrs below 26 to avoid incompatibility with pip's bundled rich/attr modules
     this.addDevDependency("attrs@>=22.2.0,<26");
 
-    ["aws-lambda-powertools@^3.4.1", "packaging@^24.0", "pydantic", "urllib3@^2.7.0"].forEach((spec: string) =>
+    ["aws-lambda-powertools@^3.4.1", "packaging@^24.0", "pydantic", "urllib3@^2.8.0"].forEach((spec: string) =>
       this.addDependency(spec),
     );
 

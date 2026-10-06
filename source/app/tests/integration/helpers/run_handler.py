@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterator, Optional, Sequence, TypedDict
 
 from instance_scheduler.handler.scheduling_request import (
@@ -65,7 +65,10 @@ class SchedulingTestContext:
         dt: datetime,
         target: SchedulingTarget = target(),
         environment: MockSchedulingRequestEnvironment = MockSchedulingRequestEnvironment(),
+        dispatch_time: Optional[str] = None,
     ) -> Any:
+        if dispatch_time is None:
+            dispatch_time = datetime.now(timezone.utc).isoformat()
         with environment.patch_env():
             schedule_store = InMemoryScheduleDefinitionStore()
             period_store = InMemoryPeriodDefinitionStore()
@@ -82,7 +85,7 @@ class SchedulingTestContext:
                 "current_dt": dt.isoformat(),
                 "schedules": schedule_store.serialize(),
                 "periods": period_store.serialize(),
-                "dispatch_time": "2023-05-12 14:55:10.600619",
+                "dispatch_time": dispatch_time,
             }
 
             return handle_scheduling_request(event, MockLambdaContext())
