@@ -46,7 +46,7 @@ def test_passing_tz_unaware_dt_to_scheduling_request_handler_throws_error(
         "region": "us-east-1",
         "service": "ec2",
         "current_dt": datetime(2023, 6, 19, 12, 0, 0).isoformat(),
-        "dispatch_time": "2023-05-12 14:55:10.600619",
+        "dispatch_time": datetime.now(timezone.utc).isoformat(),
     }
 
     with pytest.raises(ValueError), MockSchedulingRequestEnvironment().patch_env():

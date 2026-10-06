@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.11] - 2026-10-06
+
+### Fixed
+
+- Fixed an issue where a delayed or duplicate asynchronous invocation of the scheduling request handler could start or stop instances based on an outdated schedule evaluation time. Scheduling requests older than one scheduling interval are now discarded.
+
+### Security
+
+- Patched the brace-expansion npm package vulnerabilities.
+- Updated the following dependencies versions:
+  - urllib3 2.7.0 → 2.8.0
+  - virtualenv 21.7.9 → 21.14.2
+
 ## [v3.2.10] - 2026-09-14
 
 ### Security

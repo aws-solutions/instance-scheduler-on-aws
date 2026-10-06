@@ -1,9 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 import inspect
+import json
 import traceback
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -128,6 +129,31 @@ def handle_scheduling_request(event: Mapping[str, Any], _context: LambdaContext)
         region=event["region"],
     ):
         try:
+            # lambda async invocations are delivered at-least-once and may be delayed by hours.
+            # a request older than one scheduling interval has been superseded by a newer one, so
+            # acting on it would apply the schedule as of its (stale) current_dt
+            request_age = datetime.now(timezone.utc) - datetime.fromisoformat(
+                event["dispatch_time"]
+            )
+            max_request_age = timedelta(minutes=env.scheduling_interval_minutes)
+            if request_age > max_request_age:
+                logger.warning(
+                    "Dropping stale scheduling request",
+                    extra={
+                        "dispatch_time": event["dispatch_time"],
+                        "current_dt": event["current_dt"],
+                        "age_seconds": request_age.total_seconds(),
+                        "threshold_seconds": max_request_age.total_seconds(),
+                    },
+                )
+                return json.dumps(
+                    {
+                        "skipped": "stale_request",
+                        "dispatch_time": event["dispatch_time"],
+                        "age_seconds": request_age.total_seconds(),
+                    }
+                )
+
             scheduling_context = build_scheduling_context(event, env)
             result_summary: SchedulingSummary[ManagedInstance]
             match event["service"]:
