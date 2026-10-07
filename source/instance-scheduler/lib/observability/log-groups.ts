@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Aws, Stack } from "aws-cdk-lib";
-import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { CfnLogGroup, LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
 import { KmsKeys } from "../helpers/kms";
 import { addCfnGuardSuppression } from "../helpers/cfn-guard";
@@ -83,6 +83,17 @@ export class ISLogGroups {
         ? "Retain"
         : cfnConditionToValue(InstanceSchedulerStack.sharedConfig.retainDataAndLogsCondition, "Retain", "Delete"),
     );
+    if (kmsKey) {
+      // Make hub log groups respect EncryptionMode parameter.
+      // Spoke log groups never had a CMK and are unaffected.
+      (logGroup.node.defaultChild as CfnLogGroup).addPropertyOverride("KmsKeyId", {
+        "Fn::If": [
+          InstanceSchedulerStack.sharedConfig.useSolutionManagedKeyCondition.logicalId,
+          kmsKey.keyArn,
+          Aws.NO_VALUE,
+        ],
+      });
+    }
     addCfnGuardSuppression(logGroup, ["CW_LOGGROUP_RETENTION_PERIOD_CHECK"]); // Retention period is defined in CfnMapping and evades the CFN Guard check
     return logGroup;
   }

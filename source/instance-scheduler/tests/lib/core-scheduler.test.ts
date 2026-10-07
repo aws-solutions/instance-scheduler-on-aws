@@ -166,14 +166,20 @@ describe("core scheduler", function () {
       });
     });
 
-    it("is encrypted with KMS key", function () {
+    it("is encrypted with KMS key when EncryptionMode=Enabled, falls back to SSE-DDB otherwise", function () {
       const keys = coreScheduler.findResources("AWS::KMS::Key");
       const keyIds = Object.getOwnPropertyNames(keys);
       expect(keyIds).toHaveLength(1);
       expect(table.Properties.SSESpecification).toStrictEqual({
-        KMSMasterKeyId: { "Fn::GetAtt": [keyIds[0], "Arn"] },
-        SSEEnabled: true,
-        SSEType: "KMS",
+        "Fn::If": [
+          conditions.useSolutionManagedKey,
+          {
+            KMSMasterKeyId: { "Fn::GetAtt": [keyIds[0], "Arn"] },
+            SSEEnabled: true,
+            SSEType: "KMS",
+          },
+          { Ref: "AWS::NoValue" },
+        ],
       });
     });
 
@@ -241,14 +247,20 @@ describe("core scheduler", function () {
       });
     });
 
-    it("is encrypted with KMS key", function () {
+    it("is encrypted with KMS key when EncryptionMode=Enabled, falls back to SSE-DDB otherwise", function () {
       const keys = coreScheduler.findResources("AWS::KMS::Key");
       const keyIds = Object.getOwnPropertyNames(keys);
       expect(keyIds).toHaveLength(1);
       expect(table.Properties.SSESpecification).toStrictEqual({
-        KMSMasterKeyId: { "Fn::GetAtt": [keyIds[0], "Arn"] },
-        SSEEnabled: true,
-        SSEType: "KMS",
+        "Fn::If": [
+          conditions.useSolutionManagedKey,
+          {
+            KMSMasterKeyId: { "Fn::GetAtt": [keyIds[0], "Arn"] },
+            SSEEnabled: true,
+            SSEType: "KMS",
+          },
+          { Ref: "AWS::NoValue" },
+        ],
       });
     });
 
@@ -316,14 +328,20 @@ describe("core scheduler", function () {
       });
     });
 
-    it("is encrypted with KMS key", function () {
+    it("is encrypted with KMS key when EncryptionMode=Enabled, falls back to SSE-DDB otherwise", function () {
       const keys = coreScheduler.findResources("AWS::KMS::Key");
       const keyIds = Object.getOwnPropertyNames(keys);
       expect(keyIds).toHaveLength(1);
       expect(table.Properties.SSESpecification).toStrictEqual({
-        KMSMasterKeyId: { "Fn::GetAtt": [keyIds[0], "Arn"] },
-        SSEEnabled: true,
-        SSEType: "KMS",
+        "Fn::If": [
+          conditions.useSolutionManagedKey,
+          {
+            KMSMasterKeyId: { "Fn::GetAtt": [keyIds[0], "Arn"] },
+            SSEEnabled: true,
+            SSEType: "KMS",
+          },
+          { Ref: "AWS::NoValue" },
+        ],
       });
     });
 
@@ -412,4 +430,41 @@ describe("core scheduler", function () {
   const topics = coreScheduler.findResources("AWS::SNS::Topic");
   const topicIds = Object.getOwnPropertyNames(topics);
   expect(topicIds).toHaveLength(1);
+
+  describe("EncryptionMode parameter wiring", function () {
+    const keys = coreScheduler.findResources("AWS::KMS::Key");
+    const keyId = Object.getOwnPropertyNames(keys)[0];
+    const conditionalSolutionKeyArn = {
+      "Fn::If": [conditions.useSolutionManagedKey, { "Fn::GetAtt": [keyId, "Arn"] }, { Ref: "AWS::NoValue" }],
+    };
+
+    it("SNS topic KmsMasterKeyId is conditional on EncryptionMode", function () {
+      const topic = topics[topicIds[0]];
+      expect(topic.Properties.KmsMasterKeyId).toEqual(conditionalSolutionKeyArn);
+    });
+
+    it("Hub log groups KmsKeyId is conditional on EncryptionMode", function () {
+      const logGroups = coreScheduler.findResources("AWS::Logs::LogGroup");
+      const logGroupIds = Object.getOwnPropertyNames(logGroups);
+      expect(logGroupIds).toHaveLength(2);
+      for (const id of logGroupIds) {
+        expect(logGroups[id].Properties.KmsKeyId).toEqual(conditionalSolutionKeyArn);
+      }
+    });
+
+    it("SQS resize queue KmsMasterKeyId is conditional on EncryptionMode", function () {
+      const queues = coreScheduler.findResources("AWS::SQS::Queue");
+      const queueIds = Object.getOwnPropertyNames(queues);
+      expect(queueIds.length).toBeGreaterThanOrEqual(2);
+      for (const id of queueIds) {
+        const props = queues[id].Properties;
+        if (props.KmsMasterKeyId) {
+          expect(props.KmsMasterKeyId).toEqual(conditionalSolutionKeyArn);
+          expect(props.SqsManagedSseEnabled).toEqual({
+            "Fn::If": [conditions.useSolutionManagedKey, { Ref: "AWS::NoValue" }, true],
+          });
+        }
+      }
+    });
+  });
 });
