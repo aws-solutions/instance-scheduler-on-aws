@@ -18,13 +18,13 @@ describe("Handler", () => {
 
   it("should fail in absence of path inputs ", async function () {
     expect.assertions(2);
-    await expect(handler("", "")).rejects.toThrowError("undefined input path");
-    await expect(handler(undefined, undefined)).rejects.toThrowError("undefined input path");
+    await expect(handler("", "")).rejects.toThrow("undefined input path");
+    await expect(handler(undefined, undefined)).rejects.toThrow("undefined input path");
   });
 
   it("should fail for invalid cdk asset path", async function () {
     expect.assertions(1);
-    await expect(handler("invalidPath", __outputPath)).rejects.toThrowError(/(ENOENT).+(invalidPath)/g);
+    await expect(handler("invalidPath", __outputPath)).rejects.toThrow(/(ENOENT).+(invalidPath)/g);
   });
 
   it("should succeed if cdk assets not found", async function () {
@@ -37,7 +37,7 @@ describe("Handler", () => {
     const mockAssetPath = path.join(__assetDirectoryPath, "./asset.cdkAsset.zip");
     await writeFile(mockAssetPath, "NoOp");
     // Act, Assert
-    await expect(handler(__assetDirectoryPath, "invalidPath")).rejects.toThrowError(/(ENOENT).+(invalidPath)/g);
+    await expect(handler(__assetDirectoryPath, "invalidPath")).rejects.toThrow(/(ENOENT).+(invalidPath)/g);
     // Cleanup
     await rm(mockAssetPath);
   });
