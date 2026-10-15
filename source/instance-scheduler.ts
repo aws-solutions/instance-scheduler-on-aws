@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { App, DefaultStackSynthesizer, StackSynthesizer } from "aws-cdk-lib";
 import { getSolutionContext } from "./instance-scheduler/lib/cdk-context";
+import { disableBundledCfnValidation } from "./instance-scheduler/lib/helpers/cfn-validation";
 import { InstanceSchedulerStack } from "./instance-scheduler/lib/instance-scheduler-stack";
 import { SpokeStack } from "./instance-scheduler/lib/remote-stack";
 interface AppProps {
@@ -33,6 +34,8 @@ function addAppStacks(app: App, props: AppProps): void {
 }
 
 function main(): void {
+  disableBundledCfnValidation();
+
   const packageVersion =
     process.env.npm_package_version ??
     (() => {

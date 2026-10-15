@@ -78,7 +78,7 @@ describe("CDKAssetPackager", () => {
 
       // Act, Assert
       await expect(assetPackager.createAssetZip(__assetPath)).resolves.toBeUndefined();
-      expect(addLocalFolderMock).toBeCalledTimes(0);
+      expect(addLocalFolderMock).toHaveBeenCalledTimes(0);
     });
 
     it("should zip assets in the folder for valid path", async function () {
@@ -91,13 +91,13 @@ describe("CDKAssetPackager", () => {
 
       // Act, Assert
       await expect(assetPackager.createAssetZip(__asset1)).resolves.toBeUndefined();
-      expect(addLocalFolderMock).toBeCalledTimes(1);
-      expect(writeZipMock).toBeCalledWith(`${path.join(__assetPath, __asset1)}.zip`);
+      expect(addLocalFolderMock).toHaveBeenCalledTimes(1);
+      expect(writeZipMock).toHaveBeenCalledWith(`${path.join(__assetPath, __asset1)}.zip`);
     });
 
     it("should throw error if error encountered", async function () {
       lstatMock.mockRejectedValue(new Error("error encountered"));
-      await expect(assetPackager.createAssetZip("")).rejects.toThrowError("error encountered");
+      await expect(assetPackager.createAssetZip("")).rejects.toThrow("error encountered");
     });
   });
 
@@ -110,7 +110,7 @@ describe("CDKAssetPackager", () => {
     it("should move zips for valid paths", async function () {
       readdirMock.mockResolvedValue([__asset2]);
       await assetPackager.moveZips(__outputPath);
-      expect(renameMock).toBeCalledWith(
+      expect(renameMock).toHaveBeenCalledWith(
         path.join(__assetPath, __asset2),
         path.join(__outputPath, __asset2.split("asset.").pop() ?? "unexpected"),
       );
@@ -118,7 +118,7 @@ describe("CDKAssetPackager", () => {
 
     it("should throw error if error encountered", async function () {
       readdirMock.mockRejectedValue(new Error("error encountered"));
-      await expect(assetPackager.moveZips("")).rejects.toThrowError("error encountered");
+      await expect(assetPackager.moveZips("")).rejects.toThrow("error encountered");
     });
   });
 });

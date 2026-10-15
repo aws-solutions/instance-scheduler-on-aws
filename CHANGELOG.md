@@ -4,7 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [v3.2.11] - 2026-10-06
+## [v3.2.12] - 2026-10-15
+
+### Security
+
+- Patched the brace-expansion (bundled inside aws-cdk-lib) and handlebars npm package vulnerabilities.
+- Updated the following dependencies versions:
+  - aws-cdk-lib and its alpha modules 2.265.0 → 2.273.0
+  - @aws-cdk/cloud-assembly-schema 54.23.0 → 54.26.0
+  - jest 29.7.0 → 30.5.2
+  - handlebars 4.7.9 → 4.7.10
+  - Werkzeug 3.1.8 → 3.1.9
+
+### Changed
+
+- Disabled the default synthesis-time CloudFormation template validation in aws-cdk-lib because it fails on the hub stack template.
+- Pinned attrs below 26 in the CLI development dependencies to avoid an intermittent pip failure during test environment setup.
+
+## [v3.2.11] - 2026-10-05
 
 ### Fixed
 

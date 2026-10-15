@@ -397,7 +397,7 @@
             "--peer",
             "--no-deprecated",
             "--dep=dev,prod,peer,optional",
-            "--filter=@types/jest,esbuild,eslint,eslint-config-prettier,eslint-plugin-header,eslint-plugin-import,eslint-plugin-prettier,jest,jest-extended,projen,ts-jest,ts-node,cdk-nag,source-map-support"
+            "--filter=esbuild,eslint,eslint-config-prettier,eslint-plugin-header,eslint-plugin-import,eslint-plugin-prettier,jest-extended,projen,ts-jest,ts-node,cdk-nag,source-map-support"
           ]
         },
         {
@@ -417,9 +417,9 @@
             "eslint-plugin-header",
             "eslint-plugin-import",
             "eslint-plugin-prettier",
-            "jest",
             "jest-extended",
             "jest-junit",
+            "jest",
             "projen",
             "ts-jest",
             "ts-node",

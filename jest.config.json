@@ -16,6 +16,9 @@
   "transform": {
     "^.+\\.tsx?$": "ts-jest"
   },
+  "setupFiles": [
+    "<rootDir>/source/instance-scheduler/tests/jest-setup-cdk-validation.ts"
+  ],
   "setupFilesAfterEnv": [
     "jest-extended/all"
   ],

@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.2.11", cdkVersion: "2.265.0" }).synth();
+  new InstanceScheduler({ version: "3.2.12", cdkVersion: "2.273.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -95,6 +95,11 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
 
   private static readonly jestOptions: JestOptions = {
     junitReporting: false, // we will override
+    // Jest 30 drops the micromatch/braces dependency chain that carries
+    // GHSA-vfj7-8cjw-p6xm (no fixed braces release exists).
+    // Note: projen applies this range to `@types/jest` as well, so it must stay
+    // at the major level (`@types/jest` has no 30.5.x release).
+    jestVersion: "^30",
     updateSnapshot: UpdateSnapshot.NEVER,
     configFilePath: this.jestConfigFile,
     jestConfig: {
@@ -106,6 +111,9 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
       ],
       roots: [`<rootDir>/${this.testdir}`],
       transform: { "^.+\\.tsx?$": new Transform("ts-jest") },
+      // Runs before the test modules load, so it lands before any stack is
+      // synthesized. See the file for why CDK validation is off under jest.
+      setupFiles: [`<rootDir>/${this.testdir}/jest-setup-cdk-validation.ts`],
       setupFilesAfterEnv: ["jest-extended/all"],
       // Use the babel coverage provider instead of v8. The v8 provider activates
       // the V8 inspector to gather coverage, which intermittently crashes the
@@ -446,6 +454,9 @@ class InstanceSchedulerCli extends PythonProject {
       "types-PyYAML@^6.0.12.12",
       "types-requests@2.31.0.6", // held back, need to support urllib3@^1
     ].forEach((spec: string) => this.addDevDependency(spec));
+
+    // Pin attrs below 26 to avoid incompatibility with pip's bundled rich/attr modules
+    this.addDevDependency("attrs@>=22.2.0,<26");
 
     const pyproject = this.tryFindObjectFile("pyproject.toml");
     if (!pyproject) {
