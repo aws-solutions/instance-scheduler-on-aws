@@ -132,7 +132,7 @@
     },
     {
       "name": "packaging",
-      "version": "^24.0",
+      "version": "^26.0",
       "type": "runtime"
     },
     {
