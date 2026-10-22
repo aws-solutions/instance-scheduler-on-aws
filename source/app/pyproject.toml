@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "instance_scheduler"
-version = "3.2.12"
+version = "3.2.13"
 description = "Instance Scheduler on AWS"
 license = "Apache-2.0"
 authors = [ "Amazon Web Services" ]
@@ -15,7 +15,7 @@ readme = "README.md"
 
   [tool.poetry.dependencies]
   aws-lambda-powertools = "^3.4.1"
-  packaging = "^24.0"
+  packaging = "^26.0"
   pydantic = "*"
   python = "^3.12"
   urllib3 = "^2.8.0"

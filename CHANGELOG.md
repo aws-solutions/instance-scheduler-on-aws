@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.13] - 2026-10-22
+
+### Security
+
+- Updated the following dependencies versions:
+  - certifi 2026.7.22 → 2026.10.19
+  - virtualenv 21.14.2 → 21.14.12
+
 ## [v3.2.12] - 2026-10-15
 
 ### Security
