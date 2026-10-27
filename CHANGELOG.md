@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.14] - 2026-10-27
+
+### Security
+
+- Patched the virtualenv Python package vulnerability.
+- Updated the following dependencies versions:
+  - aws-lambda-powertools 3.36.0 → 3.37.0
+  - boto3 1.43.117 → 1.43.119
+  - boto3-stubs-lite 1.43.117 → 1.43.118
+  - botocore 1.43.117 → 1.43.119
+  - botocore-stubs 1.43.117 → 1.43.118
+  - cachetools 7.2.4 → 7.2.5
+  - certifi 2026.10.19 → 2026.10.23
+  - coverage 7.16.2 → 7.17.0
+  - graphql-core 3.3.0 → 3.3.1
+  - jsonpatch 1.36 → 1.37
+  - jsonpath-ng 1.12.0 → 1.14.0
+  - jsonpointer 3.4 → 3.5
+  - mypy-boto3-ec2 1.43.117 → 1.43.118
+  - mypy-boto3-lambda 1.43.114 → 1.43.118
+  - pycparser 3.11 → 3.12
+  - virtualenv 21.14.12 → 21.14.13
+
 ## [v3.2.13] - 2026-10-22
 
 ### Security
