@@ -40,6 +40,7 @@ lodash.truncate under the MIT license.
 mime-db under the MIT license.
 mime-types under the MIT license.
 minimatch under the BlueOak-1.0.0 license.
+@isaacs/nonrecursive-glob-match under the BlueOak-1.0.0 license.
 properties-file under the MIT license.
 punycode under the MIT license.
 require-from-string under the MIT license.
@@ -673,12 +674,7 @@ clone under the MIT license.
 dice-coefficient under the MIT license.
 n-gram under the MIT license.
 fastest-levenshtein under the MIT license.
-foreground-child under the ISC license.
-jackspeak under the BlueOak-1.0.0 license.
-@isaacs/cliui under the ISC license.
-eastasianwidth under the MIT license.
 minipass under the ISC license.
-package-json-from-dist under the BlueOak-1.0.0 license.
 path-scurry under the BlueOak-1.0.0 license.
 is-valid-path under the MIT license.
 is-invalid-path under the MIT license.
@@ -984,7 +980,6 @@ napi-postinstall under the MIT license.
 @emnapi/wasi-threads under the MIT license.
 @napi-rs/wasm-runtime under the MIT license.
 @tybys/wasm-util under the MIT license.
-@pkgjs/parseargs under the MIT license.
 @unrs/resolver-binding-android-arm-eabi under the MIT license.
 @unrs/resolver-binding-android-arm64 under the MIT license.
 @unrs/resolver-binding-darwin-arm64 under the MIT license.

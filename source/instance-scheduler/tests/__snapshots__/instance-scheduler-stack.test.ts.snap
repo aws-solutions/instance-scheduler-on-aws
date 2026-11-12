@@ -6574,6 +6574,34 @@ fields @timestamp, resource, decision, reason, action_taken, action_info
             },
             {
               "Action": [
+                "ssm:GetParametersByPath",
+                "ssm:GetParameters",
+                "ssm:GetParameter",
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition",
+                    },
+                    ":ssm:*:",
+                    {
+                      "Ref": "AWS::AccountId",
+                    },
+                    ":parameter/IS/",
+                    {
+                      "Ref": "Namespace",
+                    },
+                    "/regions/*",
+                  ],
+                ],
+              },
+            },
+            {
+              "Action": [
                 "ssm:PutParameter",
                 "ssm:DeleteParameter",
                 "ssm:DeleteParameters",

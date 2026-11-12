@@ -12,7 +12,7 @@ import { EventBus } from "aws-cdk-lib/aws-events";
 import { SchedulerRole } from "../iam/scheduler-role";
 import { RegionRegistrationCustomResource } from "./region-registration";
 import { addCfnGuardSuppression, addCfnGuardSuppressionCfnResource } from "../helpers/cfn-guard";
-import { updateSSMParams } from "../iam/ssm-params-region-registration-permission";
+import { getSSMParams, updateSSMParams } from "../iam/ssm-params-region-registration-permission";
 
 export interface SpokeRegistrationLambdaProps {
   readonly dataLayer: InstanceSchedulerDataLayer;
@@ -97,6 +97,7 @@ export class SpokeRegistrationLambda {
             `arn:${Aws.PARTITION}:iam::*:role/${SchedulerRole.roleName(props.namespace)}`,
           ],
         }),
+        getSSMParams(props.namespace),
         updateSSMParams(props.namespace),
       ],
     });

@@ -38,6 +38,7 @@ from instance_scheduler.scheduling.resource_registration import (
 from instance_scheduler.util import safe_json
 from instance_scheduler.util.app_env_utils import AppEnvError, env_to_bool
 from instance_scheduler.util.session_manager import (
+    AssumedRole,
     assume_role,
     lambda_execution_role,
 )
@@ -111,6 +112,17 @@ class InvalidRequestException(Exception):
     pass
 
 
+# States the target account's region registration custom resource writes to its SSM
+# parameter before invoking this function. "registering" is also accepted for Register
+# so that a retry after a partially failed registration is not rejected.
+ALLOWED_REGISTRATION_STATES: Final[Mapping[str, frozenset[RegionRegistrationState]]] = {
+    "Register": frozenset(
+        {RegionRegistrationState.CREATED, RegionRegistrationState.REGISTERING}
+    ),
+    "Deregister": frozenset({RegionRegistrationState.DELETING}),
+}
+
+
 logger: Final = powertools_logger()
 
 
@@ -129,21 +141,24 @@ def lambda_handler(
         region=registration_request.region,
     )
 
+    def ssm_param_role(
+        env: SpokeRegistrationEnvironment,
+        registration_request: SpokeRegistrationRequest,
+    ) -> AssumedRole:
+        if registration_request.account == lambda_execution_role().account:
+            return lambda_execution_role()
+        return assume_role(
+            account=registration_request.account,
+            region=environ["AWS_REGION"],
+            role_name=env.ssm_param_update_role_name,
+        )
+
     def set_registration_status(
         env: SpokeRegistrationEnvironment,
         registration_request: SpokeRegistrationRequest,
         status: RegionRegistrationState,
     ) -> None:
-        if registration_request.account == lambda_execution_role().account:
-            assumed_role = lambda_execution_role()
-        else:
-            assumed_role = assume_role(
-                account=registration_request.account,
-                region=environ["AWS_REGION"],
-                role_name=env.ssm_param_update_role_name,
-            )
-
-        ssm_client: SSMClient = assumed_role.client("ssm")
+        ssm_client: SSMClient = ssm_param_role(env, registration_request).client("ssm")
         ssm_provider = SSMProvider(boto3_client=ssm_client)
         ssm_provider.set(
             name=f"{env.ssm_param_path_name}/{registration_request.region}",
@@ -154,12 +169,43 @@ def lambda_handler(
         )
         return None
 
+    def verify_request_originated_from_target_account(
+        env: SpokeRegistrationEnvironment,
+        registration_request: SpokeRegistrationRequest,
+    ) -> None:
+        """
+        The invocation payload is not bound to the identity of the caller, so the
+        target account must confirm the request. Before invoking this function, the
+        target account's region registration custom resource writes the expected
+        state to an SSM parameter in its own account, which only that account (and
+        this function) can write. Requests whose target does not show a matching
+        state are rejected before any resources are modified.
+        """
+        ssm_client: SSMClient = ssm_param_role(env, registration_request).client("ssm")
+        param_name = f"{env.ssm_param_path_name}/{registration_request.region}"
+        try:
+            current_state = ssm_client.get_parameter(Name=param_name)["Parameter"][
+                "Value"
+            ]
+        except ssm_client.exceptions.ParameterNotFound:
+            current_state = None
+
+        allowed_states = ALLOWED_REGISTRATION_STATES[registration_request.operation]
+        if current_state not in {state.value for state in allowed_states}:
+            raise InvalidRequestException(
+                f"Rejected {registration_request.operation} request for "
+                f"{registration_request.account}-{registration_request.region}: "
+                f"registration state in target account is {current_state!r}, expected "
+                f"one of {sorted(state.value for state in allowed_states)}"
+            )
+
     try:
         match registration_request.operation:
             case "Register":
                 logger.info(
                     f"Received registration request for {registration_request.account}-{registration_request.region}"
                 )
+                verify_request_originated_from_target_account(env, registration_request)
                 set_registration_status(
                     env, registration_request, RegionRegistrationState.REGISTERING
                 )
@@ -198,6 +244,7 @@ def lambda_handler(
                 logger.info(
                     f"Received deregistration request for {registration_request.account}-{registration_request.region}"
                 )
+                verify_request_originated_from_target_account(env, registration_request)
                 scheduler_role = assume_role(
                     account=registration_request.account,
                     region=registration_request.region,

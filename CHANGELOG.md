@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v3.2.15] - 2026-11-12
+
+### Security
+
+- The hub spoke registration function now verifies that each registration and deregistration
+  request was initiated by the target spoke account's own stack before acting on it.
+  - Spoke stacks older than v3.1.0 must be updated to continue registering with the hub.
+- Patched the glob and minimatch npm package vulnerabilities.
+- Updated the following dependencies versions:
+  - glob 10.5.0, 13.0.6 → 14.0.4
+  - minimatch 9.0.9, 10.2.5, 10.2.6 → 11.0.6
+
 ## [v3.2.14] - 2026-10-27
 
 ### Security
