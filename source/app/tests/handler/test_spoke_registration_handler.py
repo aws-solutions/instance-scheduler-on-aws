@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 import json
 
+import boto3
+import pytest
 from instance_scheduler.model.store.resource_registry import ResourceRegistry
 from instance_scheduler.model.store.schedule_definition_store import (
     ScheduleDefinitionStore,
@@ -21,6 +23,34 @@ from tests.test_utils.mock_environs.mock_spoke_registration_environment import (
 )
 from tests.test_utils.unordered_list import UnorderedList
 
+SPOKE_ACCOUNT = "123456789012"
+SSM_PARAM_PATH = MockSpokeRegistrationEnvironment().ssm_param_path_name
+
+
+def set_registration_state(region: str, state: str) -> None:
+    # simulates the spoke's region registration custom resource, which writes this
+    # parameter in its own account before invoking the spoke registration handler
+    boto3.client("ssm").put_parameter(
+        Name=f"{SSM_PARAM_PATH}/{region}",
+        Value=state,
+        Type="String",
+        Overwrite=True,
+    )
+
+
+def get_registration_state(region: str) -> str:
+    return str(
+        boto3.client("ssm").get_parameter(Name=f"{SSM_PARAM_PATH}/{region}")[
+            "Parameter"
+        ]["Value"]
+    )
+
+
+def registered_ec2_count(resource_registry: ResourceRegistry, region: str) -> int:
+    return len(
+        list(resource_registry.find_by_scheduling_target(SPOKE_ACCOUNT, region, "ec2"))
+    )
+
 
 def test_registration_request_adds_resources_to_registry(
     resource_registry: ResourceRegistry,
@@ -35,6 +65,7 @@ def test_registration_request_adds_resources_to_registry(
         create_ec2_instances(2, "test-schedule")
         create_rds_instances(1, "test-schedule")
         create_rds_clusters(1, "test-schedule")
+        set_registration_state("us-east-1", "created")
 
         event = {
             "account": "123456789012",
@@ -82,6 +113,7 @@ def test_registration_sends_registration_events(
             "test-schedule",
             role=assume_mocked_role(region=spoke_region),
         )
+        set_registration_state(spoke_region, "created")
 
         event = {
             "account": "123456789012",
@@ -232,3 +264,148 @@ def test_registration_sends_registration_events(
                 },
             ]
         )
+
+
+def test_registration_marks_region_as_managed(
+    resource_registry: ResourceRegistry,
+    registry_table: str,
+    local_event_bus: str,
+    global_event_bus: str,
+) -> None:
+    with MockSpokeRegistrationEnvironment().patch_env():
+        from instance_scheduler.handler.spoke_registration import lambda_handler
+
+        set_registration_state("us-east-1", "created")
+        lambda_handler(
+            {"account": SPOKE_ACCOUNT, "region": "us-east-1", "operation": "Register"},
+            MockLambdaContext(),
+        )
+
+        assert get_registration_state("us-east-1") == "managed"
+
+
+def test_registration_retry_is_accepted_while_registering(
+    resource_registry: ResourceRegistry,
+    registry_table: str,
+    local_event_bus: str,
+    global_event_bus: str,
+) -> None:
+    with MockSpokeRegistrationEnvironment().patch_env():
+        from instance_scheduler.handler.spoke_registration import lambda_handler
+
+        create_ec2_instances(1, "test-schedule")
+        set_registration_state("us-east-1", "registering")
+        lambda_handler(
+            {"account": SPOKE_ACCOUNT, "region": "us-east-1", "operation": "Register"},
+            MockLambdaContext(),
+        )
+
+        assert registered_ec2_count(resource_registry, "us-east-1") == 1
+
+
+@pytest.mark.parametrize("state", [None, "managed", "deleting", "deleted"])
+def test_registration_is_rejected_when_not_requested_by_target_account(
+    state: str | None,
+    resource_registry: ResourceRegistry,
+    registry_table: str,
+    local_event_bus: str,
+    global_event_bus: str,
+) -> None:
+    with MockSpokeRegistrationEnvironment().patch_env():
+        from instance_scheduler.handler.spoke_registration import (
+            InvalidRequestException,
+            lambda_handler,
+        )
+
+        create_ec2_instances(1, "test-schedule")
+        if state is not None:
+            set_registration_state("us-east-1", state)
+
+        with pytest.raises(InvalidRequestException):
+            lambda_handler(
+                {
+                    "account": SPOKE_ACCOUNT,
+                    "region": "us-east-1",
+                    "operation": "Register",
+                },
+                MockLambdaContext(),
+            )
+
+        assert registered_ec2_count(resource_registry, "us-east-1") == 0
+        if state is not None:
+            assert get_registration_state("us-east-1") == state
+
+
+def test_deregistration_removes_resources_when_requested_by_target_account(
+    resource_registry: ResourceRegistry,
+    registry_table: str,
+    local_event_bus: str,
+    global_event_bus: str,
+) -> None:
+    with MockSpokeRegistrationEnvironment().patch_env():
+        from instance_scheduler.handler.spoke_registration import lambda_handler
+
+        create_ec2_instances(2, "test-schedule")
+        set_registration_state("us-east-1", "created")
+        lambda_handler(
+            {"account": SPOKE_ACCOUNT, "region": "us-east-1", "operation": "Register"},
+            MockLambdaContext(),
+        )
+        assert registered_ec2_count(resource_registry, "us-east-1") == 2
+
+        set_registration_state("us-east-1", "deleting")
+        lambda_handler(
+            {
+                "account": SPOKE_ACCOUNT,
+                "region": "us-east-1",
+                "operation": "Deregister",
+            },
+            MockLambdaContext(),
+        )
+
+        assert registered_ec2_count(resource_registry, "us-east-1") == 0
+        assert get_registration_state("us-east-1") == "deleted"
+
+
+@pytest.mark.parametrize("state", [None, "created", "registering", "managed"])
+def test_deregistration_is_rejected_when_not_requested_by_target_account(
+    state: str | None,
+    resource_registry: ResourceRegistry,
+    registry_table: str,
+    local_event_bus: str,
+    global_event_bus: str,
+) -> None:
+    with MockSpokeRegistrationEnvironment().patch_env():
+        from instance_scheduler.handler.spoke_registration import (
+            InvalidRequestException,
+            lambda_handler,
+        )
+
+        create_ec2_instances(2, "test-schedule")
+        set_registration_state("us-east-1", "created")
+        lambda_handler(
+            {"account": SPOKE_ACCOUNT, "region": "us-east-1", "operation": "Register"},
+            MockLambdaContext(),
+        )
+        assert registered_ec2_count(resource_registry, "us-east-1") == 2
+
+        ssm = boto3.client("ssm")
+        if state is None:
+            ssm.delete_parameter(Name=f"{SSM_PARAM_PATH}/us-east-1")
+        else:
+            set_registration_state("us-east-1", state)
+
+        # forged deregistration request naming this account
+        with pytest.raises(InvalidRequestException):
+            lambda_handler(
+                {
+                    "account": SPOKE_ACCOUNT,
+                    "region": "us-east-1",
+                    "operation": "Deregister",
+                },
+                MockLambdaContext(),
+            )
+
+        assert registered_ec2_count(resource_registry, "us-east-1") == 2
+        if state is not None:
+            assert get_registration_state("us-east-1") == state

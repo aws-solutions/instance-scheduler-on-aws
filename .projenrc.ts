@@ -16,7 +16,7 @@ import {
 import { PythonProject } from "projen/lib/python";
 
 function main() {
-  new InstanceScheduler({ version: "3.2.14", cdkVersion: "2.273.0" }).synth();
+  new InstanceScheduler({ version: "3.2.15", cdkVersion: "2.273.0" }).synth();
 }
 
 interface InstanceSchedulerProps {
@@ -162,6 +162,11 @@ class InstanceScheduler extends AwsCdkTypeScriptApp {
     this.overrideVersion(props.version);
     // cdk deps should lock to the same version as cdk itself, so they must be specified separately
     this.addDeps(...this.getCdkDeps(props.cdkVersion));
+    // force patched glob (DoS fix in 14.0.2) and minimatch (DoS fix in 11.0.1) where upstream still pins vulnerable majors
+    this.package.addField("overrides", {
+      "glob@>=9.0.0 <14.0.2": "^14.0.2",
+      "minimatch@>=7.0.0 <11.0.1": "^11.0.1",
+    });
     this.addTestTasks();
     this.addTypescriptFiles("global.d.ts");
     // adding to project props doesn't seem to work as expected
